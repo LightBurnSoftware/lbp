@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LBP Documentation Preview</title>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: #fafafa;
+    color: #1a1a2e;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* Sidebar */
+  #sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #1a1a2e;
+    color: #ccc;
+    padding: 20px 0;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    overflow-y: auto;
+    z-index: 10;
+  }
+
+  #sidebar h1 {
+    font-size: 16px;
+    color: #fff;
+    padding: 0 20px 16px;
+    border-bottom: 1px solid #2a2a4e;
+    margin-bottom: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+  }
+
+  #sidebar a {
+    display: block;
+    padding: 8px 20px;
+    color: #aaa;
+    text-decoration: none;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+  }
+
+  #sidebar a:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  #sidebar a.active { color: #fff; border-left-color: #5b7fff; background: rgba(91,127,255,0.1); }
+
+  #sidebar .section-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #666;
+    padding: 16px 20px 6px;
+    font-weight: 600;
+  }
+
+  /* Content */
+  #content {
+    margin-left: 260px;
+    flex: 1;
+    padding: 40px 60px;
+    max-width: 900px;
+  }
+
+  .doc-section {
+    margin-bottom: 60px;
+    padding-bottom: 40px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+
+  .doc-section:last-child { border-bottom: none; }
+
+  /* Typography */
+  #content h1 { font-size: 28px; margin: 0 0 20px; color: #1a1a2e; font-weight: 700; }
+  #content h2 { font-size: 22px; margin: 32px 0 12px; color: #1a1a2e; font-weight: 600; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+  #content h3 { font-size: 17px; margin: 24px 0 8px; color: #333; font-weight: 600; }
+  #content h4 { font-size: 15px; margin: 20px 0 6px; color: #444; font-weight: 600; }
+  #content p { margin: 8px 0; line-height: 1.65; font-size: 15px; }
+  #content ul, #content ol { margin: 8px 0 8px 24px; line-height: 1.65; font-size: 15px; }
+  #content li { margin: 4px 0; }
+  #content strong { font-weight: 600; }
+  #content hr { border: none; border-top: 1px solid #e0e0e0; margin: 24px 0; }
+  #content em { font-style: italic; color: #555; }
+
+  /* Code */
+  #content code {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: #f0f0f0;
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+
+  #content pre {
+    background: #1e1e2e;
+    color: #cdd6f4;
+    padding: 16px 20px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+
+  #content pre code {
+    background: none;
+    padding: 0;
+    font-size: 13px;
+    color: inherit;
+  }
+
+  /* Tables */
+  #content table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+
+  #content th {
+    background: #f0f0f5;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+  }
+
+  #content td {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+  }
+
+  #content tr:nth-child(even) { background: #f8f8fa; }
+
+  /* Blockquotes (DRAFT markers) */
+  #content blockquote {
+    border-left: 4px solid #e8a735;
+    background: #fff8e6;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 14px;
+    color: #6b5900;
+  }
+
+  #content blockquote strong { color: #a57800; }
+
+  /* Loading */
+  #loading {
+    text-align: center;
+    padding: 60px;
+    color: #888;
+    font-size: 16px;
+  }
+
+  /* Server note */
+  #server-note {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 12px 20px;
+    margin-bottom: 24px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #664d03;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<nav id="sidebar">
+  <h1>LBP Documentation</h1>
+  <div class="section-label">Overview</div>
+  <a href="#index" class="active">Index</a>
+  <a href="#introduction">Introduction</a>
+  <div class="section-label">Specification</div>
+  <a href="#framing">Wire Format & Framing</a>
+  <a href="#job-control">Job Control</a>
+  <a href="#movement">Movement</a>
+  <a href="#laser">Laser Control</a>
+  <a href="#settings">Job Settings</a>
+  <a href="#state">Machine State</a>
+  <a href="#configuration">Configuration</a>
+  <div class="section-label">Advanced</div>
+  <a href="#files">File Transfer</a>
+  <a href="#tools">Tool Control</a>
+  <a href="#vendor-extensions">Vendor Extensions</a>
+</nav>
+
+<main id="content">
+  <div id="server-note">
+    <strong>Note:</strong> This preview requires a local HTTP server to load .md files.
+    Run <code>python3 -m http.server 8000</code> from the <code>docs/</code> directory
+    and open <code>http://localhost:8000/preview.html</code>
+  </div>
+  <div id="loading">Loading documentation...</div>
+</main>
+
+<script>
+const pages = [
+  { id: 'index', file: 'index.md' },
+  { id: 'introduction', file: 'introduction.md' },
+  { id: 'framing', file: 'framing.md' },
+  { id: 'job-control', file: 'job-control.md' },
+  { id: 'movement', file: 'movement.md' },
+  { id: 'laser', file: 'laser.md' },
+  { id: 'settings', file: 'settings.md' },
+  { id: 'state', file: 'state.md' },
+  { id: 'configuration', file: 'configuration.md' },
+  { id: 'files', file: 'files.md' },
+  { id: 'tools', file: 'tools.md' },
+  { id: 'vendor-extensions', file: 'vendor-extensions.md' },
+];
+
+marked.setOptions({
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      return hljs.highlight(code, { language: lang }).value;
+    }
+    return hljs.highlightAuto(code).value;
+  }
+});
+
+async function loadDocs() {
+  const content = document.getElementById('content');
+  const loading = document.getElementById('loading');
+  const serverNote = document.getElementById('server-note');
+  let html = serverNote.outerHTML;
+  let failed = false;
+
+  for (const page of pages) {
+    try {
+      const resp = await fetch(page.file);
+      if (!resp.ok) throw new Error(resp.statusText);
+      const md = await resp.text();
+      html += `<div class="doc-section" id="${page.id}">${marked.parse(md)}</div>`;
+    } catch (e) {
+      if (!failed) {
+        failed = true;
+        serverNote.style.display = 'block';
+      }
+      html += `<div class="doc-section" id="${page.id}"><h1>${page.file}</h1><p style="color:#c00">Failed to load: ${e.message}</p></div>`;
+    }
+  }
+
+  content.innerHTML = html;
+
+  // Re-highlight any code blocks marked missed the first pass
+  document.querySelectorAll('pre code').forEach(el => {
+    if (!el.classList.contains('hljs')) hljs.highlightElement(el);
+  });
+
+  // Show server note if we're on file:// protocol
+  if (window.location.protocol === 'file:') {
+    document.getElementById('server-note').style.display = 'block';
+  }
+}
+
+// Scroll-spy for sidebar
+function updateActiveLink() {
+  const sections = document.querySelectorAll('.doc-section');
+  const links = document.querySelectorAll('#sidebar a');
+  let current = '';
+
+  sections.forEach(section => {
+    const rect = section.getBoundingClientRect();
+    if (rect.top <= 100) current = section.id;
+  });
+
+  links.forEach(link => {
+    link.classList.toggle('active', link.getAttribute('href') === '#' + current);
+  });
+}
+
+window.addEventListener('scroll', updateActiveLink);
+loadDocs();
+</script>
+
+</body>
+</html>
