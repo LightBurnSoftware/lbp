@@ -22,9 +22,19 @@ add_library(lbp STATIC
 	include/lbp/spec.h
 )
 
-target_include_directories(lbp PUBLIC include)
+target_include_directories(lbp PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+	$<INSTALL_INTERFACE:include>
+)
 
 add_executable(TestLBP test/main.cpp)
 
 target_link_libraries(TestLBP PRIVATE lbp)
 
+install(TARGETS lbp
+	ARCHIVE DESTINATION lib
+	LIBRARY DESTINATION lib
+)
+install(DIRECTORY include/lbp
+	DESTINATION include
+)
