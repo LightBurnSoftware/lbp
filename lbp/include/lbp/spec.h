@@ -139,13 +139,12 @@ constexpr uint16_t cmd_mainboard_version = flag_files | 0x05B0; // TODO
 // ----------------------------------------------------------------------------
 constexpr uint16_t flag_settings = 0x5000; // (5 = "S", for "Settings")
 
+// Speed commands
 constexpr uint16_t flag_speed = flag_settings | 0x0100;
 
 constexpr uint16_t cmd_speed_xy	= flag_speed | flag_x | flag_y;
 constexpr uint16_t cmd_speed_z	= flag_speed | flag_z;
 constexpr uint16_t cmd_speed_u	= flag_speed | flag_u;
-
-constexpr uint16_t cmd_cut_type = flag_speed | 0x0CC7; // Settings: Cut, Cut Type
 
 // Boundary commands
 constexpr uint16_t flag_bounds_min = flag_settings | 0x0200;
@@ -161,7 +160,16 @@ constexpr uint16_t cmd_bounds_max_z = flag_bounds_max | flag_z;
 constexpr uint16_t cmd_bounds_min_u = flag_bounds_min | flag_u;
 constexpr uint16_t cmd_bounds_max_u = flag_bounds_max | flag_u;
 
-// Cut Settings Values
+// When this appears in a job header, all following absolute xy move commands
+// should be interpreted as relative to the following options.
+constexpr uint16_t cmd_cut_from = flag_settings | 0x0CCF; // int8 value, listed below.
+// options for cmd_cut_from
+constexpr uint8_t cut_from_current_position = 0x0; // The current position at the start of the job
+constexpr uint8_t cut_from_user_origin = 0x1; // The user origin (set by cfg_user_origin_x and cfg_user_origin_y) at the start of the job.
+constexpr uint8_t cut_from_absolute = 0x2; // Absolute machine coordinates.
+
+// Cut Type
+constexpr uint16_t cmd_cut_type = flag_settings | 0x0CC7;
 constexpr uint16_t flag_cut_type_scan_uni = 0x0100;
 constexpr uint16_t flag_cut_type_scan_bi = 0x0200;
 
@@ -270,10 +278,14 @@ constexpr uint32_t state_computing = 0x0040;		// machine is performing a non-tri
 // Position Queries
 constexpr uint16_t flag_pos = flag_state | 0x0100;
 
-constexpr uint16_t cmd_pos_axis_x = flag_pos | flag_x; // return int32 micrometers
-constexpr uint16_t cmd_pos_axis_y = flag_pos | flag_y; // return int32 micrometers
-constexpr uint16_t cmd_pos_axis_z = flag_pos | flag_z; // return int32 micrometers
-constexpr uint16_t cmd_pos_axis_u = flag_pos | flag_u; // return int32 micrometers
+constexpr uint16_t cmd_pos_x = flag_pos | flag_x; // return int32 micrometers
+constexpr uint16_t cmd_pos_y = flag_pos | flag_y; // return int32 micrometers
+constexpr uint16_t cmd_pos_z = flag_pos | flag_z; // return int32 micrometers
+constexpr uint16_t cmd_pos_u = flag_pos | flag_u; // return int32 micrometers
+
+constexpr uint16_t cmd_pos_xy = flag_pos | flag_x | flag_y; // return int32 micrometers (x, y)
+constexpr uint16_t cmd_pos_xyz = flag_pos | flag_x | flag_y | flag_z; // return int32 micrometers (x, y, z)
+constexpr uint16_t cmd_pos_xyzu = flag_pos | flag_x | flag_y | flag_z | flag_u; // return int32 micrometers (x, y, z, u)
 
 // TODO: machine lifespan queries
 constexpr uint16_t flag_total_time = flag_state | 0x0800;

@@ -57,7 +57,7 @@ Vec4 operator/(const Vec4 &vec, int32_t d)
 	return product;
 }
 
-void Vec4::Reset()
+void Vec4::reset()
 {
 	x = 0;
 	y = 0;

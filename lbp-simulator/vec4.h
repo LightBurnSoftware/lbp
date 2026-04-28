@@ -19,7 +19,7 @@ struct Vec4
 
 	/** @return True if any of the four values are non-zero. */
 	explicit operator bool() const;
-	void Reset();
+	void reset();
 };
 
 Vec4 operator+(const Vec4 &a, const Vec4 &b);

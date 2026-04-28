@@ -29,8 +29,9 @@ static Vec4 calcVelocity(const Vec4 &delta, int32_t magnitude )
 	return result;
 }
 
-MovementSim::MovementSim()
-	: m_max_pos(300000, 180000, 120000, 60000) // hardcoded for now.
+MovementSim::MovementSim(Configuration &config)
+	: m_config(config)
+	, m_max_pos(300000, 180000, 120000, 60000) // hardcoded for now.
 {
 	// Empty
 }
@@ -40,22 +41,46 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	const uint16_t cmd = request.cmd();
 
 	switch (cmd) {
-	case lbp::cmd_pos_axis_x:
+	case lbp::cmd_pos_x:
 		gLog().push(Log::DEBUG, QString("X Axis Query: %1").arg(m_pos.x));
 		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.x));
 		return true;
-	case lbp::cmd_pos_axis_y:
+	case lbp::cmd_pos_y:
 		gLog().push(Log::DEBUG, QString("Y Axis Query: %1").arg(m_pos.y));
 		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.y));
 		return true;
-	case lbp::cmd_pos_axis_z:
+	case lbp::cmd_pos_z:
 		gLog().push(Log::DEBUG, QString("Z Axis Query: %1").arg(m_pos.z));
 		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.z));
 		return true;
-	case lbp::cmd_pos_axis_u:
+	case lbp::cmd_pos_u:
 		gLog().push(Log::DEBUG, QString("U Axis Query: %1").arg(m_pos.u));
 		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.u));
 		return true;
+	case lbp::cmd_pos_xy: {
+		lbp::CmdMsg m(cmd, 8);
+		m.writeInt(m_pos.x);
+		m.writeInt(m_pos.y);
+		out_q.push(m);
+		return true;
+	}
+	case lbp::cmd_pos_xyz: {
+		lbp::CmdMsg m(cmd, 12);
+		m.writeInt(m_pos.x);
+		m.writeInt(m_pos.y);
+		m.writeInt(m_pos.z);
+		out_q.push(m);
+		return true;
+	}
+	case lbp::cmd_pos_xyzu: {
+		lbp::CmdMsg m(cmd, 16);
+		m.writeInt(m_pos.x);
+		m.writeInt(m_pos.y);
+		m.writeInt(m_pos.z);
+		m.writeInt(m_pos.u);
+		out_q.push(m);
+		return true;
+	}
 	case lbp::cmd_jog_x_pos_start:
 		startJog(Vec4(1, 0, 0, 0));
 		out_q.push(lbp::CmdMsg(cmd));
@@ -120,6 +145,8 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
+	case lbp::cmd_cut_from:
+	case lbp::cmd_cut_type:
 	case lbp::cmd_home_xy:
 	case lbp::cmd_home_z:
 	case lbp::cmd_speed_xy:
@@ -179,13 +206,13 @@ MovementSim::State MovementSim::updateTarget()
 			target.z = 0;
 			break;
 		case lbp::cmd_move_abs_x:
-			target.x = p.readIntArg();
+			target.x = p.readIntArg() + m_job_origin.x;
 			break;
 		case lbp::cmd_move_rel_x:
 			target.x += p.readIntArg();
 			break;
 		case lbp::cmd_move_abs_y:
-			target.y = p.readIntArg();
+			target.y = p.readIntArg() + m_job_origin.y;
 			break;
 		case lbp::cmd_move_rel_y:
 			target.y += p.readIntArg();
@@ -203,8 +230,8 @@ MovementSim::State MovementSim::updateTarget()
 			target.u += p.readIntArg();
 			break;
 		case lbp::cmd_move_abs_xy:
-			target.x = p.readIntArg();
-			target.y = p.readIntArg();
+			target.x = p.readIntArg() + m_job_origin.x;
+			target.y = p.readIntArg() + m_job_origin.y;
 			break;
 		case lbp::cmd_move_rel_xy:
 			target.x += p.readIntArg();
@@ -266,6 +293,22 @@ MovementSim::State MovementSim::updateTarget()
 			m_dwell_ms = p.readIntArg();
 			m_dwell_acc_ms = 0;
 			return MovementSim::State::Dwelling;
+		case lbp::cmd_cut_from:
+			switch (p.readByteArg()) {
+			case lbp::cut_from_current_position:
+				m_job_origin.x = m_pos.x;
+				m_job_origin.y = m_pos.y;
+				break;
+			case lbp::cut_from_user_origin:
+				m_config.get(lbp::cfg_user_origin_x, m_job_origin.x);
+				m_config.get(lbp::cfg_user_origin_y, m_job_origin.y);
+				break;
+			case lbp::cut_from_absolute:
+			default:
+				m_job_origin.reset();
+				break;
+			}
+			break;
 		case lbp::cmd_job_header_begin:
 		case lbp::cmd_job_header_end:
 		case lbp::cmd_job_body_begin:
@@ -274,8 +317,11 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_frame_begin:
 		case lbp::cmd_frame_end:
 		case lbp::cmd_job_begin:
+			m_job_cmd = p.cmd();
+			break;
 		case lbp::cmd_job_end:
 			m_job_cmd = p.cmd();
+			m_job_origin.reset();
 			break;
 		default:
 			gLog().push(Log::ERROR, QString("unexpected queued move command %1").arg(p.cmd()));
@@ -295,7 +341,7 @@ MovementSim::State MovementSim::updateTarget()
 
 void MovementSim::stop()
 {
-	m_vel.Reset();
+	m_vel.reset();
 	m_target_pos = m_pos;
 	m_state = MovementSim::State::Idle;
 	while (!m_cmd_q.empty()) {
