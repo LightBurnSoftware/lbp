@@ -104,15 +104,15 @@ constexpr uint16_t flag_laser = 0x1000; // (1 = "L", for "Laser")
 
 constexpr uint16_t cmd_laser_power_min	= flag_laser | 0x05A0; // int8 laser index, int16 percent of max power
 constexpr uint16_t cmd_laser_power_max	= flag_laser | 0x05A1; // int8 laser index, int16 percent of max power
-constexpr uint16_t cmd_laser_freq 		= flag_laser | 0x05F0; // int8 laser index, int32 frequency (TODO unit)
+constexpr uint16_t cmd_laser_freq 		= flag_laser | 0x05F0; // int8 laser index, int32 frequency (Hz)
 constexpr uint16_t cmd_laser_enable 	= flag_laser | 0x05E1; // int8 laser index (choose which laser(s) is the cut default.)
 constexpr uint16_t cmd_laser_disable 	= flag_laser | 0x05E2; // int8 laser index, (choose which lasers(s) is the cut default.)
-constexpr uint16_t cmd_laser_offset_xy	= flag_laser | 0x05B0 | flag_x | flag_y; // int8 laser index, int32 x, y offsets (um)
 
 constexpr uint16_t cmd_laser_off 		= flag_laser | 0x05C1; // int8 laser index (0 for the lasers enabled with cmd_laser_enable)
 constexpr uint16_t cmd_laser_on 		= flag_laser | 0x05C2; // int8 laser index (0 for the lasers enabled with cmd_laser_enable)
 
 constexpr uint16_t cmd_focus_z 			= flag_laser | 0x0F00 | flag_z; // arguments TODO
+constexpr uint16_t cmd_laser_offset_xy	= flag_laser | 0x05B0 | flag_x | flag_y; // int8 laser index, int32 x, y offsets (um) // TODO
 
 // ----------------------------------------------------------------------------
 // 0x0004: Files --------------------------------------------------------------
@@ -142,9 +142,11 @@ constexpr uint16_t flag_settings = 0x5000; // (5 = "S", for "Settings")
 // Speed commands
 constexpr uint16_t flag_speed = flag_settings | 0x0100;
 
-constexpr uint16_t cmd_speed_xy	= flag_speed | flag_x | flag_y;
-constexpr uint16_t cmd_speed_z	= flag_speed | flag_z;
-constexpr uint16_t cmd_speed_u	= flag_speed | flag_u;
+constexpr uint16_t cmd_speed_xy = flag_speed | flag_x | flag_y;
+constexpr uint16_t cmd_speed_x = flag_speed | flag_x;
+constexpr uint16_t cmd_speed_y = flag_speed | flag_y;
+constexpr uint16_t cmd_speed_z = flag_speed | flag_z;
+constexpr uint16_t cmd_speed_u = flag_speed | flag_u;
 
 // Boundary commands
 constexpr uint16_t flag_bounds_min = flag_settings | 0x0200;
@@ -162,11 +164,11 @@ constexpr uint16_t cmd_bounds_max_u = flag_bounds_max | flag_u;
 
 // When this appears in a job header, all following absolute xy move commands
 // should be interpreted as relative to the following options.
-constexpr uint16_t cmd_cut_from = flag_settings | 0x0CCF; // int8 value, listed below.
+constexpr uint16_t cmd_cut_from = flag_settings | 0x0CCF; // arg: int8 value, listed below.
 // options for cmd_cut_from
-constexpr uint8_t cut_from_current_position = 0x0; // The current position at the start of the job
-constexpr uint8_t cut_from_user_origin = 0x1; // The user origin (set by cfg_user_origin_x and cfg_user_origin_y) at the start of the job.
-constexpr uint8_t cut_from_absolute = 0x2; // Absolute machine coordinates.
+constexpr uint8_t cut_from_current_position = 0x0;
+constexpr uint8_t cut_from_user_origin = 0x1;
+constexpr uint8_t cut_from_absolute = 0x2;
 
 // Cut Type
 constexpr uint16_t cmd_cut_type = flag_settings | 0x0CC7;
