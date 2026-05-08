@@ -187,33 +187,36 @@ constexpr uint16_t cut_type_scan_bi_y = flag_cut_type_scan_bi | flag_y;
 // ----------------------------------------------------------------------------
 constexpr uint16_t flag_move = 0x6000; // (6 = "G", for "Go")
 
-constexpr uint16_t flag_move_abs = flag_move | 0x0A00;
-constexpr uint16_t flag_move_rel = flag_move | 0x0100;
+constexpr uint16_t flag_travel_abs = flag_move | 0x0A00;
+constexpr uint16_t flag_travel_rel = flag_move | 0x0B00;
+
+constexpr uint16_t flag_cut_abs = flag_move | 0x0C00;
+constexpr uint16_t flag_cut_rel = flag_move | 0x0D00;
 
 // Discrete Movement Commands: Argument: one signed int32 (micrometers) per indicated axis.
-constexpr uint16_t cmd_move_rel_x = flag_move_rel | flag_x;
-constexpr uint16_t cmd_move_rel_y = flag_move_rel | flag_y;
-constexpr uint16_t cmd_move_rel_z = flag_move_rel | flag_z;
-constexpr uint16_t cmd_move_rel_u = flag_move_rel | flag_u;
+constexpr uint16_t cmd_travel_rel_x = flag_travel_rel | flag_x;
+constexpr uint16_t cmd_travel_rel_y = flag_travel_rel | flag_y;
+constexpr uint16_t cmd_travel_rel_z = flag_travel_rel | flag_z;
+constexpr uint16_t cmd_travel_rel_u = flag_travel_rel | flag_u;
 
-constexpr uint16_t cmd_move_rel_xy = flag_move_rel | flag_x | flag_y;
-constexpr uint16_t cmd_move_rel_xyz = flag_move_rel | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_move_rel_xyzu = flag_move_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_travel_rel_xy = flag_travel_rel | flag_x | flag_y;
+constexpr uint16_t cmd_travel_rel_xyz = flag_travel_rel | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_travel_rel_xyzu = flag_travel_rel | flag_x | flag_y | flag_z | flag_u;
 
-constexpr uint16_t cmd_move_abs_x =	flag_move_abs | flag_x;
-constexpr uint16_t cmd_move_abs_y =	flag_move_abs | flag_y;
-constexpr uint16_t cmd_move_abs_z =	flag_move_abs | flag_z;
-constexpr uint16_t cmd_move_abs_u =	flag_move_abs | flag_u;
+constexpr uint16_t cmd_travel_abs_x =	flag_travel_abs | flag_x;
+constexpr uint16_t cmd_travel_abs_y =	flag_travel_abs | flag_y;
+constexpr uint16_t cmd_travel_abs_z =	flag_travel_abs | flag_z;
+constexpr uint16_t cmd_travel_abs_u =	flag_travel_abs | flag_u;
 
-constexpr uint16_t cmd_move_abs_xy = flag_move_abs | flag_x | flag_y;
-constexpr uint16_t cmd_move_abs_xyz = flag_move_abs | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_move_abs_xyzu = flag_move_abs | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_travel_abs_xy = flag_travel_abs | flag_x | flag_y;
+constexpr uint16_t cmd_travel_abs_xyz = flag_travel_abs | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_travel_abs_xyzu = flag_travel_abs | flag_x | flag_y | flag_z | flag_u;
 
 // Continuous jog moves
+constexpr uint16_t flag_jog_pos_start	= flag_move | 0x0100;
 constexpr uint16_t flag_jog_pos_stop	= flag_move | 0x0200;
-constexpr uint16_t flag_jog_pos_start	= flag_move | 0x0300;
+constexpr uint16_t flag_jog_neg_start	= flag_move | 0x0300;
 constexpr uint16_t flag_jog_neg_stop	= flag_move | 0x0400;
-constexpr uint16_t flag_jog_neg_start	= flag_move | 0x0500;
 
 constexpr uint16_t cmd_jog_x_pos_start	= flag_jog_pos_start | flag_x;
 constexpr uint16_t cmd_jog_x_pos_stop 	= flag_jog_pos_stop | flag_x;
@@ -234,6 +237,25 @@ constexpr uint16_t cmd_jog_u_pos_start	= flag_jog_pos_start | flag_u;
 constexpr uint16_t cmd_jog_u_pos_stop	= flag_jog_pos_stop | flag_u;
 constexpr uint16_t cmd_jog_u_neg_start	= flag_jog_neg_start | flag_u;
 constexpr uint16_t cmd_jog_u_neg_stop 	= flag_jog_neg_stop | flag_u;
+
+// Discrete Movement Commands: Argument: one signed int32 (micrometers) per indicated axis.
+constexpr uint16_t cmd_cut_rel_x = flag_cut_rel | flag_x;
+constexpr uint16_t cmd_cut_rel_y = flag_cut_rel | flag_y;
+constexpr uint16_t cmd_cut_rel_z = flag_cut_rel | flag_z;
+constexpr uint16_t cmd_cut_rel_u = flag_cut_rel | flag_u;
+
+constexpr uint16_t cmd_cut_rel_xy = flag_cut_rel | flag_x | flag_y;
+constexpr uint16_t cmd_cut_rel_xyz = flag_cut_rel | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_cut_rel_xyzu = flag_cut_rel | flag_x | flag_y | flag_z | flag_u;
+
+constexpr uint16_t cmd_cut_abs_x = flag_cut_abs | flag_x;
+constexpr uint16_t cmd_cut_abs_y = flag_cut_abs | flag_y;
+constexpr uint16_t cmd_cut_abs_z = flag_cut_abs | flag_z;
+constexpr uint16_t cmd_cut_abs_u = flag_cut_abs | flag_u;
+
+constexpr uint16_t cmd_cut_abs_xy = flag_cut_abs | flag_x | flag_y;
+constexpr uint16_t cmd_cut_abs_xyz = flag_cut_abs | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_cut_abs_xyzu = flag_cut_abs | flag_x | flag_y | flag_z | flag_u;
 
 // Dwell
 constexpr uint16_t cmd_dwell = flag_move | 0x02B; // int32 duration (microseconds)

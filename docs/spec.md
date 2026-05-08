@@ -64,6 +64,13 @@ Consider the command `cmd_move_abs_xy` ("Absolute Move in X and Y"):
 Put together, a developer inspecting LBP messages on the wire can read this quite easily.
 
 ## Moving the Laser
+LBP provides two broad categories of laser movement: **travel** and **cut**.
+**Travel**  commands indicate that the laser is not *expected* to be cutting and simply needs to move to the desired
+location as efficiently as possible.
+**Cut** commands indicate that the movement is in the context of a cutting or engraving job. LBP provides this distinction
+to aid the firmware in motion planning decisions.
+
+
 There are three broad categories of move commands:
 - Absolute moves
 - Relative moves
@@ -181,7 +188,7 @@ in addition to any respective numerical arguments. This index is `1`-based, with
 | `cmd_laser_disable`   | int8 laser index                           | 3              |
 | `cmd_laser_power_max` | int8 laser index, int16 max power (%)*     | 5              |
 | `cmd_laser_power_min` | int8 laser index, int16 max power (%)*     | 5              |
-| `cmd_laser_freq`      | int8 laser index, int32 pwm frequency (Hz) | 7              |
+| `cmd_laser_freq`      | int8 laser index, int32 PWM frequency (Hz) | 7              |
 
 These laser settings are expected to persist until the respective commands are sent again.
 
@@ -189,16 +196,18 @@ These laser settings are expected to persist until the respective commands are s
 Before embarking on a cut, LB will send `cmd_laser_enable` (and possibly `cmd_laser_disable`) messages
 to dictate which lasers are being utilized for a cut.
 
-Unlike other laser commands, a laser index value of `0` is not valid for these commands, since these commands
-are those that give the `0` index argument its meaning.
+A laser index value of `0` is **not** valid for `cmd_laser_enable`, since `cmd_laser_enable` is the command that
+gives the `0` index its meaning for other commands.
+
+A laser index value of `0` **is** valid for `cmd_laser_disable`, and will disable **all** laser tubes.
 
 ### Laser Power
 Laser power for a cut is sent as a percentage of the laser's configured maximum output power.
 The minimum and maximum output power for each laser involved in a cut should be sent before turning the laser on and moving.
 
 ### \*Note: Percentages in LBP
-All percentages in LBP are represented as int16 arguments, where each integer value is 1/16384 of 100%, or `1/163.84 %`.
-For example, `100%` is represented as `16384`, `50%` is represented as `8192`, and `1%` is represented as `165`.
+All percentages in LBP are represented as unsigned 16-bit integer arguments, where each integer value is 1/65535 of 100%, or `1/655.35 %`.
+For example, `100%` is represented as `65535`, `50%` as `32768`, and `1%` as `655`.
 
 ### Laser Frequency (PWM)
 In addition to power, it is also necessary to set the laser's PWM frequency. This is given in int32 Hz.
