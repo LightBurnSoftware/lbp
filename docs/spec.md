@@ -54,41 +54,200 @@ When appropriate, the LSB (Least Significant Nibble) of certain commands may con
 or some logical-OR combinations thereof.
 
 ### Composition Example:
-Consider the command `cmd_move_abs_xy` ("Absolute Move in X and Y"):
+Consider the command `cmd_travel_abs_xy` ("Travel to Absolute X and Y position"):
 
 `0x6A03` is composed of:
 - `0x6000`: MSB for "movement."
-- `0x0A00`: Indicates an "absolute" move.
+- `0x0A00`: Indicates an "absolute cut" move.
 - `0x0003`: Flags for both X and Y axes are set.
 
 Put together, a developer inspecting LBP messages on the wire can read this quite easily.
 
 ## Moving the Laser
-LBP provides two broad categories of laser movement: **travel** and **cut**.
-**Travel**  commands indicate that the laser is not *expected* to be cutting and simply needs to move to the desired
-location as efficiently as possible.
-**Cut** commands indicate that the movement is in the context of a cutting or engraving job. LBP provides this distinction
-to aid the firmware in motion planning decisions.
+LBP provides many categories of movement commands. This is to give the firmware **context** for the movement.
+The first broad categorical distinction is whether the move is an "operator" move or a "programmed" move.
+
+- **Operator** moves originate outside the context of a programmed job. The user is pressing buttons or other controls
+in LightBurn to move the laser in real time.
+- **Programmed** moves occur in the context of a job.
+
+Within these categories are further distinctions. Both **operator** and **programmed** moves may be either **absolute** or **relative**,
+with **operator** moves also having the option of being **continuous**. **Programmed** moves provide additional context of **cut** vs **travel**,
+which may effect how the firmware plans the movement. In addition, the **homing** is considered an **operator** move.
+So, all together, we have:
+
+**Operator**
+- **home**: move the laser to its **home** position on any or all axes.
+- **jog start**: start a continuous movement on a particular axis.
+- **jog stop**: stop a continuous movement on a particular axis.
+- **jog step**: step the laser by a certain distance from its current position. Think of this as a "relative operator move."
+- **goto**: move the laser directly to a certain absolute position. Think of this as an "absolute operator move."
+
+**Programmed**:
+- **relative travel**: move the laser a specified distance from its current position. It is **not expected** that the laser is cutting.
+- **absolute travel**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
+- **relative cut**: move the laser a specified distance from its current position. The laser **is expected** to be active and cutting.
+- **absolute cut**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`).The laser **is expected** to be active and cutting.
+- **dwell**: perform no movement for a specified number of milliseconds.
+
+These distinctions exist to provide the firmware with as much **context** as possible for the command. They also allow for more granular
+configuration of default speeds and movement behaviors. The intention is to help make LBP-capable firmware easier to write and maintain.
+
+**Note**: These **programmed movement** commands **do not** automatically turn the laser on or off. The user is expected to program those commands separately,
+prior to the movement commands.
+
+#### TODO: Galvanometer Movement
+How these movement commands may differ for galvanometer movement is yet to be designed.
+We may either define different commands, or specify that the same commands are to be interpreted with different units.
+
+### Movement Speed
+These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands, see below).
+If no speed has been set by the user since the last power cycle,
+the laser should move at the rate specified by configured defaults.
+
+#### TODO: Granular Movement Speed Commands
+It may be useful to define different speed commands for the different kinds of movement.
+We may do this in the future. For now, `cmd_speed_*` overrides default behavior for all moves,
+and most movement commands are expected to be preceeded with a `cmd_speed_*` if they wish to
+have different speeds than preceding movements.
+
+### Operator Movements
+These commands are expected to originate from a movement panel in the user interface. The user is issuing movement commands to the machine live
+and expects the machine to respond in real time.
+
+#### Go To (Absolute Operator Move)
+Go To commands move the laser to the specified position along the command's indicated axis.
+Each command includes one 32-bit integer argument corresponding to the desired axis position in micrometers.
+
+| Command         | Arguments (Axis positions in micrometers) | Payload Length |
+|-----------------|-------------------------------------------|----------------|
+| `cmd_goto_x`    | int32 X (μm)                              | 6              |
+| `cmd_goto_y`    | int32 Y (μm)                              | 6              |
+| `cmd_goto_z`    | int32 Z (μm)                              | 6              |
+| `cmd_goto_u`    | int32 U (μm)                              | 6              |
+| `cmd_goto_xy`   | int32 X, int32 Y (μm)                     | 10             |
+| `cmd_goto_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
+| `cmd_goto_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+
+**Note**: Go To command coordinates are to be interpreted relative to the machine's absolute zero.
+
+#### Jog Step (Relative Operator Move)
+
+| Command             | Arguments (Axis positions in micrometers) | Payload Length |
+|---------------------|-------------------------------------------|----------------|
+| `cmd_jog_step_x`    | int32 X (μm)                              | 6              |
+| `cmd_jog_step_y`    | int32 Y (μm)                              | 6              |
+| `cmd_jog_step_z`    | int32 Z (μm)                              | 6              |
+| `cmd_jog_step_u`    | int32 U (μm)                              | 6              |
+| `cmd_jog_step_xy`   | int32 X, int32 Y (μm)                     | 10             |
+| `cmd_jog_step_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
+| `cmd_jog_step_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
 
 
-There are three broad categories of move commands:
-- Absolute moves
-- Relative moves
-- Continuous moves
+#### Jog Start/Stop (Continuous Operator Move)
+Continuous movements are different from Absolute (Goto) or Relative (Jog Step) moves in that they have no distance or positional arguments.
+In fact, they have **no arguments at all**.
+They consist simply of "start" or "stop" commands for movement along a specified axis.
 
-The firmware responds to all movement commands upon receipt with a message consisting of the
-same command and no arguments. For example, the response to a `cmd_move_abs_xy` message is:
+Upon receipt of a "start" command, the firmware is expected to start moving the laser along the axis and direction encoded in the command.
+The firmware is expected to continue moving the laser until either the respective "stop" command is received, a higher-priority
+or contradictory command is received, or a fault occurs (such as contact with a machine boundary).
 
-| Command             | Arguments | Payload Length |
-|---------------------|-----------|----------------|
-| `cmd_move_abs_xy`   | None      | 2              |
+| Command               | Description                            | Payload Length |
+|-----------------------|----------------------------------------|----------------|
+| `cmd_jog_start_pos_x` | Start moving along the positive x axis | 2              |
+| `cmd_jog_stop_pos_x`  | Stop moving along the positive x axis  | 2              |
+| `cmd_jog_start_neg_x` | Start moving along the negative x axis | 2              |
+| `cmd_jog_stop_neg_x`  | Stop moving along the negative x axis  | 2              |
+| `cmd_jog_start_pos_y` | Start moving along the positive y axis | 2              |
+| `cmd_jog_stop_pos_y`  | Stop moving along the positive y axis  | 2              |
+| `cmd_jog_start_neg_y` | Start moving along the negative y axis | 2              |
+| `cmd_jog_stop_neg_y`  | Stop moving along the negative y axis  | 2              |
+| `cmd_jog_start_pos_z` | Start moving along the positive z axis | 2              |
+| `cmd_jog_stop_pos_z`  | Stop moving along the positive z axis  | 2              |
+| `cmd_jog_start_neg_z` | Start moving along the negative z axis | 2              |
+| `cmd_jog_stop_neg_z`  | Stop moving along the negative z axis  | 2              |
+| `cmd_jog_start_pos_u` | Start moving along the positive u axis | 2              |
+| `cmd_jog_stop_pos_u`  | Stop moving along the positive u axis  | 2              |
+| `cmd_jog_start_neg_u` | Start moving along the negative u axis | 2              |
+| `cmd_jog_stop_neg_u`  | Stop moving along the negative u axis  | 2              |
+
+This specification neither forbids nor requires the capability for simultaneous axis jogging -
+it simply provides the command definitions.
+If the user sends `cmd_jog_x_pos_start` immediately followed by `cmd_jog_y_pos_start`, and
+your hardware is capable of said movement, we leave the resulting behaviour to your discretion.
+It is reasonable to either cancel the X jog and begin a Y Jog, begin jogging diagonally, or cancel both requests.
+
+#### Movement Command Response
+The firmware responds to all operator movement commands upon receipt with a message consisting of the
+same command and no arguments. For example, the response to a `cmd_goto_xy` message is:
+
+| Command         | Arguments | Payload Length |
+|-----------------|-----------|----------------|
+| `cmd_goto_xy`   | None      | 2              |
 
 This response is sent immediately upon receipt of the command, and is sent whether the move
 succeeds or fails. The firmware is not required to send any positional update upon move completion.
 
-These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands).
-If no speed has been set by the user since the last power cycle,
-the laser should move at the rate specified by configured defaults.
+### Programmed Movements
+These commands are expected to appear in the context of an cutting/engraving job.
+
+#### Relative Moves
+Relative move commands move the laser by a specified distance (or **delta**) from its previous position at the start of the move.
+Each command includes one 32-bit integer argument corresponding to the desired axis delta in micrometers.
+
+| Command               | Arguments (axis distance in micrometers) | Payload Length |
+|-----------------------|------------------------------------------|----------------|
+| `cmd_travel_rel_x`    | int32 X (μm)                             | 6              |
+| `cmd_travel_rel_y`    | int32 Y (μm)                             | 6              |
+| `cmd_travel_rel_z`    | int32 Z (μm)                             | 6              |
+| `cmd_travel_rel_u`    | int32 U (μm)                             | 6              |
+| `cmd_travel_rel_xy`   | int32 X, int32 Y (μm)                    | 10             |
+| `cmd_travel_rel_xyz`  | int32 X, int32 Y, int32 Z (μm)           | 14             |
+| `cmd_travel_rel_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+
+| Command               | Arguments (axis distance in micrometers) | Payload Length |
+|-----------------------|------------------------------------------|----------------|
+| `cmd_cut_rel_x`       | int32 X (μm)                             | 6              |
+| `cmd_cut_rel_y`       | int32 Y (μm)                             | 6              |
+| `cmd_cut_rel_z`       | int32 Z (μm)                             | 6              |
+| `cmd_cut_rel_u`       | int32 U (μm)                             | 6              |
+| `cmd_cut_rel_xy`      | int32 X, int32 Y (μm)                    | 10             |
+| `cmd_cut_rel_xyz`     | int32 X, int32 Y, int32 Z (μm)           | 14             |
+| `cmd_cut_rel_xyzu`    | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+
+#### Absolute Moves
+
+| Command               | Arguments (Axis positions in micrometers) | Payload Length |
+|-----------------------|-------------------------------------------|----------------|
+| `cmd_travel_abs_x`    | int32 X (μm)                              | 6              |
+| `cmd_travel_abs_y`    | int32 Y (μm)                              | 6              |
+| `cmd_travel_abs_z`    | int32 Z (μm)                              | 6              |
+| `cmd_travel_abs_u`    | int32 U (μm)                              | 6              |
+| `cmd_travel_abs_xy`   | int32 X, int32 Y (μm)                     | 10             |
+| `cmd_travel_abs_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
+| `cmd_travel_abs_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+
+
+| Command               | Arguments (Axis positions in micrometers) | Payload Length |
+|-----------------------|-------------------------------------------|----------------|
+| `cmd_cut_abs_x`       | int32 X (μm)                              | 6              |
+| `cmd_cut_abs_y`       | int32 Y (μm)                              | 6              |
+| `cmd_cut_abs_z`       | int32 Z (μm)                              | 6              |
+| `cmd_cut_abs_u`       | int32 U (μm)                              | 6              |
+| `cmd_cut_abs_xy`      | int32 X, int32 Y (μm)                     | 10             |
+| `cmd_cut_abs_xyz`     | int32 X, int32 Y, int32 Z (μm)            | 14             |
+| `cmd_cut_abs_xyzu`    | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+
+**Note** In the context of a job, absolute moves in X and Y have the option to be sent relative to a specified origin. This origin is set with the command `cmd_cut_from` and should be set as part of the **Job Header** (see below).
+
+#### Dwell
+While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of milliseconds.
+This can occur whether the laser is on or off.
+
+| Command     | Arguments (code)   | Payload Length |
+|-------------|--------------------|----------------|
+| `cmd_dwell` | int32 milliseconds | 6              |
 
 ### Setting movement speed
 Setting the movement speed is done using the following command codes:
@@ -103,79 +262,6 @@ Setting the movement speed is done using the following command codes:
 
 `cmd_speed_x` and `cmd_speed_y` are provided for machines that cannot move diagonally,
 or whose x and y axis movement mechanisms meaningfully differ.
-
-### Absolute Moves
-Absolute move commands move the laser to the specified position along the command's indicated axis.
-Each command includes one 32-bit integer argument corresponding to the desired axis position in micrometers.
-
-| Command             | Arguments (Axis positions in micrometers) | Payload Length |
-|---------------------|-------------------------------------------|----------------|
-| `cmd_move_abs_x`    | int32 X (μm)                              | 6              |
-| `cmd_move_abs_y`    | int32 Y (μm)                              | 6              |
-| `cmd_move_abs_z`    | int32 Z (μm)                              | 6              |
-| `cmd_move_abs_u`    | int32 U (μm)                              | 6              |
-| `cmd_move_abs_xy`   | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_move_abs_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_move_abs_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
-
-#### Job Cut Origin
-In the context of a job, absolute moves in X and Y have the option to be sent relative to a specified origin.
-
-This origin is set with the command `cmd_cut_from` and should be set as part of the **Job Header** (see below).
-
-| Command           | Arguments (code) | Payload Length |
-|-------------------|------------------|----------------|
-| `cmd_cut_from`    | int8 code        | 3              |
-
-This origin, represented as a single-byte argument, can be either:
-
-- `cut_from_user_origin`: The User Origin, specified using configuration commands (see below).
-- `cut_from_current_position`: The laser's XY position at the start of the job.
-- `cut_from_absolute`: The laser's machine-specified `(0, 0)`.
-
-
-### Relative Moves
-Relative move commands move the laser by a specified distance (or **delta**) from its previous position at the start of the move.
-Each command includes one 32-bit integer argument corresponding to the desired axis delta in micrometers.
-
-| Command             | Arguments (axis distance in micrometers) | Payload Length |
-|---------------------|------------------------------------------|----------------|
-| `cmd_move_rel_x`    | int32 X (μm)                             | 6              |
-| `cmd_move_rel_y`    | int32 Y (μm)                             | 6              |
-| `cmd_move_rel_z`    | int32 Z (μm)                             | 6              |
-| `cmd_move_rel_u`    | int32 U (μm)                             | 6              |
-| `cmd_move_rel_xy`   | int32 X, int32 Y (μm)                    | 10             |
-| `cmd_move_rel_xyz`  | int32 X, int32 Y, int32 Z (μm)           | 14             |
-| `cmd_move_rel_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
-
-### Continuous Moves (Jog)
-Continuous movements are different from Absolute or Relative moves in that they have no distance or positional arguments.
-They consist simply of "start" or "stop" commands for movement along a specified axis.
-
-Upon receipt of a "start" command, the firmware is expected to start moving the laser along the axis and direction encoded in the command.
-The firmware is expected to continue moving the laser until either the respective "stop" command is received, a higher-priority
-or contractictory command is received, or a fault occurs (such as contact with a machine boundary).
-
-| Command               | Description                            | Payload Length |
-|-----------------------|----------------------------------------|----------------|
-| `cmd_jog_x_pos_start` | Start moving along the positive x axis | 2              |
-| `cmd_jog_x_pos_stop`  | Stop moving along the positive x axis  | 2              |
-| `cmd_jog_y_pos_start` | Start moving along the positive y axis | 2              |
-| `cmd_jog_y_pos_stop`  | Stop moving along the positive y axis  | 2              |
-| `cmd_jog_z_pos_start` | Start moving along the positive z axis | 2              |
-| `cmd_jog_z_pos_stop`  | Stop moving along the positive z axis  | 2              |
-| `cmd_jog_u_pos_start` | Start moving along the positive u axis | 2              |
-| `cmd_jog_u_pos_stop`  | Stop moving along the positive u axis  | 2              |
-
-This specification neither forbids nor requires the capability for simultaneous axis jogging -
-it simply provides the command definitions.
-If the user sends `cmd_jog_x_pos_start` immediately followed by `cmd_jog_y_pos_start`, and
-your hardware is capable of said movement, we leave the resulting behaviour to your discretion.
-It is reasonable to either cancel the X jog and begin a Y Jog, begin jogging diagonally, or cancel both requests.
-
-#### TODO
-How these commands may differ for galvanometer movement is yet to be designed.
-We may either define different commands, or specify that the same commands are to be interpreted with different units.
 
 ## Controlling the Laser
 Your machine may have more than one laser tube. All laser control commands have 1-byte laser index argument
@@ -225,14 +311,81 @@ Once the laser settings have been sent, it is still necessary to turn the enable
 appropriate to send a laser index of `0` to apply these commands to the enabled laser tube(s).
 
 ## Making a Cut
+Generally, cuts or engravings will be programmed in the following pattern:
+1. Settings for the cut, if they differ from those for the previous cut, are sent with respective commands - lasers are enabled or disabled, laser power and frequency set set, movement speed is set.
+2. If the laser is not already at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_travel_xy`.
+3. `cmd_laser_on` and `cmd_cut_xy` are sent, turning on the laser(s) and performing the cut.
+
+## Raster Engraving
+To aid in motion planning, LBP offers a special command for encoding raster lines.
+
+| Command             | Arguments                      | Payload Length |
+|---------------------|--------------------------------|----------------|
+| `cmd_raster_power`  | 1 <= N <= 8 int16 power values | 6 - 16         |
+
+If the firmware receives this command, the next `cmd_cut_x`, `cmd_cut_y`, or `cmd_cut_xy` should be assumed to be a raster line.
+This `cmd_cut` will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
+The laser is to perform the movement at the set speed, changing output power as it moves to engrave all N in one pass.
 
 ## Composing a Job
+We use the term "job" to refer to a series of programmed commands that encode a complete cutting/engraving task for the laser.
+LBP uses commands with `_begin` and `_end` as bookend-style tags to indicate the context of these messages.
+
+| Command                | Payload Length | Description                                                     |
+|------------------------|----------------|-----------------------------------------------------------------|
+| `cmd_job_begin`        | 2              | Marks the start of job commands.                                |
+| `cmd_job_header_begin` | 2              | Marks the start of commands in the job header.                  |
+| `cmd_job_header_end`   | 2              | Marks the end of the job header.                                |
+| `cmd_job_body_begin`   | 2              | Marks the start of commands that make up the action of the job. |
+| `cmd_job_body_end`     | 2              | Marks the end of commands that make up the action of the job.   |
+| `cmd_job_end`          | 2              | Marks the end of job commands.                                  |
 
 ### The Job Header
 
+The Job header is a place to put settings that apply to the entire job.
+So far, this consists of:
+
+#### Job Cut Origin
+In the context of a job, absolute moves in X and Y have the option to be sent relative to a specified origin.
+
+| Command           | Arguments (code) | Payload Length |
+|-------------------|------------------|----------------|
+| `cmd_cut_from`    | int8 code        | 3              |
+
+This origin, represented as a single-byte argument, can be either:
+
+- `cut_from_user_origin`: The User Origin, specified using configuration commands (see below).
+- `cut_from_current_position`: The laser's XY position at the start of the job.
+- `cut_from_absolute`: The laser's machine-specified `(0, 0)`.
+
+#### Job Bounds
+LBP provides the following commands to inform the firmware of the boundaries of the job in absolute coordinates calculated from the previously-specified job origin.
+
+| Command               | Arguments (μm)           | Payload Length |
+|-----------------------|--------------------------|----------------|
+| `cmd_bounds_min_x`    | int32 minimum x position | 6              |
+| `cmd_bounds_max_x`    | int32 maximum x position | 6              |
+| `cmd_bounds_min_y`    | int32 minimum y position | 6              |
+| `cmd_bounds_max_y`    | int32 maximum y position | 6              |
+| `cmd_bounds_min_z`    | int32 minimum z position | 6              |
+| `cmd_bounds_max_z`    | int32 maximum z position | 6              |
+| `cmd_bounds_min_u`    | int32 minimum u position | 6              |
+| `cmd_bounds_max_u`    | int32 maximum u position | 6              |
+
 ### The Job Body
+This is where the action of the job is programmed. This will mostly consist of:
+- commands for applying laser settings
+- commands for applying cut settings
+- commands for traveling and cutting.
 
 ## Sending a Job
+
+
+### Files
+
+### TODO: Streaming vs. Files
+We intend to implement commands to allow LightBurn to ask the firmware what method of job delivery is preferred:
+command streaming or bulk delivery (in a file). These commands and workflows have not yet been designed.
 
 ## Framing
 
