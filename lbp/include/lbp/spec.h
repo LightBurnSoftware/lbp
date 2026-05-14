@@ -119,15 +119,8 @@ constexpr uint16_t cmd_laser_offset_xy	= flag_laser | 0x05B0 | flag_x | flag_y; 
 // ----------------------------------------------------------------------------
 constexpr uint16_t flag_files = 0x4000; // (4 starts with "F", for "Files")
 
-constexpr uint16_t cmd_get_filename		= flag_files | 0x0401; // TODO: int16 file index
-constexpr uint16_t cmd_set_filename		= flag_files | 0x0402; // TODO: int16 short file index
-constexpr uint16_t cmd_delete_file		= flag_files | 0x0403; // TODO: int16 file index
-constexpr uint16_t cmd_begin_file		= flag_files | 0x0404; // int32 file size
-constexpr uint16_t cmd_end_file			= flag_files | 0x0405; // Marks the end of a sent file.
-constexpr uint16_t cmd_new_file			= flag_files | 0x0406; // TODO
-constexpr uint16_t cmd_file_count		= flag_files | 0x0407; // TODO
-constexpr uint16_t cmd_file_time		= flag_files | 0x0408; // TODO
-constexpr uint16_t cmd_calc_file_time 	= flag_files | 0x0409; // TODO
+constexpr uint16_t cmd_file_begin		= flag_files | 0x0401; // Arg: int32 file size
+constexpr uint16_t cmd_file_end			= flag_files | 0x0402; // Marks the end of a sent file.
 constexpr uint16_t cmd_file_chunk		= flag_files | 0x04FC; // Mark a file chunk.
 
 // Filesystem queries:

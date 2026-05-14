@@ -327,7 +327,7 @@ If the firmware receives this command, the next `cmd_cut_x`, `cmd_cut_y`, or `cm
 This `cmd_cut` will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
 The laser is to perform the movement at the set speed, changing output power as it moves to engrave all N in one pass.
 
-## Composing a Job
+## Jobs
 We use the term "job" to refer to a series of programmed commands that encode a complete cutting/engraving task for the laser.
 LBP uses commands with `_begin` and `_end` as bookend-style tags to indicate the context of these messages.
 
@@ -378,15 +378,121 @@ This is where the action of the job is programmed. This will mostly consist of:
 - commands for applying cut settings
 - commands for traveling and cutting.
 
-## Sending a Job
-
-
 ### Files
+A LBP **file** is simply a concatenated list of a valid and complete LBP messages.
+(Including the message header, size, and checksum fields.)
+Thus, the bytes in a file can be parsed into payloads using the same algorithms as bytes coming in off the wire.
+
+### Receiving a File
+A **file** is sent with the following commands:
+
+| Command          | Arguments                | Payload Length        |
+|------------------|--------------------------|-----------------------|
+| `cmd_file_begin` | int32 file size in bytes | 6                     |
+| `cmd_file_chunk` | Slice of file content    | 2 ~ `size_file_chunk` |
+| `cmd_file_end`   | None                     | 2                     |
+
+Files are sent in messages of the maximum permitted size.
+Firmware is expected to use the argument of `cmd_file_begin` to prepare storage for the incoming file.
+It will then concatenate the arguments of all `cmd_file_chunk` messages in the order they are received.
+
+### TODO: File Chunk ordering.
+It may prove necessary to add a "sequence number" or "file offset" argument to each `cmd_file_chunk` message.
+
+### TODO: More filesystem commands
+More filesystem commands are planned but their designs are not finalized.
+Possible functionalities include:
+- Saving files to the machine.
+- Loading saved files
+- Listing all files saved on the machine.
+- Deleting files saved on the machine.
+
+### Executing a Job
+Lightburn will concatenate all the commands for a job into a **file** and send using the commands listed above.
+Once a file has been sent, Lightburn can send `cmd_execute` to begin execution of the currently loaded file.
+
+| Command        | Payload Length | Description                                    |
+|----------------|----------------|------------------------------------------------|
+| `cmd_execute`  | 2              | Execute the file currently loaded as a job.    |
+| `cmd_pause`    | 2              | Pause the job that is currently executing.     |
+| `cmd_continue` | 2              | Continue a paused job.                         |
+| `cmd_stop`     | 2              | Stop any job and/or cancel all queued actions. |
+
+One advantage of sending a job as a file is that a job can be sent once and then executed multiple times, enabling workflows
+such as manual moving of the material or changing the **user origin** between executions.
 
 ### TODO: Streaming vs. Files
 We intend to implement commands to allow LightBurn to ask the firmware what method of job delivery is preferred:
 command streaming or bulk delivery (in a file). These commands and workflows have not yet been designed.
 
 ## Framing
+**Framing** is a useful operation that Lightburn provides as a sanity check for its users.
+The laser is moved in such a way as to demonstrate the bounds of the cutting job.
+It can do this either as a simple bounding rectangle or a tight outline.
+
+There are no frame-specific movement commands, but LBP does provide bookend commands to let the firmware know that
+the contained movement commands are part of a framing operation.
+
+| Command            | Payload Length | Description                                                                     |
+|--------------------|----------------|---------------------------------------------------------------------------------|
+| `cmd_frame_begin`  | 2              | Indicates that all following movement commands are part of a framing operation. |
+| `cmd_frame_end`    | 2              | Marks the end of a framing operation.                                           |
+
+Framing operations can either be streamed or sent as a file.
+
+### TODO: Streaming vs. Files for Framing operations.
+It is intended that framing operations be either streamed or sent as a file. If sent as a file,
+we may require a some special commands to enable the firmware distinguish whether it should
+execute its most recently received job file or most recently recieved frame file.
+
+## Queries
+The responses to all commands discussed above have been quite simple - an acknowledgment consisting of the same command code and no arguments.
+We now introduce commands with non-trivial responses. These query commands do not have arguments, but their responses do.
+
+Let's start with the most straightforward queries: what is the current laser position?
+
+### Current Position
+The following queries are received from LightBurn with no arguments. The following table describes the responses.
+
+| Command (Query)  | Response Arguments (μm)                  | Payload Length |
+|------------------|------------------------------------------|----------------|
+| `cmd_pos_x`      | int32 X (μm)                             | 6              |
+| `cmd_pos_y`      | int32 Y (μm)                             | 6              |
+| `cmd_pos_z`      | int32 Z (μm)                             | 6              |
+| `cmd_pos_u`      | int32 U (μm)                             | 6              |
+| `cmd_pos_xy`     | int32 X, int32 Y (μm)                    | 10             |
+| `cmd_pos_xyz`    | int32 X, int32 Y, int32 Z (μm)           | 14             |
+| `cmd_pos_xyzu`   | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+
+These positions are expected to be reported in machine coordinates, relative to absolute machine zero.
+
+### Machine State
+"State" can mean a lot of things, but in the case of the query `cmd_get_state`, it refers to a set of flags which broadly describes what the machine is
+doing at the time of the query.
+
+| Command (Query)  | Response Arguments    | Payload Length |
+|------------------|-----------------------|----------------|
+| `cmd_get_state`  | int32 state flags     | 6              |
+
+The response argument is a logical-OR composition of one or more of the following flags:
+- `state_idle`: The machine is on, but not moving or executing any programmed commands.
+- `state_moving`: The machine is moving, either from operator or programmed commands.
+- `state_executing_job`: The machine is executing a job.
+- `state_executing_frame`: The machine is executing framing commands.
+- `state_paused`: The machine is paused mid-job.
+- `state_receiving`: The machine is currently receiving a file from LightBurn.
+- `state_file_loaded`: A file is loaded and ready to execute.
+- `state_computing`: The machine is performing a non-trivial calculation.
+
+Many simulatenous flags are possible - for example it is quite reasonable to be moving during a job.
+
+**Note:** More state flags may prove necessary as development continues.
 
 ## Configuration
+The machine's configuration represent characteristics or settings of the machine that are expected to persist between power settings.
+These may include default behaviors such as movement speeds, more granular characteristics such as acceleration values, or physical properties such as rotary dimensions.
+Configuration commands can either represent **get** or **set** operations, depending on whether the message includes arguments.
+
+### Configuration Query (Get)
+
+### Configuration Assignment (Set)
