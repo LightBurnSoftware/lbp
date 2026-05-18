@@ -493,6 +493,30 @@ The machine's configuration represent characteristics or settings of the machine
 These may include default behaviors such as movement speeds, more granular characteristics such as acceleration values, or physical properties such as rotary dimensions.
 Configuration commands can either represent **get** or **set** operations, depending on whether the message includes arguments.
 
+Configuration commands can be easily identified because their symbol names begin with the `cfg_`.
+
 ### Configuration Query (Get)
+Configuration Query (Get) messages use the Configuration code as their command code and have no arguments.
+The firmware is to respond to these messages with the same code and a 4-byte argument.
+Most of the time this is just a 32-bit integer, but flags are also possible.
+
+As an example, the firmware may receive a message containing `cfg_x_home_offset` and no arguments.
+This indicates a query for that configured value.
+
+| Command (Query)     | Response Arguments | Payload Length |
+|---------------------|--------------------|----------------|
+| `cfg_x_home_offset` | int32 X (μm)       | 6              |
+
+The firmware responds with the `int32` X homing offset in micrometers.
 
 ### Configuration Assignment (Set)
+
+**Setting** a configuration value actually requires two commands.
+LightBurn will send a message with the configuration code and a 32-bit argument.
+The firmware acknowledges this request with the same command and no arguments.
+LightBurn may then send many more configuration set messages. These are all responded to in turn.
+
+The firmware does not **latch** these new values, however, until it receives a message with the command code
+`cmd_commit_cfg`. Upon receipt of this message, all previous configuration set commands are completed.
+
+**Note**: Configuration queries return the last value for that configuration code that **has been committed**.
