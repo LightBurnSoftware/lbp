@@ -347,7 +347,7 @@ constexpr uint16_t cmd_total_travel_u = flag_total_travel | flag_u; // TODO: ret
 constexpr uint16_t flag_cfg = 0xC000; // "C" for "Config"
 
 // TODO: very few configurations are meaningfully implemented in the simulator.
-// units and flag definitions are subject to change.
+// codes, units, and flag definitions are subject to change.
 
 constexpr uint16_t cfg_head_dist = flag_cfg | 0x001E; // nanometers
 

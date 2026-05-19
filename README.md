@@ -35,7 +35,7 @@ It **begins** the operation and responds to the command **immediately** - **not*
 ```
 
 - **Header (4 bytes):** The 4-byte sequence `0x4452474E`, which is the ASCII encoding of `DRGN` (short for "dragon").
-- **Size (2 bytes):** A  integer which encodes the size, in bytes, of the following **Payload**.
+- **Size (2 bytes):** A 16-bit integer which encodes the size, in bytes, of the following **Payload**.
 - **Payload ("Size" bytes):** Always consists of a 2-byte Command, followed by 0 or more bytes of argument data. (This means that **Size** must always be `>= 2`)
 - **Checksum (2 bytes):** The CRC16 checksum of the **Payload**, computed over **only** the Payload data, **not** the Header of Size data. (See `checksum.cpp` for the crc16 algorithm.)
 
