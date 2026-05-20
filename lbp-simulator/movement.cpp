@@ -81,67 +81,67 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		out_q.push(m);
 		return true;
 	}
-	case lbp::cmd_jog_x_pos_start:
+	case lbp::cmd_jog_start_pos_x:
 		startJog(Vec4(1, 0, 0, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_x_pos_stop:
+	case lbp::cmd_jog_stop_pos_x:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_x_neg_start:
+	case lbp::cmd_jog_start_neg_x:
 		startJog(Vec4(-1, 0, 0, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_x_neg_stop:
+	case lbp::cmd_jog_stop_neg_x:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_y_pos_start:
+	case lbp::cmd_jog_start_pos_y:
 		startJog(Vec4(0, 1, 0, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_y_pos_stop:
+	case lbp::cmd_jog_stop_pos_y:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_y_neg_start:
+	case lbp::cmd_jog_start_neg_y:
 		startJog(Vec4(0, -1, 0, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_y_neg_stop:
+	case lbp::cmd_jog_stop_neg_y:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_z_pos_start:
+	case lbp::cmd_jog_start_pos_z:
 		startJog(Vec4(0, 0, 1, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_z_pos_stop:
+	case lbp::cmd_jog_stop_pos_z:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_z_neg_start:
+	case lbp::cmd_jog_start_neg_z:
 		startJog(Vec4(0, 0, -1, 0));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_z_neg_stop:
+	case lbp::cmd_jog_stop_neg_z:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_u_pos_start:
+	case lbp::cmd_jog_start_pos_u:
 		startJog(Vec4(0, 0, 0, 1));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_u_pos_stop:
+	case lbp::cmd_jog_stop_pos_u:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_u_neg_start:
+	case lbp::cmd_jog_start_neg_u:
 		startJog(Vec4(0, 0, 0, -1));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
-	case lbp::cmd_jog_u_neg_stop:
+	case lbp::cmd_jog_stop_neg_u:
 		stopJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
@@ -152,18 +152,48 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_speed_xy:
 	case lbp::cmd_speed_z:
 	case lbp::cmd_speed_u:
-	case lbp::cmd_move_abs_x:
-	case lbp::cmd_move_rel_x:
-	case lbp::cmd_move_abs_y:
-	case lbp::cmd_move_rel_y:
-	case lbp::cmd_move_abs_z:
-	case lbp::cmd_move_rel_z:
-	case lbp::cmd_move_abs_u:
-	case lbp::cmd_move_rel_u:
-	case lbp::cmd_move_abs_xy:
-	case lbp::cmd_move_rel_xy:
-	case lbp::cmd_move_abs_xyz:
-	case lbp::cmd_move_rel_xyz:
+	case lbp::cmd_jog_step_x:
+	case lbp::cmd_jog_step_y:
+	case lbp::cmd_jog_step_z:
+	case lbp::cmd_jog_step_u:
+	case lbp::cmd_jog_step_xy:
+	case lbp::cmd_jog_step_xyz:
+	case lbp::cmd_jog_step_xyzu:
+	case lbp::cmd_goto_x:
+	case lbp::cmd_goto_y:
+	case lbp::cmd_goto_z:
+	case lbp::cmd_goto_u:
+	case lbp::cmd_goto_xy:
+	case lbp::cmd_goto_xyz:
+	case lbp::cmd_goto_xyzu:
+	case lbp::cmd_cut_abs_x:
+	case lbp::cmd_cut_abs_y:
+	case lbp::cmd_cut_abs_z:
+	case lbp::cmd_cut_abs_u:
+	case lbp::cmd_cut_abs_xy:
+	case lbp::cmd_cut_abs_xyz:
+	case lbp::cmd_cut_abs_xyzu:
+	case lbp::cmd_cut_rel_x:
+	case lbp::cmd_cut_rel_y:
+	case lbp::cmd_cut_rel_z:
+	case lbp::cmd_cut_rel_u:
+	case lbp::cmd_cut_rel_xy:
+	case lbp::cmd_cut_rel_xyz:
+	case lbp::cmd_cut_rel_xyzu:
+	case lbp::cmd_travel_abs_x:
+	case lbp::cmd_travel_abs_y:
+	case lbp::cmd_travel_abs_z:
+	case lbp::cmd_travel_abs_u:
+	case lbp::cmd_travel_abs_xy:
+	case lbp::cmd_travel_abs_xyz:
+	case lbp::cmd_travel_abs_xyzu:
+	case lbp::cmd_travel_rel_x:
+	case lbp::cmd_travel_rel_y:
+	case lbp::cmd_travel_rel_z:
+	case lbp::cmd_travel_rel_u:
+	case lbp::cmd_travel_rel_xy:
+	case lbp::cmd_travel_rel_xyz:
+	case lbp::cmd_travel_rel_xyzu:
 	case lbp::cmd_laser_power_min:
 	case lbp::cmd_laser_power_max:
 	case lbp::cmd_laser_freq:
@@ -171,6 +201,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_laser_disable:
 	case lbp::cmd_laser_on:
 	case lbp::cmd_laser_off:
+	case lbp::cmd_raster_power:
 	case lbp::cmd_air_off:
 	case lbp::cmd_air_on:
 	case lbp::cmd_dwell:
@@ -205,38 +236,90 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_home_z:
 			target.z = 0;
 			break;
-		case lbp::cmd_move_abs_x:
+		case lbp::cmd_goto_x:
+		case lbp::cmd_cut_abs_x:
+		case lbp::cmd_travel_abs_x:
 			target.x = p.readIntArg() + m_job_origin.x;
 			break;
-		case lbp::cmd_move_rel_x:
+		case lbp::cmd_jog_step_x:
+		case lbp::cmd_cut_rel_x:
+		case lbp::cmd_travel_rel_x:
 			target.x += p.readIntArg();
 			break;
-		case lbp::cmd_move_abs_y:
+		case lbp::cmd_goto_y:
+		case lbp::cmd_cut_abs_y:
+		case lbp::cmd_travel_abs_y:
 			target.y = p.readIntArg() + m_job_origin.y;
 			break;
-		case lbp::cmd_move_rel_y:
+		case lbp::cmd_jog_step_y:
+		case lbp::cmd_cut_rel_y:
+		case lbp::cmd_travel_rel_y:
 			target.y += p.readIntArg();
 			break;
-		case lbp::cmd_move_abs_z:
+		case lbp::cmd_goto_z:
+		case lbp::cmd_cut_abs_z:
+		case lbp::cmd_travel_abs_z:
 			target.z = p.readIntArg();
 			break;
-		case lbp::cmd_move_rel_z:
+		case lbp::cmd_jog_step_z:
+		case lbp::cmd_cut_rel_z:
+		case lbp::cmd_travel_rel_z:
 			target.z += p.readIntArg();
 			break;
-		case lbp::cmd_move_abs_u:
+		case lbp::cmd_goto_u:
+		case lbp::cmd_cut_abs_u:
+		case lbp::cmd_travel_abs_u:
 			target.u = p.readIntArg();
 			break;
-		case lbp::cmd_move_rel_u:
+		case lbp::cmd_jog_step_u:
+		case lbp::cmd_cut_rel_u:
+		case lbp::cmd_travel_rel_u:
 			target.u += p.readIntArg();
 			break;
-		case lbp::cmd_move_abs_xy:
+		case lbp::cmd_goto_xy:
+		case lbp::cmd_cut_abs_xy:
+		case lbp::cmd_travel_abs_xy:
 			target.x = p.readIntArg() + m_job_origin.x;
 			target.y = p.readIntArg() + m_job_origin.y;
 			break;
-		case lbp::cmd_move_rel_xy:
+		case lbp::cmd_jog_step_xy:
+		case lbp::cmd_cut_rel_xy:
+		case lbp::cmd_travel_rel_xy:
 			target.x += p.readIntArg();
 			target.y += p.readIntArg();
 			break;
+		case lbp::cmd_goto_xyz:
+		case lbp::cmd_cut_abs_xyz:
+		case lbp::cmd_travel_abs_xyz:
+			target.x = p.readIntArg() + m_job_origin.x;
+			target.y = p.readIntArg() + m_job_origin.y;
+			target.z = p.readIntArg();
+			break;
+		case lbp::cmd_jog_step_xyz:
+		case lbp::cmd_cut_rel_xyz:
+		case lbp::cmd_travel_rel_xyz:
+			target.x += p.readIntArg();
+			target.y += p.readIntArg();
+			target.z += p.readIntArg();
+			break;
+		case lbp::cmd_goto_xyzu:
+		case lbp::cmd_cut_abs_xyzu:
+		case lbp::cmd_travel_abs_xyzu:
+			target.x = p.readIntArg() + m_job_origin.x;
+			target.y = p.readIntArg() + m_job_origin.y;
+			target.z = p.readIntArg();
+			target.u = p.readIntArg();
+			break;
+		case lbp::cmd_jog_step_xyzu:
+		case lbp::cmd_cut_rel_xyzu:
+		case lbp::cmd_travel_rel_xyzu:
+			target.x += p.readIntArg();
+			target.y += p.readIntArg();
+			target.z += p.readIntArg();
+			target.u += p.readIntArg();
+			break;
+		case lbp::cmd_speed_x:
+		case lbp::cmd_speed_y:
 		case lbp::cmd_speed_xy:
 			m_target_vel_xy = p.readIntArg();
 			break;
@@ -244,7 +327,7 @@ MovementSim::State MovementSim::updateTarget()
 			m_target_vel_z = p.readIntArg();
 			break;
 		case lbp::cmd_speed_u:
-			//_target_vel_u = p.readArgInt());
+			m_target_vel_u = p.readIntArg();
 			break;
 		case lbp::cmd_laser_power_min:
 			if (p.readByteArg() > 1) {
@@ -285,6 +368,8 @@ MovementSim::State MovementSim::updateTarget()
 				m_laser_1.on = false;
 			}
 			break;
+		case lbp::cmd_raster_power:
+			break; // TODO
 		case lbp::cmd_air_off:
 			break; // TODO
 		case lbp::cmd_air_on:

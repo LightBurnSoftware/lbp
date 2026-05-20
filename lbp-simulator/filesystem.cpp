@@ -13,7 +13,7 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 	const uint16_t cmd = request.cmd();
 
 	switch (cmd) {
-	case cmd_begin_file: {
+	case cmd_file_begin: {
 		gLog().push(Log::INFO, "BOF~~~~~~");
 		out_q.push(CmdMsg(cmd));
 		m_is_receiving = true;
@@ -23,7 +23,7 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 		gLog().push(Log::INFO, QString("File size: %1").arg(size));
 		return true;
 	}
-	case cmd_end_file:
+	case cmd_file_end:
 		gLog().push(Log::INFO, "EOF~~~~~~");
 		out_q.push(CmdMsg(cmd));
 		m_is_receiving = false;
@@ -33,15 +33,6 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 			m_file_buffer.write(request.args(), request.size() - 2);
 			gLog().push(Log::INFO, QString("Receiving %1").arg(request.size() - 2));
 		}
-		out_q.push(CmdMsg(cmd));
-		return true;
-	case cmd_get_filename:
-	case cmd_set_filename:
-	case cmd_delete_file:
-	case cmd_new_file:
-	case cmd_file_count:
-	case cmd_file_time:
-	case cmd_calc_file_time:
 		out_q.push(CmdMsg(cmd));
 		return true;
 	default:

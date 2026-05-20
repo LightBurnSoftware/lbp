@@ -114,6 +114,8 @@ constexpr uint16_t cmd_laser_on 		= flag_laser | 0x05C2; // int8 laser index (0 
 constexpr uint16_t cmd_focus_z 			= flag_laser | 0x0F00 | flag_z; // arguments TODO
 constexpr uint16_t cmd_laser_offset_xy	= flag_laser | 0x05B0 | flag_x | flag_y; // int8 laser index, int32 x, y offsets (um) // TODO
 
+constexpr uint16_t cmd_raster_power = flag_laser | 0x05A2; // up to 8 16-bit power % arguments
+
 // ----------------------------------------------------------------------------
 // 0x0004: Files --------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -241,15 +243,11 @@ constexpr uint16_t cmd_goto_xy = flag_goto | flag_x | flag_y;
 constexpr uint16_t cmd_goto_xyz = flag_goto | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_goto_xyzu = flag_goto | flag_x | flag_y | flag_z | flag_u;
 
-// Programmed moves, move directly without expectation to cut. ("rapid")
+// Programmed Travel Commands: move directly without expectation to cut. ("rapid")
 constexpr uint16_t flag_travel_abs = flag_move | 0x0800;
 constexpr uint16_t flag_travel_rel = flag_move | 0x0900;
 
-// Programmed moves, move directly while cutting.
-constexpr uint16_t flag_cut_abs = flag_move | 0x0A00;
-constexpr uint16_t flag_cut_rel = flag_move | 0x0B00;
-
-// Discrete Travel Commands: Argument: one signed int32 (micrometers) per indicated axis.
+// Travel Commands: Argument: one signed int32 (micrometers) per indicated axis.
 constexpr uint16_t cmd_travel_rel_x = flag_travel_rel | flag_x;
 constexpr uint16_t cmd_travel_rel_y = flag_travel_rel | flag_y;
 constexpr uint16_t cmd_travel_rel_z = flag_travel_rel | flag_z;
@@ -268,7 +266,11 @@ constexpr uint16_t cmd_travel_abs_xy = flag_travel_abs | flag_x | flag_y;
 constexpr uint16_t cmd_travel_abs_xyz = flag_travel_abs | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_travel_abs_xyzu = flag_travel_abs | flag_x | flag_y | flag_z | flag_u;
 
-// Discrete Movement Commands: Argument: one signed int32 (micrometers) per indicated axis.
+// Programmed Cut Commands: move while cutting.
+constexpr uint16_t flag_cut_abs = flag_move | 0x0A00;
+constexpr uint16_t flag_cut_rel = flag_move | 0x0B00;
+
+// Cut Commands: Argument: one signed int32 (micrometers) per indicated axis.
 constexpr uint16_t cmd_cut_rel_x = flag_cut_rel | flag_x;
 constexpr uint16_t cmd_cut_rel_y = flag_cut_rel | flag_y;
 constexpr uint16_t cmd_cut_rel_z = flag_cut_rel | flag_z;

@@ -355,7 +355,7 @@ To aid in motion planning, LBP offers a special command for encoding raster line
 
 | Command             | Arguments                      | Payload Length |
 |---------------------|--------------------------------|----------------|
-| `cmd_raster_power`  | 1 <= N <= 8 int16 power values | 6 - 16         |
+| `cmd_raster_power`  | 1 <= N <= 8 int16 power values | 6 - 18         |
 
 If the firmware receives this command, the next `cmd_cut_x`, `cmd_cut_y`, or `cmd_cut_xy` should be assumed to be a raster line.
 This `cmd_cut` will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
