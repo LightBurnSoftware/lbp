@@ -351,6 +351,10 @@ constexpr uint16_t flag_cfg = 0xC000; // "C" for "Config"
 // TODO: very few configurations are meaningfully implemented in the simulator.
 // codes, units, and flag definitions are subject to change.
 
+// User Origin
+constexpr uint16_t cfg_user_origin_x = flag_cfg | 0x0060 | flag_x;
+constexpr uint16_t cfg_user_origin_y = flag_cfg | 0x0060 | flag_y;
+
 constexpr uint16_t cfg_head_dist = flag_cfg | 0x001E; // nanometers
 
 constexpr uint16_t cfg_laser1_freq			= flag_cfg | 0x0111; // hz (20000)
@@ -368,8 +372,7 @@ constexpr uint16_t cfg_laser2_preig_freq = flag_cfg | 0x0142;  // hz (20000)
 constexpr uint16_t cfg_laser2_preig_pct	= flag_cfg | 0x0152;  // percent * 10
 // constexpr uint16_t cfg_laser2_type 		= flag_cfg | 0x0161; // TODO
 
-constexpr uint16_t cfg_x_settings			= flag_cfg | flag_x | 0x0A10; // TODO binary flags
-constexpr uint16_t cfg_x_step_length 		= flag_cfg | flag_x | 0x0A20; // nanometers?  (micrometers * 1M)
+constexpr uint16_t cfg_x_step_length 		= flag_cfg | flag_x | 0x0A20; // micrometers
 constexpr uint16_t cfg_x_max_speed 			= flag_cfg | flag_x | 0x0A30; // micrometers/sec
 constexpr uint16_t cfg_x_jumpoff_speed 		= flag_cfg | flag_x | 0x0A40; // micrometers/sec^2
 constexpr uint16_t cfg_x_max_accel 			= flag_cfg | flag_x | 0x0A50; // micrometers/sec^2
@@ -380,8 +383,7 @@ constexpr uint16_t cfg_x_estop_accel		= flag_cfg | flag_x | 0x0A90; // micromete
 constexpr uint16_t cfg_x_home_offset		= flag_cfg | flag_x | 0x0AA0; // micrometers
 constexpr uint16_t cfg_x_backlash			= flag_cfg | flag_x | 0x0AB0; // micrometers
 
-constexpr uint16_t cfg_y_settings			= flag_cfg | flag_y | 0x0A10; // TODO binary flags
-constexpr uint16_t cfg_y_step_length 		= flag_cfg | flag_y | 0x0A20; // nanometers?  (micrometers * 1M)
+constexpr uint16_t cfg_y_step_length 		= flag_cfg | flag_y | 0x0A20; // micrometers
 constexpr uint16_t cfg_y_max_speed 			= flag_cfg | flag_y | 0x0A30; // micrometers/sec
 constexpr uint16_t cfg_y_jumpoff_speed 		= flag_cfg | flag_y | 0x0A40; // micrometers/sec^2
 constexpr uint16_t cfg_y_max_accel 			= flag_cfg | flag_y | 0x0A50; // micrometers/sec^2
@@ -392,8 +394,7 @@ constexpr uint16_t cfg_y_estop_accel		= flag_cfg | flag_y | 0x0A90; // micromete
 constexpr uint16_t cfg_y_home_offset		= flag_cfg | flag_y | 0x0AA0; // micrometers
 constexpr uint16_t cfg_y_backlash			= flag_cfg | flag_y | 0x0AB0; // micrometers
 
-constexpr uint16_t cfg_z_settings			= flag_cfg | flag_z | 0x0A10; // TODO binary flags
-constexpr uint16_t cfg_z_step_length 		= flag_cfg | flag_z | 0x0A20; // nanometers?  (micrometers * 1M)
+constexpr uint16_t cfg_z_step_length 		= flag_cfg | flag_z | 0x0A20; // micrometers
 constexpr uint16_t cfg_z_max_speed 			= flag_cfg | flag_z | 0x0A30; // micrometers/sec
 constexpr uint16_t cfg_z_jumpoff_speed 		= flag_cfg | flag_z | 0x0A40; // micrometers/sec^2
 constexpr uint16_t cfg_z_max_accel 			= flag_cfg | flag_z | 0x0A50; // micrometers/sec^2
@@ -404,8 +405,7 @@ constexpr uint16_t cfg_z_estop_accel		= flag_cfg | flag_z | 0x0A90; // micromete
 constexpr uint16_t cfg_z_home_offset		= flag_cfg | flag_z | 0x0AA0; // micrometers
 constexpr uint16_t cfg_z_backlash			= flag_cfg | flag_z | 0x0AB0; // micrometers
 
-constexpr uint16_t cfg_u_settings			= flag_cfg | flag_u | 0x0A10; // binary flags
-constexpr uint16_t cfg_u_step_length 		= flag_cfg | flag_u | 0x0A20; // nanometers?  (micrometers * 1M)
+constexpr uint16_t cfg_u_step_length 		= flag_cfg | flag_u | 0x0A20; // micrometers
 constexpr uint16_t cfg_u_max_speed 			= flag_cfg | flag_u | 0x0A30; // micrometers/sec
 constexpr uint16_t cfg_u_jumpoff_speed 		= flag_cfg | flag_u | 0x0A40; // micrometers/sec^2
 constexpr uint16_t cfg_u_max_accel 			= flag_cfg | flag_u | 0x0A50; // micrometers/sec^2
@@ -419,17 +419,13 @@ constexpr uint16_t cfg_u_backlash			= flag_cfg | flag_u | 0x0AB0; // micrometers
 // Configurables - cut:
 constexpr uint16_t cfg_idle_speed		= flag_cfg | 0x0201; // micrometers/sec
 constexpr uint16_t cfg_idle_acc			= flag_cfg | 0x0202; // micrometers/sec^2
-constexpr uint16_t cfg_idle_delay		= flag_cfg | 0x0203; // ??	// microseconds?
+constexpr uint16_t cfg_idle_delay		= flag_cfg | 0x0203; // microseconds
 constexpr uint16_t cfg_start_speed		= flag_cfg | 0x0204; // micrometers/sec
 constexpr uint16_t cfg_min_acc			= flag_cfg | 0x0205; // micrometers/sec^2
-constexpr uint16_t cfg_max_acc			= flag_cfg | 0x0206; // ??	// micrometers/sec^2
+constexpr uint16_t cfg_max_acc			= flag_cfg | 0x0206; // micrometers/sec^2
 constexpr uint16_t cfg_acc_factor_pct	= flag_cfg | 0x0207; // percent
 constexpr uint16_t cfg_G0_acc_factor_pct = flag_cfg | 0x0208; // percent
 constexpr uint16_t cfg_speed_factor_pct = flag_cfg | 0x0209; // percent
-
-constexpr uint16_t cfg_docking_position_x = flag_cfg | 0x0D00 | flag_x; // micrometers
-constexpr uint16_t cfg_docking_position_y = flag_cfg | 0x0D00 | flag_y; // micrometers
-constexpr uint16_t cfg_docking_position_z = flag_cfg | 0x0D00 | flag_z; // micrometers
 
 // Configurables - engrave:
 constexpr uint16_t cfg_engrave_x_start_speed = flag_cfg | 0x0E50 | flag_x; // micrometers/sec
@@ -461,8 +457,6 @@ constexpr uint16_t cfg_status_off_delay	= flag_cfg | 0x0215; // milliseconds
 constexpr uint16_t cfg_finish_delay 	= flag_cfg | 0x0216; // milliseconds
 
 // Configuration - Feeder
-// flags (0x8000 ? 0x2000 = Last Feeding off, 0x0800 = Progressive feed on)
-constexpr uint16_t cfg_feed_flags		= flag_cfg | 0x0217;
 constexpr uint16_t cfg_feed_pre_delay	= flag_cfg | 0x0218; // milliseconds
 constexpr uint16_t cfg_feed_post_delay	= flag_cfg | 0x0219; // milliseconds
 constexpr uint16_t cfg_feed_backlash	= flag_cfg | 0x021A; // micrometers
@@ -478,10 +472,6 @@ constexpr uint16_t cfg_wireless_panel_slow = flag_cfg | 0x0225; // micrometers/s
 // Configurables - Axis and Autolayout
 constexpr uint16_t cfg_autolayout = flag_cfg | 0x0401;
 constexpr uint16_t cfg_axis_auto_home = flag_cfg | 0x0402;
-
-// User Origin
-constexpr uint16_t cfg_user_origin_x = flag_cfg | 0x0060 | flag_x;
-constexpr uint16_t cfg_user_origin_y = flag_cfg | 0x0060 | flag_y;
 
 } // namespace lbp
 
