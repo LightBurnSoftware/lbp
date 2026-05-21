@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "configuration.h"
 #include "simutils.h"
 #include "vec4.h"
 
@@ -31,7 +32,7 @@ struct LaserSettings {
 class MovementSim
 {
 public:
-	MovementSim();
+	MovementSim(Configuration &config);
 
 	/**
 	 * @brief Attempt to process the given request. May enqueue an output packet.
@@ -76,17 +77,20 @@ private:
 	void startJog(Vec4 dir);
 	void stopJog();
 
-	State m_state = State::Idle;  // "movement state" - controls internal state machine.
-	Vec4 m_pos;					  // current position vector.
-	Vec4 m_target_pos;			  // user-specified target position.
-	Vec4 m_max_pos;				  // configured maximum dimension (assume Quadrant I).
-	Vec4 m_vel;					  // current velocity vector.
-	int32_t m_dwell_ms = 0;		  // ms to dwell, if we're in that state
-	int32_t m_dwell_acc_ms = 0;	  // accumulated ms spent dwelling
+	Configuration &m_config; // reference to configuration component, for certain lookups.
+	State m_state = State::Idle; // "movement state" - controls internal state machine.
+	Vec4 m_pos; // current position vector.
+	Vec4 m_target_pos; // user-specified target position.
+	Vec4 m_job_origin; // origin offset for absolute moves during the current job.
+	Vec4 m_max_pos; // configured maximum dimension (assume Quadrant I).
+	Vec4 m_vel; // current velocity vector.
+	int32_t m_dwell_ms = 0; // ms to dwell, if we're in that state
+	int32_t m_dwell_acc_ms = 0; // accumulated ms spent dwelling
 	uint32_t m_target_vel_xy = 0; // user-specified target velocity (xy)
-	uint32_t m_target_vel_z = 0;  // user-specified target velocity (z)
-	LaserSettings m_laser_1;	  // current settings for laser 1
-	LaserSettings m_laser_2;	  // current settings for laser 2
-	CmdQueue m_cmd_q;			  // queue for scheduled movement commands.
+	uint32_t m_target_vel_z = 0; // user-specified target velocity (z)
+	uint32_t m_target_vel_u = 0; // user-specified target velocity (u)
+	LaserSettings m_laser_1; // current settings for laser 1
+	LaserSettings m_laser_2; // current settings for laser 2
+	CmdQueue m_cmd_q; // queue for scheduled movement commands.
 	uint16_t m_job_cmd; // cache a "begin job" or "begin frame" command for state derivations.
 };

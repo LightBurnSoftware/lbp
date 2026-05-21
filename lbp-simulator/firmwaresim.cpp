@@ -10,6 +10,7 @@
 
 FirmwareSim::FirmwareSim(Connection &conn)
 	: m_connection(conn)
+	, m_movement(m_config)
 {
 	gLog().push(Log::INFO, "Started sim");
 	m_config.load();
