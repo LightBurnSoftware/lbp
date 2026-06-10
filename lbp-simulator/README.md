@@ -1,10 +1,8 @@
 # Simulator (lbp-simulator)
-
-The LightBurn Protocol is being developed simultaneously with a simple simulator. The simulator is a Qt Desktop application.
-It is provided also as an sample of the `lbp` software library in action.
+This simulator is a Qt Desktop application, developed simultaneously with the protocol specification and lbp library,
+both to assist in development of the protocol itself, and as a sample of the lbp software library in action.
 
 ## Overview
-
 While the simulator *is* a desktop application and does make use of Qt and the C++ standard library,
 its architecture adopts a layered approach.
 Usage of Qt and aspects of C++ that are not friendly to embedded contexts are limited to
@@ -16,7 +14,6 @@ The actual simulation loop written to be embedded-friendly, with no heap allocat
 desktop application concerns to serve as an example for `lbp` library usage.
 
 ## Simulator classes
-
 - **MainWindow:** The Qt entrance point for the desktop application software. It displays the global log messages, connection status, and a simulation view.
 - **SimView:** A widget displaying a simple view of the current laser position. It preserves cuts. (Press c to clear.)
 - **Connection:** A Qt class that provides a TCP server for LightBurn to connect to. Includes a **Parser**.
