@@ -116,7 +116,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_laser2_max_power,
 										   cfg_laser2_preig_freq,
 										   cfg_laser2_preig_pct,
-										   cfg_x_settings,
 										   cfg_x_step_length,
 										   cfg_x_max_speed,
 										   cfg_x_jumpoff_speed,
@@ -127,7 +126,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_x_estop_accel,
 										   cfg_x_home_offset,
 										   cfg_x_backlash,
-										   cfg_y_settings,
 										   cfg_y_step_length,
 										   cfg_y_max_speed,
 										   cfg_y_jumpoff_speed,
@@ -138,7 +136,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_y_estop_accel,
 										   cfg_y_home_offset,
 										   cfg_y_backlash,
-										   cfg_z_settings,
 										   cfg_z_step_length,
 										   cfg_z_max_speed,
 										   cfg_z_jumpoff_speed,
@@ -149,7 +146,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_z_estop_accel,
 										   cfg_z_home_offset,
 										   cfg_z_backlash,
-										   cfg_u_settings,
 										   cfg_u_step_length,
 										   cfg_u_max_speed,
 										   cfg_u_jumpoff_speed,
@@ -168,10 +164,7 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_max_acc,
 										   cfg_acc_factor_pct,
 										   cfg_G0_acc_factor_pct,
-										   cfg_speed_factor_pct,
-										   cfg_docking_position_x,
-										   cfg_docking_position_y,
-										   cfg_docking_position_z,
+                                           cfg_speed_factor_pct,
 										   cfg_engrave_x_start_speed,
 										   cfg_engrave_y_start_speed,
 										   cfg_engrave_x_acc,
@@ -191,7 +184,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_status_on_delay,
 										   cfg_status_off_delay,
 										   cfg_finish_delay,
-										   cfg_feed_flags,
 										   cfg_feed_pre_delay,
 										   cfg_feed_post_delay,
 										   cfg_feed_backlash,
@@ -275,9 +267,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_laser2_preig_pct:
 		name = "cfg_laser2_preig_pct";
 		return true;
-	case cfg_x_settings:
-		name = "cfg_x_settings";
-		return true;
 	case cfg_x_step_length:
 		name = "cfg_x_step_length";
 		return true;
@@ -307,9 +296,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 		return true;
 	case cfg_x_backlash:
 		name = "cfg_x_backlash";
-		return true;
-	case cfg_y_settings:
-		name = "cfg_y_settings";
 		return true;
 	case cfg_y_step_length:
 		name = "cfg_y_step_length";
@@ -341,9 +327,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_y_backlash:
 		name = "cfg_y_backlash";
 		return true;
-	case cfg_z_settings:
-		name = "cfg_z_settings";
-		return true;
 	case cfg_z_step_length:
 		name = "cfg_z_step_length";
 		return true;
@@ -373,9 +356,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 		return true;
 	case cfg_z_backlash:
 		name = "cfg_z_backlash";
-		return true;
-	case cfg_u_settings:
-		name = "cfg_u_settings";
 		return true;
 	case cfg_u_step_length:
 		name = "cfg_u_step_length";
@@ -434,15 +414,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_speed_factor_pct:
 		name = "cfg_speed_factor_pct";
 		return true;
-	case cfg_docking_position_x:
-		name = "cfg_docking_position_x";
-		return true;
-	case cfg_docking_position_y:
-		name = "cfg_docking_position_y";
-		return true;
-	case cfg_docking_position_z:
-		name = "cfg_docking_position_z";
-		return true;
 	case cfg_engrave_x_start_speed:
 		name = "cfg_engrave_x_start_speed";
 		return true;
@@ -500,9 +471,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_finish_delay:
 		name = "cfg_finish_delay";
 		return true;
-	case cfg_feed_flags:
-		name = "cfg_feed_flags";
-		return true;
 	case cfg_feed_pre_delay:
 		name = "cfg_feed_pre_delay";
 		return true;
@@ -558,7 +526,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_laser2_max_power:
 	case cfg_laser2_preig_freq:
 	case cfg_laser2_preig_pct:
-	case cfg_x_settings:
 	case cfg_x_step_length:
 	case cfg_x_max_speed:
 	case cfg_x_jumpoff_speed:
@@ -569,7 +536,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_x_estop_accel:
 	case cfg_x_home_offset:
 	case cfg_x_backlash:
-	case cfg_y_settings:
 	case cfg_y_step_length:
 	case cfg_y_max_speed:
 	case cfg_y_jumpoff_speed:
@@ -580,7 +546,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_y_estop_accel:
 	case cfg_y_home_offset:
 	case cfg_y_backlash:
-	case cfg_z_settings:
 	case cfg_z_step_length:
 	case cfg_z_max_speed:
 	case cfg_z_jumpoff_speed:
@@ -591,7 +556,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_z_estop_accel:
 	case cfg_z_home_offset:
 	case cfg_z_backlash:
-	case cfg_u_settings:
 	case cfg_u_step_length:
 	case cfg_u_max_speed:
 	case cfg_u_jumpoff_speed:
@@ -611,9 +575,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_acc_factor_pct:
 	case cfg_G0_acc_factor_pct:
 	case cfg_speed_factor_pct:
-	case cfg_docking_position_x:
-	case cfg_docking_position_y:
-	case cfg_docking_position_z:
 	case cfg_engrave_x_start_speed:
 	case cfg_engrave_y_start_speed:
 	case cfg_engrave_x_acc:
@@ -633,7 +594,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_status_on_delay:
 	case cfg_status_off_delay:
 	case cfg_finish_delay:
-	case cfg_feed_flags:
 	case cfg_feed_pre_delay:
 	case cfg_feed_post_delay:
 	case cfg_feed_backlash:
