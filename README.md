@@ -1,5 +1,3 @@
-# README.md
-
 # LightBurn Protocol
 LightBurn Protocol is an open communication protocol designed to allow software, controllers, firmware, and related tooling to communicate in a more consistent and interoperable way.
 The project is released under the MIT License in the hope that manufacturers, developers, and the broader maker ecosystem can build compatible implementations without unnecessary barriers.
