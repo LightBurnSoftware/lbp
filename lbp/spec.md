@@ -2,19 +2,93 @@
 
 This document is meant to accompany the `spec.h` header and provide a guide for common `lbp` workflows.
 
+## Overview
+LBP is a transport-agnostic command-and-response binary protocol for controlling laser cutters and engravers.
+
+LBP is also a work-in-progress. Some functionality has not yet been implemented, and the structure of some messages and workflows is still to be determined. Feedback and commentary is welcome.
+
+LBP is intended to function over a variety of different transport layers, e.g. serial, TCP, UDP, websocket, etc. This specification assumes that the transport layer will deliver LBP messages quickly and in the correct order.
+
 ## Message Structure
 
-The basic unit of LBP communication is the **message**. As discussed in the README, every LBP message consists of:
+```
++--------------+------+----------+----------+
+| Header       | Size | Payload  | Checksum |
+| [4B]: "DRGN" | [2B] | [Size B] | [2B]     |
++--------------+------+----------+----------+
+```
 
 - **Header (4 bytes):** The 4-byte sequence `0x4452474E`, which is the ASCII encoding of `DRGN` (short for "dragon").
 - **Size (2 bytes):** A 16-bit integer which encodes the size, in bytes, of the following **Payload**.
 - **Payload ("Size" bytes):** Always consists of a 2-byte Command, followed by 0 or more bytes of argument data. (This means that **Size** must always be `>= 2`)
-- **Checksum (2 bytes):** The CRC16 checksum of the **Payload** data.
+- **Checksum (2 bytes):** The CRC16 checksum of the **Payload**, computed over **only** the Payload data, **not** the Header of Size data. (See `checksum.cpp` for the crc16 algorithm.)
 
-All numerical data is transmitted in Big-Endian format.
+**IMPORTANT** All Size, Payload, and Checksum data is encoded in **Big-Endian Format**. (Helper functions are provided in `lbp/beio.h`)
 
-The firmware is expected to respond to every message it receives. This response is, in most cases, an acknowledgement, consisting of the same command code
-it was sent and zero arguments. In the case of queries, the response will include arguments representing the requested data.
+See the `spec.h` header file for message dimension constants, command code definitions, and argument information.
+
+## Simple Workflows
+
+At a high level, LBP works as a command-and-response protocol:
+
+1. **LightBurn sends commands.** These are compact, structured binary messages — instructions like "move to this position," "set laser power," "start a job," or "report your current state."
+
+2. **The controller executes them and responds.** The manufacturer's firmware receives each packet, interprets the command, carries out the operation on the hardware, and responds to Lightburn with another message. This message always contains the same command code as the request along with optional arguments in the case of a query.
+
+In the case of commands that result in long-running operations, the firmware's response is an **acknowledgement** of the request.
+It **begins** the operation and responds to the command **immediately** - **not** at the conclusion of the operation.
+
+### Handshake
+
+LBP provides a simple no-op "Handshake" command code. This helps confirm communication between LightBurn and the firmware.
+
+**LightBurn Sends:**
+
+```
++--------------+-------+---------+----------+
+| Header       | Size  | Payload | Checksum |
+| 44 52 47 4e  | 00 02 | 01 b8   | 5c 2f    |
++--------------+-------+---------+----------+
+```
+
+The Handshake is the simplest kind of message in the LBP: The payload is a simple command code with no additional arguments.
+
+**Firmware Responds:**
+
+```
++--------------+-------+---------+----------+
+| Header       | Size  | Payload | Checksum |
+| 44 52 47 4e  | 00 02 | 01 b8   | 5c 2f    |
++--------------+-------+---------+----------+
+```
+
+The firmware responds to the handshake command in the same way it responds to all commands - with another LBP message with the same command code.
+
+### Position Query
+
+Here we use the code command code `cmd_pos_axis_x`, defined in `lbp/spec.h` to ask for the current x position of the laser in micrometers:
+
+**LightBurn Sends:**
+
+```
++--------------+-------+---------+----------+
+| Header       | Size  | Payload | Checksum |
+| 44 52 47 4e  | 00 02 | 81 01   | da 8b    |
++--------------+-------+---------+----------+
+```
+
+**Firmware Responds:**
+
+```
++--------------+-------+-------------------+----------+
+| Header       | Size  | Payload           | Checksum |
+| 44 52 47 4e  | 00 06 | 81 01 00 00 4e 20 | 36 00    |
++--------------+-------+-------------------+----------+
+```
+
+Our laser's x-axis position is 20 mm. So, the firmware responds: The payload consists of the same command,
+(`cmd_pos_axis_x`: `81 01`) followed by a 4-byte integer `0x00004e20`, which is 20,000 micrometers.
+We see here that the payload size is 6 bytes: 2 bytes for the command code acknowledgement + 4 bytes for the x position argument.
 
 ## Command Code Design
 LBP command codes are unsigned 16-bit integers. We do not require all 65,536 possible values,
@@ -373,6 +447,31 @@ LBP uses commands with `_begin` and `_end` as bookend-style tags to indicate the
 | `cmd_job_body_begin`   | 2              | Marks the start of commands that make up the action of the job. |
 | `cmd_job_body_end`     | 2              | Marks the end of commands that make up the action of the job.   |
 | `cmd_job_end`          | 2              | Marks the end of job commands.                                  |
+
+
+Jobs are encoded with the following series of messages:
+- `cmd_job_begin`
+  - `cmd_job_header_begin`
+    - *job setting message #1*
+    - *job setting message #2*
+    - ...
+	- *final job setting message*
+  - `cmd_job_header_end`
+  - `cmd_job_body_begin`
+    - *job command message #1*
+    - *job command message #2*
+	- ...
+	- *final job command message*
+  - `cmd_job_body_end`
+- `cmd_job_end`
+
+The `cmd_job_start` and `cmd_job_end` bookends are important because they let the firmware know that a job is being executed.
+
+**Note**
+Currently, the Lightburn LBP implementation and the LBP simulator support only the following workflow for jobs:
+
+1. LightBurn sends the entire job to the firmware as a **file**.
+2. LightBurn sends the `cmd_execute` command to signal that the firmware should execute its received file.
 
 ### The Job Header
 
