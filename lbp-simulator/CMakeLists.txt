@@ -1,8 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
 project(lbp-simulator LANGUAGES CXX)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network)
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network SerialPort)
 
 qt_standard_project_setup()
 
@@ -12,7 +11,9 @@ qt_add_executable(lbp-simulator
     mainwindow.cpp
     mainwindow.h
 
-    connection.h connection.cpp
+    transport.h
+    tcptransport.h tcptransport.cpp
+
     simview.h simview.cpp
     log.h log.cpp
     firmwaresim.h firmwaresim.cpp
@@ -24,18 +25,22 @@ qt_add_executable(lbp-simulator
     vec4.h vec4.cpp
     filesystem.h filesystem.cpp
     simutils.h
+    transportwidget.h transportwidget.cpp
+    serialtransport.h
+    serialtransport.cpp
 )
 
 add_subdirectory(../lbp build)
 
 target_link_libraries(lbp-simulator
     PRIVATE
+        lbp
         Qt::Core
         Qt::Widgets
         Qt6::Network
         Qt6::Widgets
+        Qt6::SerialPort
 )
-target_link_libraries(lbp-simulator PRIVATE lbp)
 
 include(GNUInstallDirs)
 

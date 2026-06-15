@@ -3,11 +3,13 @@
 
 #pragma once
 
-#include "connection.h"
 #include "firmwaresim.h"
 #include "simview.h"
+#include "transport.h"
+#include "transportwidget.h"
 
 #include <QMainWindow>
+#include <QPushButton>
 #include <QTextEdit>
 #include <QWidget>
 
@@ -27,12 +29,21 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override;
 
 private:
-	void _onBytesAvailable();
+	void stopTransport();
+	void startTransport();
+	void onClearClicked();
+	void onTransportRx(const QByteArray &bytes);
 
-	QTextEdit *m_server_console;
-	QTextEdit *m_sim_console;
-	SimView *m_sim_view;
-	Connection *m_connection;
+	// widgets
+	TransportWidget *wTransport = nullptr;
+	QTextEdit *wSimConsole = nullptr;
+	SimView *wSimView = nullptr;
+	QPushButton *pbStart = nullptr;
+	QPushButton *pbStop = nullptr;
+	QPushButton *pbClearSim = nullptr;
+
+	// members
+	Transport *m_transport = nullptr;
 	FirmwareSim m_sim;
 	QElapsedTimer m_sim_timer;
 };
