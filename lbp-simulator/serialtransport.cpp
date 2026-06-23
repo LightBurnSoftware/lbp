@@ -52,7 +52,7 @@ bool SerialTransport::sendBytes(const uint8_t *data, int len)
 		return false;
 	}
 	else {
-		gLog().push(Log::INFO, "Sent " + QString::number(sent) + " bytes.");
+		gLog().push(Log::DEBUG, "Sent " + QString::number(sent) + " bytes.");
 		return true;
 	}
 }
