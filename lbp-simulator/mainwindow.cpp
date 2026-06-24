@@ -158,8 +158,9 @@ void MainWindow::startTransport()
 	} break;
 	case Transport::Type::Serial: {
 		QString port = wTransport->port();
-		if (!port.isEmpty()) {
-			m_transport = new SerialTransport(port, this);
+		int baud = wTransport->baudRate();
+		if (!port.isEmpty() && baud > 0) {
+			m_transport = new SerialTransport(port, baud, this);
 		}
 		else {
 			m_transport = nullptr;

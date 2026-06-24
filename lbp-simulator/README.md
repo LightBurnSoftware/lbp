@@ -16,7 +16,9 @@ desktop application concerns to serve as an example for `lbp` library usage.
 ## Simulator classes
 - **MainWindow:** The Qt entrance point for the desktop application software. It displays the global log messages, connection status, and a simulation view.
 - **SimView:** A widget displaying a simple view of the current laser position. It preserves cuts. (Press c to clear.)
-- **Connection:** A Qt class that provides a TCP server for LightBurn to connect to. Includes a **Parser**.
+- **Transport:** A Qt base class that provides an interface for the transport layer, allowing communication with LightBurn. 
+- **SerialTransport:** An implemention of Transport that uses `QSerialPort` for serial communication.
+- **TCPTransport:** An implemention of Transport that uses `QTCPSocket` for TCP communication.
 - **FirmwareSim:** This is where the simulation `loop` is implemented. It parses **Payloads** from **Connection**, processes them, and sends output **Messages** back through the **Connection**.
 - **MovementSim:** This is where the physical state of the machine is simulated. It is responsible for all movement and laser commands. It maintains its own **Queue** of **CmdPayloads** which it executes in order.
 - **FileSystem:** This class is responsible for receiving, concatenating, and parsing files sent in `cmd_file_chunk`. As more file-related commands are implemented, its capabilites are expected to expand.

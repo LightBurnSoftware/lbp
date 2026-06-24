@@ -28,6 +28,9 @@ struct LaserSettings {
  * job operations, it will send a return command and then push that command onto a FIFO command queue.
  * As long as it is not paused (TODO), it will process this command queue in order, moving the toolhead, setting
  * laser power, until the queue is exhausted.
+ *
+ * This component is not intended to represent real-world motion-planning. It does not, as yet, simulate
+ * acceleration or deceleration.
  */
 class MovementSim
 {

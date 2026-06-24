@@ -12,7 +12,7 @@ class SerialTransport : public Transport
 {
 	Q_OBJECT
 public:
-    SerialTransport(const QString &port, QObject *parent = nullptr);
+	SerialTransport(const QString &port, int baud, QObject *parent = nullptr);
 
 	bool start() override;
 
