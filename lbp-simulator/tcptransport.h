@@ -26,12 +26,6 @@ public:
 	/** @brief Stop and destroy any active socket and close the server. */
 	void stop() override;
 
-	/**
-	 * @brief Send raw data through the TCP socket.
-	 * @param data The data to be sent.
-	 * @param len The number of bytes to send.
-	 * @return True on success, false on failure.
-	 */
 	bool sendBytes(const uint8_t *data, int len) override;
 
 private slots:
