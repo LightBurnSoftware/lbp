@@ -73,6 +73,8 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		return true;
 	}
 	case lbp::cmd_pos_xyzu: {
+		gLog().push(Log::DEBUG, "XYZU Axis Query");
+
 		lbp::CmdMsg m(cmd, 16);
 		m.writeInt(m_pos.x);
 		m.writeInt(m_pos.y);

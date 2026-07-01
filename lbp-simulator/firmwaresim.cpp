@@ -8,20 +8,23 @@
 #include <lbp/payload.h>
 #include <lbp/spec.h>
 
-FirmwareSim::FirmwareSim(Connection &conn)
-	: m_connection(conn)
-	, m_movement(m_config)
+FirmwareSim::FirmwareSim()
+	: m_movement(m_config)
 {
 	gLog().push(Log::INFO, "Started sim");
 	m_config.load();
 }
 
+void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
+{
+	m_parser.feed(bytes, len);
+}
+
 SimState FirmwareSim::loop(int ms)
 {
-	// Process commands from connection
-	auto &cparser = m_connection.parser();
-	while (cparser.parseNext()) {
-		process(cparser.payload());
+	// Process commands from transport
+	while (m_parser.parseNext()) {
+		process(m_parser.payload());
 	}
 
 	// Process commands from the job, if applicable
@@ -45,9 +48,11 @@ SimState FirmwareSim::loop(int ms)
 	update(ms);
 
 	// send output packets
-	while (!m_out_q.empty()) {
-		lbp::CmdMsg p = m_out_q.pop();
-		m_connection.sendBytes(p.data(), p.size());
+	if (m_transport) {
+		while (!m_out_q.empty()) {
+			lbp::CmdMsg p = m_out_q.pop();
+			m_transport->sendBytes(p.data(), p.size());
+		}
 	}
 
 	// collate simulation state for caller
@@ -55,6 +60,11 @@ SimState FirmwareSim::loop(int ms)
 	state.pos = m_movement.getPos();
 	state.power = m_movement.getLaserPower(0x01);
 	return state;
+}
+
+void FirmwareSim::setTransport(Transport *conn)
+{
+	m_transport = conn;
 }
 
 bool FirmwareSim::process(lbp::MaxPayload &payload)

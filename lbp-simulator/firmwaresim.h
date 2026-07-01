@@ -4,7 +4,7 @@
 #pragma once
 
 #include "configuration.h"
-#include "connection.h"
+#include "transport.h"
 #include "filesystem.h"
 #include "movement.h"
 #include "simstate.h"
@@ -27,11 +27,7 @@
 class FirmwareSim
 {
 public:
-	/**
-	 * @brief Constructor
-	 * @param conn The transport class, enables communication with LightBurn.
-	 */
-	FirmwareSim(Connection &conn);
+	FirmwareSim();
 
 	/**
 	 * @brief Execute a single iteration of the simulation loop.
@@ -48,6 +44,15 @@ public:
 	 */
 	SimState loop(int ms);
 
+	/**
+	 * @brief Stop previous transport connection and start new one.
+	 * @param conn The new connection.
+	 */
+	void setTransport(Transport *conn);
+
+	/** @brief Called when bytes are available to be read from transport. */
+	void rxCallback(const uint8_t *bytes, size_t len);
+
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
@@ -55,11 +60,11 @@ private:
 	/** Update the simulation. */
 	void update(int ms);
 
-	Connection &m_connection; // Connection to LightBurn - sends and receives bytes.
-	Configuration
-		m_config; // Configuration component - manages reading, writing, and storing config values.
-	MovementSim m_movement;	 // Movement component - simulates movement and laser actions.
+	Transport *m_transport = nullptr; // Connection to LightBurn - sends and receives bytes.
+	WireParser m_parser; // Buffers and parses incoming bytes into messages.
+	Configuration m_config; // Manages reading, writing, and storing config values.
+	MovementSim m_movement; // Movement component - simulates movement and laser actions.
 	FileSystem m_filesystem; // Filesystem component - receives and manages files from LightBurn.
-	OutputQueue m_out_q;	 // Output message queue.
+	OutputQueue m_out_q; // Output message queue.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 };
