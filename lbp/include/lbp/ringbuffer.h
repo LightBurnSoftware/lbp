@@ -103,12 +103,26 @@ public:
 		m_tail = 0;
 	}
 
+	/** Mark the current tail in case a rewind is requested */
+	void mark()
+	{
+		m_mark = m_tail;
+	}
+
+	/** Move the tail back to the mark. */
+	void rewind()
+	{
+		m_tail = m_mark;
+	}
+
+
 private:
 	static constexpr size_t kModMask = Capacity - 1;
 
 	uint8_t m_data[Capacity]; // Actual data.
 	size_t m_head = 0;		// Write index
 	size_t m_tail = 0;		// Read index
+	size_t m_mark = 0;
 };
 
 } // namespace lbp

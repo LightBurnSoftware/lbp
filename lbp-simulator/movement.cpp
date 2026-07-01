@@ -439,6 +439,28 @@ void MovementSim::stop()
 	m_laser_2.on = false;
 }
 
+void MovementSim::pause()
+{
+	if (m_state != MovementSim::State::Paused) {
+		m_paused.state = m_state;
+		m_paused.laser_1 = m_laser_1.on;
+		m_paused.laser_2 = m_laser_2.on;
+
+		m_laser_1.on = false;
+		m_laser_2.on = false;
+		m_state = MovementSim::State::Paused;
+	}
+}
+
+void MovementSim::resume()
+{
+	if (m_state == MovementSim::State::Paused) {
+		m_laser_1.on = m_paused.laser_1;
+		m_laser_2.on = m_paused.laser_2;
+		m_state = m_paused.state;
+	}
+}
+
 void MovementSim::startJog(Vec4 dir)
 {
 	if (m_state != MovementSim::State::Idle) {
@@ -505,21 +527,19 @@ void MovementSim::update(int ms)
 			next_state = updateTarget();
 		}
 		break;
+	case MovementSim::State::Paused:
+		break;
 	}
 	m_state = next_state;
 }
 
-Vec4 MovementSim::getPos() const
+SimState MovementSim::getSimState() const
 {
-	return m_pos;
-}
-
-float MovementSim::getLaserPower(int index) const
-{
-	if (index > 1) {
-		return m_laser_2.on ? m_laser_2.power_max : 0.f;
-	}
-	return m_laser_1.on ? m_laser_1.power_max : 0.f;
+	return SimState {
+		m_pos,
+		m_laser_1.on ? m_laser_1.power_max : 0.f,
+		m_laser_2.on ? m_laser_2.power_max : 0.f
+	};
 }
 
 bool MovementSim::canEnqueue() const
@@ -545,6 +565,12 @@ uint32_t MovementSim::getFwState(uint32_t state)
 		state |= lbp::state_executing_frame;
 	} else {
 		state &= ~lbp::state_executing_frame;
+	}
+
+	if (m_state == MovementSim::State::Paused) {
+		state |= lbp::state_paused;
+	} else {
+		state &= ~lbp::state_paused;
 	}
 
 	return state;

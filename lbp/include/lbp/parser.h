@@ -49,14 +49,23 @@ public:
 				seeklen += 1;
 				m_header = (m_header << 8) | m_buffer.readByte();
 				if (m_header == cmd_start) {
+					m_buffer.mark(); // If a bad packet is detected, rewind to just after this header.
 					m_state = State::Size;
 					seeklen = 0;
 				}
 				break;
 			case State::Size:
 				if (m_buffer.read(m_shortbuffer, 2)) {
-					m_payload.reset(readBE16(m_shortbuffer));
-					m_state = State::Data;
+					int16_t len = readBE16(m_shortbuffer);
+					if (len < size_min_payload || len > size_file_payload) {
+						// Reject messages of invalid size.
+						numbad += 1;
+						m_buffer.rewind();
+						m_state = State::HeaderSync;
+					} else {
+						m_payload.reset(len);
+						m_state = State::Data;
+					}
 				} else {
 					return false;
 				}
@@ -74,7 +83,9 @@ public:
 					if (readBE16(m_shortbuffer) == crc16(m_payload.data(), m_payload.size())) {
 						return true;
 					} else {
+						// Reject messages with invalid checksum.
 						numbad += 1;
+						m_buffer.rewind();
 					}
 				} else {
 					return false;
