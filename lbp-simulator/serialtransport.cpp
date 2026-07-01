@@ -15,7 +15,6 @@ SerialTransport::SerialTransport(const QString &port, int baud, QObject *parent)
 	m_serial_port->setStopBits(QSerialPort::OneStop);
 
 	connect(m_serial_port, &QSerialPort::readyRead, this, &SerialTransport::onBytesReady);
-    // Empty
 }
 
 bool SerialTransport::start()

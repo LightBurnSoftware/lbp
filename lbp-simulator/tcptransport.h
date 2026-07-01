@@ -28,12 +28,11 @@ public:
 
 	bool sendBytes(const uint8_t *data, int len) override;
 
-private slots:
+private:
 	void onNewConnection();
 	void readSocket();
 	void discardSocket();
 
-private:
 	int m_port = 0;
 	QTcpServer *m_server = nullptr;
 	QTcpSocket *m_socket = nullptr;
