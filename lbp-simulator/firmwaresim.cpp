@@ -56,10 +56,7 @@ SimState FirmwareSim::loop(int ms)
 	}
 
 	// collate simulation state for caller
-	SimState state;
-	state.pos = m_movement.getPos();
-	state.power = m_movement.getLaserPower(0x01);
-	return state;
+	return m_movement.getSimState();
 }
 
 void FirmwareSim::setTransport(Transport *conn)
@@ -102,9 +99,15 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		m_out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_pause:
-		return false;
+		gLog().push(Log::INFO, "Pause command received.");
+		m_movement.pause();
+		m_out_q.push(lbp::CmdMsg(cmd));
+		return true;
 	case lbp::cmd_continue:
-		return false;
+		gLog().push(Log::INFO, "Resume command received.");
+		m_movement.resume();
+		m_out_q.push(lbp::CmdMsg(cmd));
+		return true;
 	case lbp::cmd_get_state:
 		m_out_q.push(lbp::CmdMsg(cmd, 4, m_fw_state));
 		return true;

@@ -4,6 +4,7 @@
 #pragma once
 
 #include "configuration.h"
+#include "simstate.h"
 #include "simutils.h"
 #include "vec4.h"
 
@@ -57,6 +58,12 @@ public:
 	/** @brief stop all movement and cutting and clear the command queue. */
 	void stop();
 
+	/** @brief pause command execution. */
+	void pause();
+
+	/** @brief resume command job. */
+	void resume();
+
 	/**
 	 * @brief Gather the flags for firmware state from the movement simulation component.
 	 * @param fw_state The currently understood firmward state.
@@ -64,17 +71,19 @@ public:
 	 */
 	uint32_t getFwState(uint32_t fw_state);
 
-	/** @return the currenct position */
-	Vec4 getPos() const;
-
-	/** @return laser power as a percentage of max */
-	float getLaserPower(int index) const;
+	/** @return a structure representing the physical state of the toolhead, for display usage. */
+	SimState getSimState() const;
 
 	/** @return true if the internal command queue can enqueue another command, false otherwise. */
 	bool canEnqueue() const;
 
 private:
-	enum class State { Idle, Jogging, Moving, Dwelling };
+	enum class State { Idle, Jogging, Moving, Dwelling, Paused };
+	struct PausedState {
+		bool laser_1 = false;
+		bool laser_2 = false;
+		State state = State::Idle;
+	};
 
 	State updateTarget();
 	void startJog(Vec4 dir);
@@ -94,6 +103,7 @@ private:
 	uint32_t m_target_vel_u = 0; // user-specified target velocity (u)
 	LaserSettings m_laser_1; // current settings for laser 1
 	LaserSettings m_laser_2; // current settings for laser 2
+	PausedState m_paused; // state to resume after pause.
 	CmdQueue m_cmd_q; // queue for scheduled movement commands.
 	uint16_t m_job_cmd; // cache a "begin job" or "begin frame" command for state derivations.
 };

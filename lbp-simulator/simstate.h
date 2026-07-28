@@ -8,5 +8,6 @@
 struct SimState
 {
 	Vec4 pos;
-	float power;
+	float laser_1_power;
+	float laser_2_power;
 };
