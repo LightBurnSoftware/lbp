@@ -181,7 +181,6 @@ constexpr uint16_t cut_type_scan_bi_y = flag_cut_type_scan_bi | flag_y;
 // 0x6000: Movement -----------------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t flag_move = 0x6000; // (6 = "G", for "Go")
-
 // Home
 constexpr int16_t flag_home = flag_move | 0x0100;
 
@@ -219,8 +218,12 @@ constexpr uint16_t cmd_jog_stop_pos_u = flag_jog_stop_pos | flag_u;
 constexpr uint16_t cmd_jog_start_neg_u = flag_jog_start_neg | flag_u;
 constexpr uint16_t cmd_jog_stop_neg_u = flag_jog_stop_neg | flag_u;
 
-// Operator Moves: Discrete Jogging (relative)
-constexpr uint16_t flag_jog_step = flag_move | 0x0600;
+// For the next few movement types, we can use this flag for composing absolute or relative moves.
+constexpr uint16_t flag_abs = 0x0100;
+
+// Operator Moves: Discrete Jogging
+constexpr uint16_t flag_jog = flag_move | 0x0600;
+constexpr uint16_t flag_jog_step = flag_jog // relative jog
 
 constexpr uint16_t cmd_jog_step_x = flag_jog_step | flag_x;
 constexpr uint16_t cmd_jog_step_y = flag_jog_step | flag_y;
@@ -232,7 +235,7 @@ constexpr uint16_t cmd_jog_step_xyz = flag_jog_step | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_jog_step_xyzu = flag_jog_step | flag_x | flag_y | flag_z | flag_u;
 
 // Operator Moves: GoTo (absolute)
-constexpr uint16_t flag_goto = flag_move | 0x0700;
+constexpr uint16_t flag_goto = flag_jog | flag_abs;
 
 constexpr uint16_t cmd_goto_x = flag_goto | flag_x;
 constexpr uint16_t cmd_goto_y = flag_goto | flag_y;
@@ -243,32 +246,34 @@ constexpr uint16_t cmd_goto_xy = flag_goto | flag_x | flag_y;
 constexpr uint16_t cmd_goto_xyz = flag_goto | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_goto_xyzu = flag_goto | flag_x | flag_y | flag_z | flag_u;
 
-// Programmed Travel Commands: move directly without expectation to cut. ("rapid")
-constexpr uint16_t flag_travel_abs = flag_move | 0x0800;
-constexpr uint16_t flag_travel_rel = flag_move | 0x0900;
+// Programmed Rapid Commands: move directly without expectation to cut.
+constexpr uint16_t flag_rapid = flag_move | 0x0800;
+constexpr uint16_t flag_rapid_rel = flag_rapid;
+constexpr uint16_t flag_rapid_abs = flag_rapid | flag_abs;
 
 // Travel Commands: Argument: one signed int32 (micrometers) per indicated axis.
-constexpr uint16_t cmd_travel_rel_x = flag_travel_rel | flag_x;
-constexpr uint16_t cmd_travel_rel_y = flag_travel_rel | flag_y;
-constexpr uint16_t cmd_travel_rel_z = flag_travel_rel | flag_z;
-constexpr uint16_t cmd_travel_rel_u = flag_travel_rel | flag_u;
+constexpr uint16_t cmd_rapid_rel_x = flag_rapid_rel | flag_x;
+constexpr uint16_t cmd_rapid_rel_y = flag_rapid_rel | flag_y;
+constexpr uint16_t cmd_rapid_rel_z = flag_rapid_rel | flag_z;
+constexpr uint16_t cmd_rapid_rel_u = flag_rapid_rel | flag_u;
 
-constexpr uint16_t cmd_travel_rel_xy = flag_travel_rel | flag_x | flag_y;
-constexpr uint16_t cmd_travel_rel_xyz = flag_travel_rel | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_travel_rel_xyzu = flag_travel_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_rapid_rel_xy = flag_rapid_rel | flag_x | flag_y;
+constexpr uint16_t cmd_rapid_rel_xyz = flag_rapid_rel | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_rapid_rel_xyzu = flag_rapid_rel | flag_x | flag_y | flag_z | flag_u;
 
-constexpr uint16_t cmd_travel_abs_x = flag_travel_abs | flag_x;
-constexpr uint16_t cmd_travel_abs_y = flag_travel_abs | flag_y;
-constexpr uint16_t cmd_travel_abs_z = flag_travel_abs | flag_z;
-constexpr uint16_t cmd_travel_abs_u = flag_travel_abs | flag_u;
+constexpr uint16_t cmd_rapid_abs_x = flag_rapid_abs | flag_x;
+constexpr uint16_t cmd_rapid_abs_y = flag_rapid_abs | flag_y;
+constexpr uint16_t cmd_rapid_abs_z = flag_rapid_abs | flag_z;
+constexpr uint16_t cmd_rapid_abs_u = flag_rapid_abs | flag_u;
 
-constexpr uint16_t cmd_travel_abs_xy = flag_travel_abs | flag_x | flag_y;
-constexpr uint16_t cmd_travel_abs_xyz = flag_travel_abs | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_travel_abs_xyzu = flag_travel_abs | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_rapid_abs_xy = flag_rapid_abs | flag_x | flag_y;
+constexpr uint16_t cmd_rapid_abs_xyz = flag_rapid_abs | flag_x | flag_y | flag_z;
+constexpr uint16_t cmd_rapid_abs_xyzu = flag_rapid_abs | flag_x | flag_y | flag_z | flag_u;
 
 // Programmed Cut Commands: move while cutting.
-constexpr uint16_t flag_cut_abs = flag_move | 0x0A00;
-constexpr uint16_t flag_cut_rel = flag_move | 0x0B00;
+constexpr uint16_t flag_cut = flag_move | 0x0A00;
+constexpr uint16_t flag_cut_rel = flag_cut;
+constexpr uint16_t flag_cut_abs = flag_cut | flag_abs;
 
 // Cut Commands: Argument: one signed int32 (micrometers) per indicated axis.
 constexpr uint16_t cmd_cut_rel_x = flag_cut_rel | flag_x;

@@ -157,7 +157,7 @@ in LightBurn to move the laser in real time.
 - **Programmed** moves occur in the context of a job.
 
 Within these categories are further distinctions. Both **operator** and **programmed** moves may be either **absolute** or **relative**,
-with **operator** moves also having the option of being **continuous**. **Programmed** moves provide additional context of **cut** vs **travel**,
+with **operator** moves also having the option of being **continuous**. **Programmed** moves provide additional context of **cut** vs **rapid**,
 which may effect how the firmware plans the movement. In addition, the **homing** is considered an **operator** move.
 So, all together, we have:
 
@@ -169,8 +169,8 @@ So, all together, we have:
 - **goto**: move the laser directly to a certain absolute position. Think of this as an "absolute operator move."
 
 **Programmed**:
-- **relative travel**: move the laser a specified distance from its current position. It is **not expected** that the laser is cutting.
-- **absolute travel**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
+- **relative rapid**: move the laser a specified distance from its current position. It is **not expected** that the laser is cutting.
+- **absolute rapid**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
 - **relative cut**: move the laser a specified distance from its current position. The laser **is expected** to be active and cutting.
 - **absolute cut**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`).The laser **is expected** to be active and cutting.
 - **dwell**: perform no movement for a specified number of milliseconds.
@@ -321,34 +321,34 @@ Each command includes one 32-bit integer argument corresponding to the desired a
 | `cmd_cut_rel_xyz`     | int32 X, int32 Y, int32 Z (μm)           | 14             |
 | `cmd_cut_rel_xyzu`    | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
 
-#### Travel
-**Travel** Commands are programmed moves that signal to the firmware that the laser is **not expected** to be
-on and cutting during the move. Travel moves are expected to be faster than cuts.
+#### Rapid
+**Rapid** Commands are programmed moves that signal to the firmware that the laser is **not expected** to be
+on and cutting during the move. Rapid moves are expected to be faster than cuts.
 
-#### Absolute Travel
-Just like Absolute Cuts, Absolute Travel arguments are axis positions **relative to the jog origin**.
+#### Absolute Rapid
+Just like Absolute Cuts, Absolute Rapid arguments are axis positions **relative to the jog origin**.
 Job Origin is set in the Job Header using the `cmd_cut_from` message.
 
 | Command               | Arguments (Axis positions in micrometers) | Payload Length |
 |-----------------------|-------------------------------------------|----------------|
-| `cmd_travel_abs_x`    | int32 X (μm)                              | 6              |
-| `cmd_travel_abs_y`    | int32 Y (μm)                              | 6              |
-| `cmd_travel_abs_z`    | int32 Z (μm)                              | 6              |
-| `cmd_travel_abs_u`    | int32 U (μm)                              | 6              |
-| `cmd_travel_abs_xy`   | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_travel_abs_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_travel_abs_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| `cmd_rapid_abs_x`    | int32 X (μm)                              | 6              |
+| `cmd_rapid_abs_y`    | int32 Y (μm)                              | 6              |
+| `cmd_rapid_abs_z`    | int32 Z (μm)                              | 6              |
+| `cmd_rapid_abs_u`    | int32 U (μm)                              | 6              |
+| `cmd_rapid_abs_xy`   | int32 X, int32 Y (μm)                     | 10             |
+| `cmd_rapid_abs_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
+| `cmd_rapid_abs_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
 
-#### Relative Travel
+#### Relative Rapid
 | Command               | Arguments (axis distance in micrometers) | Payload Length |
 |-----------------------|------------------------------------------|----------------|
-| `cmd_travel_rel_x`    | int32 X (μm)                             | 6              |
-| `cmd_travel_rel_y`    | int32 Y (μm)                             | 6              |
-| `cmd_travel_rel_z`    | int32 Z (μm)                             | 6              |
-| `cmd_travel_rel_u`    | int32 U (μm)                             | 6              |
-| `cmd_travel_rel_xy`   | int32 X, int32 Y (μm)                    | 10             |
-| `cmd_travel_rel_xyz`  | int32 X, int32 Y, int32 Z (μm)           | 14             |
-| `cmd_travel_rel_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+| `cmd_rapid_rel_x`    | int32 X (μm)                             | 6              |
+| `cmd_rapid_rel_y`    | int32 Y (μm)                             | 6              |
+| `cmd_rapid_rel_z`    | int32 Z (μm)                             | 6              |
+| `cmd_rapid_rel_u`    | int32 U (μm)                             | 6              |
+| `cmd_rapid_rel_xy`   | int32 X, int32 Y (μm)                    | 10             |
+| `cmd_rapid_rel_xyz`  | int32 X, int32 Y, int32 Z (μm)           | 14             |
+| `cmd_rapid_rel_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
 
 #### Dwell
 While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of milliseconds.
@@ -421,7 +421,7 @@ Where value may be:
 ## Making a Cut
 Generally, cuts or engravings will be programmed in the following pattern:
 1. Settings for the cut, if they differ from those for the previous cut, are sent with respective commands - lasers are enabled or disabled, laser power and frequency are set, movement speed is set, etc.
-2. If the laser is not already positioned at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_travel_xy`.
+2. If the laser is not already positioned at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_rapid_xy`.
 3. `cmd_laser_on` and `cmd_cut_xy` are sent, turning on the laser(s) and performing the cut.
 
 ## Raster Engraving
@@ -509,7 +509,7 @@ LBP provides the following commands to inform the firmware of the boundaries of 
 This is where the action of the job is programmed. This will mostly consist of:
 - commands for applying laser settings
 - commands for applying cut settings
-- commands for traveling and cutting
+- commands for moving and cutting
 
 ### Files
 A LBP **file** is simply a concatenated list of valid and complete LBP messages.
