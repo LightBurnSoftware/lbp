@@ -360,8 +360,8 @@ This can occur whether the laser is on or off.
 
 ## Controlling the Laser
 Your machine may have more than one laser tube. All laser control commands have 1-byte laser index argument
-in addition to any respective numerical arguments. This index is `1`-based, with `0` being shorthand for
-"use whichever lasers have been enabled."
+in addition to any respective numerical arguments. This index is `0`-based, with index `0` corresponding to the first laser,
+`1` to the second, etc.
 
 | Command               | Arguments                                  | Payload Length |
 |-----------------------|--------------------------------------------|----------------|
@@ -379,12 +379,7 @@ For example, 100% is represented as `65535`, 50% as `32768`, and 1% as `655`.
 
 ### Enabling Laser Tubes
 Before embarking on a cut, LB will send `cmd_laser_enable` (and possibly `cmd_laser_disable`) messages
-to dictate which lasers are being utilized for a cut.
-
-A laser index value of `0` is **not** valid for `cmd_laser_enable`, since `cmd_laser_enable` is the command that
-gives the `0` index its meaning for other commands.
-
-A laser index value of `0` **is** valid for `cmd_laser_disable`, and will disable **all** laser tubes.
+to indicate to the firmware that these lasers are intended to be used soon.
 
 ### Laser Power
 Laser power for a cut is sent as a percentage of the laser's configured maximum output power.
@@ -400,9 +395,6 @@ Once the laser settings have been sent, it is still necessary to turn the enable
 |-----------------|------------------|----------------|
 | `cmd_laser_on`  | int8 laser index | 3              |
 | `cmd_laser_off` | int8 laser index | 3              |
-
-**Remember:** If respective `cmd_laser_enable` and `cmd_laser_disable` have been sent prior to these commands, it is
-appropriate to send a laser index of `0` to apply these commands to the enabled laser tube(s).
 
 ### Cut Type
 This command is a work-in-progress, intended to give the firmware information about the upcoming cuts that might be helpful in motion planning.
@@ -571,12 +563,6 @@ the contained movement commands are part of a framing operation.
 | `cmd_frame_begin`  | 2              | Indicates that all following movement commands are part of a framing operation. |
 | `cmd_frame_end`    | 2              | Marks the end of a framing operation.                                           |
 
-Framing operations can either be streamed or sent as a file.
-
-### TODO: Streaming vs. Files for Framing operations.
-It is intended that framing operations be either streamed or sent as a file. If sent as a file,
-we may require a some special commands to enable the firmware distinguish whether it should
-execute its most recently received job file or most recently recieved frame file.
 
 ## Queries
 The responses to all commands discussed above have been quite simple - an acknowledgment consisting of the same command code and no arguments.
