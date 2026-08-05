@@ -17,7 +17,17 @@ struct LaserSettings {
 	float freq = 0.f;
 	float power_min = 0.f;
 	float power_max = 0.f;
+	size_t num_rasters = 0;
+	float raster_powers[lbp::size_max_cmd_args >> 1];
 	bool on = false;
+	bool enabled = false;
+
+	/** Call only after reading payload's laser index*/
+	void setRaster(lbp::CmdPayload &payload);
+	/** Update the current max power to the respective raster power based on progress ratio [0.0, 1.0]. */
+	void progressRaster(float progress);
+	void clearRaster();
+	bool isRaster() const;
 };
 
 /**
@@ -27,7 +37,7 @@ struct LaserSettings {
  *
  * When it processes a payload, and that payload is related to laser movement or cutting, or other
  * job operations, it will send a return command and then push that command onto a FIFO command queue.
- * As long as it is not paused (TODO), it will process this command queue in order, moving the toolhead, setting
+ * As long as it is not paused, it will process this command queue in order, moving the toolhead, setting
  * laser power, until the queue is exhausted.
  *
  * This component is not intended to represent real-world motion-planning. It does not, as yet, simulate
@@ -89,9 +99,12 @@ private:
 	void startJog(Vec4 dir);
 	void stopJog();
 
+	float getMoveProgress() const;
+
 	Configuration &m_config; // reference to configuration component, for certain lookups.
 	State m_state = State::Idle; // "movement state" - controls internal state machine.
 	Vec4 m_pos; // current position vector.
+	Vec4 m_start_pos; // start position of the current movement vector.
 	Vec4 m_target_pos; // user-specified target position.
 	Vec4 m_job_origin; // origin offset for absolute moves during the current job.
 	Vec4 m_max_pos; // configured maximum dimension (assume Quadrant I).

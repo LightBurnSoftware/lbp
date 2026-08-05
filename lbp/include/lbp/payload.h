@@ -103,7 +103,7 @@ public:
 		return m_data + size_cmd;
 	}
 
-	/** @brief reset Clears and reallocates the memory. */
+	/** @brief reset Reset the size and read cursor. */
 	void reset(uint16_t size)
 	{
 		m_size = size;
