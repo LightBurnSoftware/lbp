@@ -77,11 +77,11 @@ void SimView::tick(SimState state)
 	update();
 }
 
-void SimView::heatPx(int x, int y, float percent, int channel)
+void SimView::heatPx(int x, int y, float rate, int channel)
 {
 	if (x >= 0 && x < m_buffer.width() && y >= 0 && y < m_buffer.width()) {
 		QRgb px = m_buffer.pixel(x, y);
-		int heat = 0xff & qMin(255, (int) (255 * percent));
+		int heat = 0xff & qMin(255, (int) (255 * rate));
 		switch (channel) {
 		case 1:
 			px = qRed(px) | (heat << 8) | qBlue(px);

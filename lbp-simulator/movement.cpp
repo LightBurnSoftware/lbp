@@ -34,6 +34,8 @@ static inline double xydistance(const Vec4 &a, const Vec4 &b)
 	return sqrt( pow(static_cast<double>(b.x - a.x), 2) + pow(static_cast<double>(b.y - a.y), 2) );
 }
 
+static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535; }
+
 MovementSim::MovementSim(Configuration &config)
 	: m_config(config)
 	, m_max_pos(300000, 180000, 120000, 60000) // hardcoded for now.
@@ -379,20 +381,20 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_laser_power_min: {
 			uint8_t index = p.readByteArg();
 			if (index == 0) {
-				m_laser_1.power_min = p.readShortArg();
+				m_laser_1.power_min = normalize(p.readShortArg());
 			}
 			else if (index == 1) {
-				m_laser_2.power_min = p.readShortArg();
+				m_laser_2.power_min = normalize(p.readShortArg());
 			}
 		} break;
 		case lbp::cmd_laser_power_max: {
 			uint8_t index = p.readByteArg();
 			if (index == 0) {
-				m_laser_1.power_max = p.readShortArg();
+				m_laser_1.power_max = normalize(p.readShortArg());
 				m_laser_1.clearRaster();
 			}
 			else if (index == 1) {
-				m_laser_2.power_max = p.readShortArg();
+				m_laser_2.power_max = normalize(p.readShortArg());
 				m_laser_2.clearRaster();
 			}
 		} break;
@@ -642,7 +644,7 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 
 	// Assume index byte has already been read
 	for (size_t i = 0; i < num_rasters; i++) {
-		raster_powers[i] = payload.readShortArg();
+		raster_powers[i] = normalize(payload.readShortArg());
 	}
 }
 
