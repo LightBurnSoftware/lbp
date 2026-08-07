@@ -59,7 +59,7 @@ MainWindow::MainWindow(QWidget *parent)
 	setCentralWidget(centralWidget);
 
 	m_sim_timer.start();
-	startTimer(10);
+	startTimer(5);
 }
 
 MainWindow::~MainWindow()

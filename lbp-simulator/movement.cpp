@@ -341,7 +341,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_laser_enable: {
 			gLog().push(Log::DEBUG, "Laser enable");
 			uint8_t index = p.readByteArg();
-			if (index = 0) {
+			if (index == 0) {
 				m_laser_1.enabled = true;
 			}
 			else if (index == 1) {
@@ -351,7 +351,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_laser_disable: {
 			gLog().push(Log::DEBUG, "Laser disable");
 			uint8_t index = p.readByteArg();
-			if (index = 0) {
+			if (index == 0) {
 				m_laser_1.enabled = false;
 			}
 			else if (index == 1) {
@@ -391,10 +391,12 @@ MovementSim::State MovementSim::updateTarget()
 			uint8_t index = p.readByteArg();
 			if (index == 0) {
 				m_laser_1.power_max = normalize(p.readShortArg());
+				gLog().push(Log::INFO, QString("set power max 1: ") + QString::number(m_laser_1.power_max));
 				m_laser_1.clearRaster();
 			}
 			else if (index == 1) {
 				m_laser_2.power_max = normalize(p.readShortArg());
+				gLog().push(Log::INFO, QString("set power max 2: ") + QString::number(m_laser_1.power_max));
 				m_laser_2.clearRaster();
 			}
 		} break;
@@ -462,6 +464,7 @@ MovementSim::State MovementSim::updateTarget()
 		if (target != m_pos) {
 			m_vel = calcVelocity(target - m_pos, m_target_vel_xy);
 			m_target_pos = target;
+			m_start_pos = m_pos;
 			gLog().push(Log::DEBUG, QString("New Target:   %1").arg(toQString(m_target_pos)));
 			gLog().push(Log::DEBUG, QString("New Velocity: %1").arg(toQString(m_vel)));
 			return MovementSim::State::Moving;
@@ -563,9 +566,9 @@ void MovementSim::update(int ms)
 		m_laser_1.progressRaster(progress);
 		m_laser_2.progressRaster(progress);
 		if (m_pos == m_target_pos) {
-			next_state = updateTarget();
 			m_laser_1.clearRaster();
 			m_laser_2.clearRaster();
+			next_state = updateTarget();
 		} else {
 			m_vel = calcVelocity(m_target_pos - m_pos, m_target_vel_xy);
 		}
@@ -639,23 +642,30 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 	if (payload.cmd() != lbp::cmd_raster_power) return;
 
 	num_rasters = (payload.size() - 3) >> 1;
+	gLog().push(Log::INFO, QString("set raster ") + QString::number(num_rasters));
 
-	if (!num_rasters) return;
+	if (!num_rasters) {
+		return;
+	}
 
 	// Assume index byte has already been read
 	for (size_t i = 0; i < num_rasters; i++) {
-		raster_powers[i] = normalize(payload.readShortArg());
+		float power = normalize(payload.readShortArg());
+		raster_powers[i] = power;
+		gLog().push(Log::INFO, QString("----- ") + QString::number(power));
 	}
 }
 
 void LaserSettings::progressRaster(float progress)
 {
 	if (num_rasters > 0) {
-		power_max = raster_powers[(size_t) (progress * num_rasters)];
+		power_max = raster_powers[(size_t) (progress * (num_rasters - 1))];
+		gLog().push(Log::INFO, "..." + QString::number(progress) + "..." + QString::number(power_max));
 	}
 }
 
 void LaserSettings::clearRaster()
 {
+	gLog().push(Log::INFO, "clearing rasters");
 	num_rasters = 0;
 }
