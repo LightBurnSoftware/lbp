@@ -642,7 +642,7 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 	if (payload.cmd() != lbp::cmd_raster_power) return;
 
 	num_rasters = (payload.size() - 3) >> 1;
-	gLog().push(Log::INFO, QString("set raster ") + QString::number(num_rasters));
+	gLog().info(QString("set raster ") + QString::number(num_rasters));
 
 	if (!num_rasters) {
 		return;
@@ -652,7 +652,7 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 	for (size_t i = 0; i < num_rasters; i++) {
 		float power = normalize(payload.readShortArg());
 		raster_powers[i] = power;
-		gLog().push(Log::INFO, QString("----- ") + QString::number(power));
+		gLog().info(QString("----- ") + QString::number(power));
 	}
 }
 
@@ -660,12 +660,12 @@ void LaserSettings::progressRaster(float progress)
 {
 	if (num_rasters > 0) {
 		power_max = raster_powers[(size_t) (progress * (num_rasters - 1))];
-		gLog().push(Log::INFO, "..." + QString::number(progress) + "..." + QString::number(power_max));
+		gLog().info("..." + QString::number(progress) + "..." + QString::number(power_max));
 	}
 }
 
 void LaserSettings::clearRaster()
 {
-	gLog().push(Log::INFO, "clearing rasters");
+	gLog().info("clearing rasters");
 	num_rasters = 0;
 }
