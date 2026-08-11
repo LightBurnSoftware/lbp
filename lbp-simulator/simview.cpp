@@ -124,7 +124,7 @@ void SimView::heat(const SimState &state)
 	int y = getYPx(state.pos.y);
 	heatBall(x, y, 3, 0.5, 0); // heat red channel for position no matter what.
 	if (state.laser_1_power > 0.f) {
-		heatBall(x, y, 1, state.laser_1_power, 2); // heat blue channel for cutting power.
+		heatBall(x, y, 0, state.laser_1_power, 2); // heat blue channel for cutting power.
 	}
 }
 
