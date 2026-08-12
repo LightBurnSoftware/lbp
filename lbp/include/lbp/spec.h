@@ -144,7 +144,11 @@ constexpr uint16_t cmd_speed_xy = flag_speed | flag_x | flag_y;
 constexpr uint16_t cmd_speed_x = flag_speed | flag_x;
 constexpr uint16_t cmd_speed_y = flag_speed | flag_y;
 constexpr uint16_t cmd_speed_z = flag_speed | flag_z;
+constexpr uint16_t cmd_speed_a = flag_speed | flag_a;
+constexpr uint16_t cmd_speed_b = flag_speed | flag_b;
+constexpr uint16_t cmd_speed_c = flag_speed | flag_c;
 constexpr uint16_t cmd_speed_u = flag_speed | flag_u;
+constexpr uint16_t cmd_speed_v = flag_speed | flag_v;
 
 // Boundary commands
 constexpr uint16_t flag_bounds_min = flag_settings | 0x0200;
@@ -157,8 +161,16 @@ constexpr uint16_t cmd_bounds_min_y = flag_bounds_min | flag_y;
 constexpr uint16_t cmd_bounds_max_y = flag_bounds_max | flag_y;
 constexpr uint16_t cmd_bounds_min_z = flag_bounds_min | flag_z;
 constexpr uint16_t cmd_bounds_max_z = flag_bounds_max | flag_z;
+constexpr uint16_t cmd_bounds_min_a = flag_bounds_min | flag_a;
+constexpr uint16_t cmd_bounds_max_a = flag_bounds_max | flag_a;
+constexpr uint16_t cmd_bounds_min_b = flag_bounds_min | flag_b;
+constexpr uint16_t cmd_bounds_max_b = flag_bounds_max | flag_b;
+constexpr uint16_t cmd_bounds_min_c = flag_bounds_min | flag_c;
+constexpr uint16_t cmd_bounds_max_c = flag_bounds_max | flag_c;
 constexpr uint16_t cmd_bounds_min_u = flag_bounds_min | flag_u;
 constexpr uint16_t cmd_bounds_max_u = flag_bounds_max | flag_u;
+constexpr uint16_t cmd_bounds_min_v = flag_bounds_min | flag_v;
+constexpr uint16_t cmd_bounds_max_v = flag_bounds_max | flag_v;
 
 // When this appears in a job header, all following absolute xy move commands
 // should be interpreted as relative to the following options.
@@ -190,10 +202,16 @@ constexpr int16_t flag_home = flag_move | 0x0100;
 constexpr int16_t cmd_home_x = flag_home | flag_x;
 constexpr int16_t cmd_home_y = flag_home | flag_y;
 constexpr int16_t cmd_home_z = flag_home | flag_z;
+constexpr int16_t cmd_home_a = flag_home | flag_a;
+constexpr int16_t cmd_home_b = flag_home | flag_b;
+constexpr int16_t cmd_home_c = flag_home | flag_c;
 constexpr int16_t cmd_home_u = flag_home | flag_u;
+constexpr int16_t cmd_home_v = flag_home | flag_v;
 constexpr int16_t cmd_home_xy = flag_home | flag_x | flag_y;
 constexpr int16_t cmd_home_xyz = flag_home | flag_x | flag_y | flag_z;
 constexpr int16_t cmd_home_xyzu = flag_home | flag_x | flag_y | flag_z | flag_u;
+constexpr int16_t cmd_home_abc = flag_home | flag_a | flag_b | flag_c;
+constexpr int16_t cmd_home_xyzabc = flag_home | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 // Operator Moves: Continuous Jogging
 constexpr uint16_t flag_jog_start_pos = flag_move | 0x0200;
@@ -216,10 +234,30 @@ constexpr uint16_t cmd_jog_stop_pos_z = flag_jog_stop_pos | flag_z;
 constexpr uint16_t cmd_jog_start_neg_z = flag_jog_start_neg | flag_z;
 constexpr uint16_t cmd_jog_stop_neg_z = flag_jog_stop_neg | flag_z;
 
+constexpr uint16_t cmd_jog_start_pos_a = flag_jog_start_pos | flag_a;
+constexpr uint16_t cmd_jog_stop_pos_a = flag_jog_stop_pos | flag_a;
+constexpr uint16_t cmd_jog_start_neg_a = flag_jog_start_neg | flag_a;
+constexpr uint16_t cmd_jog_stop_neg_a = flag_jog_stop_neg | flag_a;
+
+constexpr uint16_t cmd_jog_start_pos_b = flag_jog_start_pos | flag_b;
+constexpr uint16_t cmd_jog_stop_pos_b = flag_jog_stop_pos | flag_b;
+constexpr uint16_t cmd_jog_start_neg_b = flag_jog_start_neg | flag_b;
+constexpr uint16_t cmd_jog_stop_neg_b = flag_jog_stop_neg | flag_b;
+
+constexpr uint16_t cmd_jog_start_pos_c = flag_jog_start_pos | flag_c;
+constexpr uint16_t cmd_jog_stop_pos_c = flag_jog_stop_pos | flag_c;
+constexpr uint16_t cmd_jog_start_neg_c = flag_jog_start_neg | flag_c;
+constexpr uint16_t cmd_jog_stop_neg_c = flag_jog_stop_neg | flag_c;
+
 constexpr uint16_t cmd_jog_start_pos_u = flag_jog_start_pos | flag_u;
 constexpr uint16_t cmd_jog_stop_pos_u = flag_jog_stop_pos | flag_u;
 constexpr uint16_t cmd_jog_start_neg_u = flag_jog_start_neg | flag_u;
 constexpr uint16_t cmd_jog_stop_neg_u = flag_jog_stop_neg | flag_u;
+
+constexpr uint16_t cmd_jog_start_pos_v = flag_jog_start_pos | flag_v;
+constexpr uint16_t cmd_jog_stop_pos_v = flag_jog_stop_pos | flag_v;
+constexpr uint16_t cmd_jog_start_neg_v = flag_jog_start_neg | flag_v;
+constexpr uint16_t cmd_jog_stop_neg_v = flag_jog_stop_neg | flag_v;
 
 // For the next few movement types, we can use this flag for composing absolute or relative moves.
 constexpr uint16_t flag_abs = 0x0100;
@@ -231,11 +269,17 @@ constexpr uint16_t flag_jog_step = flag_jog; // relative jog
 constexpr uint16_t cmd_jog_step_x = flag_jog_step | flag_x;
 constexpr uint16_t cmd_jog_step_y = flag_jog_step | flag_y;
 constexpr uint16_t cmd_jog_step_z = flag_jog_step | flag_z;
+constexpr uint16_t cmd_jog_step_a = flag_jog_step | flag_a;
+constexpr uint16_t cmd_jog_step_b = flag_jog_step | flag_b;
+constexpr uint16_t cmd_jog_step_c = flag_jog_step | flag_c;
 constexpr uint16_t cmd_jog_step_u = flag_jog_step | flag_u;
+constexpr uint16_t cmd_jog_step_v = flag_jog_step | flag_v;
 
 constexpr uint16_t cmd_jog_step_xy = flag_jog_step | flag_x | flag_y;
 constexpr uint16_t cmd_jog_step_xyz = flag_jog_step | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_jog_step_xyzu = flag_jog_step | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_jog_step_abc = flag_jog_step | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_jog_step_xyzabc = flag_jog_step | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 // Operator Moves: GoTo (absolute)
 constexpr uint16_t flag_goto = flag_jog | flag_abs;
@@ -243,11 +287,17 @@ constexpr uint16_t flag_goto = flag_jog | flag_abs;
 constexpr uint16_t cmd_goto_x = flag_goto | flag_x;
 constexpr uint16_t cmd_goto_y = flag_goto | flag_y;
 constexpr uint16_t cmd_goto_z = flag_goto | flag_z;
+constexpr uint16_t cmd_goto_a = flag_goto | flag_a;
+constexpr uint16_t cmd_goto_b = flag_goto | flag_b;
+constexpr uint16_t cmd_goto_c = flag_goto | flag_c;
 constexpr uint16_t cmd_goto_u = flag_goto | flag_u;
+constexpr uint16_t cmd_goto_v = flag_goto | flag_v;
 
 constexpr uint16_t cmd_goto_xy = flag_goto | flag_x | flag_y;
 constexpr uint16_t cmd_goto_xyz = flag_goto | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_goto_xyzu = flag_goto | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_goto_abc = flag_goto | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_goto_xyzabc = flag_goto | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 // Programmed Rapid Commands: move directly without expectation to cut.
 constexpr uint16_t flag_rapid = flag_move | 0x0800;
@@ -258,20 +308,32 @@ constexpr uint16_t flag_rapid_abs = flag_rapid | flag_abs;
 constexpr uint16_t cmd_rapid_rel_x = flag_rapid_rel | flag_x;
 constexpr uint16_t cmd_rapid_rel_y = flag_rapid_rel | flag_y;
 constexpr uint16_t cmd_rapid_rel_z = flag_rapid_rel | flag_z;
+constexpr uint16_t cmd_rapid_rel_a = flag_rapid_rel | flag_a;
+constexpr uint16_t cmd_rapid_rel_b = flag_rapid_rel | flag_b;
+constexpr uint16_t cmd_rapid_rel_c = flag_rapid_rel | flag_c;
 constexpr uint16_t cmd_rapid_rel_u = flag_rapid_rel | flag_u;
+constexpr uint16_t cmd_rapid_rel_v = flag_rapid_rel | flag_v;
 
 constexpr uint16_t cmd_rapid_rel_xy = flag_rapid_rel | flag_x | flag_y;
 constexpr uint16_t cmd_rapid_rel_xyz = flag_rapid_rel | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_rapid_rel_xyzu = flag_rapid_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_rapid_rel_abc = flag_rapid_rel | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_rapid_rel_xyzabc = flag_rapid_rel | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 constexpr uint16_t cmd_rapid_abs_x = flag_rapid_abs | flag_x;
 constexpr uint16_t cmd_rapid_abs_y = flag_rapid_abs | flag_y;
 constexpr uint16_t cmd_rapid_abs_z = flag_rapid_abs | flag_z;
+constexpr uint16_t cmd_rapid_abs_a = flag_rapid_abs | flag_a;
+constexpr uint16_t cmd_rapid_abs_b = flag_rapid_abs | flag_b;
+constexpr uint16_t cmd_rapid_abs_c = flag_rapid_abs | flag_c;
 constexpr uint16_t cmd_rapid_abs_u = flag_rapid_abs | flag_u;
+constexpr uint16_t cmd_rapid_abs_v = flag_rapid_abs | flag_v;
 
 constexpr uint16_t cmd_rapid_abs_xy = flag_rapid_abs | flag_x | flag_y;
 constexpr uint16_t cmd_rapid_abs_xyz = flag_rapid_abs | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_rapid_abs_xyzu = flag_rapid_abs | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_rapid_abs_abc = flag_rapid_abs | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_rapid_abs_xyzabc = flag_rapid_abs | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 // Programmed Cut Commands: move while cutting.
 constexpr uint16_t flag_cut = flag_move | 0x0A00;
@@ -282,20 +344,32 @@ constexpr uint16_t flag_cut_abs = flag_cut | flag_abs;
 constexpr uint16_t cmd_cut_rel_x = flag_cut_rel | flag_x;
 constexpr uint16_t cmd_cut_rel_y = flag_cut_rel | flag_y;
 constexpr uint16_t cmd_cut_rel_z = flag_cut_rel | flag_z;
+constexpr uint16_t cmd_cut_rel_a = flag_cut_rel | flag_a;
+constexpr uint16_t cmd_cut_rel_b = flag_cut_rel | flag_b;
+constexpr uint16_t cmd_cut_rel_c = flag_cut_rel | flag_c;
 constexpr uint16_t cmd_cut_rel_u = flag_cut_rel | flag_u;
+constexpr uint16_t cmd_cut_rel_v = flag_cut_rel | flag_v;
 
 constexpr uint16_t cmd_cut_rel_xy = flag_cut_rel | flag_x | flag_y;
 constexpr uint16_t cmd_cut_rel_xyz = flag_cut_rel | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_cut_rel_xyzu = flag_cut_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_cut_rel_abc = flag_cut_rel | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_cut_rel_xyzabc = flag_cut_rel | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 constexpr uint16_t cmd_cut_abs_x = flag_cut_abs | flag_x;
 constexpr uint16_t cmd_cut_abs_y = flag_cut_abs | flag_y;
 constexpr uint16_t cmd_cut_abs_z = flag_cut_abs | flag_z;
+constexpr uint16_t cmd_cut_abs_a = flag_cut_abs | flag_a;
+constexpr uint16_t cmd_cut_abs_b = flag_cut_abs | flag_b;
+constexpr uint16_t cmd_cut_abs_c = flag_cut_abs | flag_c;
 constexpr uint16_t cmd_cut_abs_u = flag_cut_abs | flag_u;
+constexpr uint16_t cmd_cut_abs_v = flag_cut_abs | flag_v;
 
 constexpr uint16_t cmd_cut_abs_xy = flag_cut_abs | flag_x | flag_y;
 constexpr uint16_t cmd_cut_abs_xyz = flag_cut_abs | flag_x | flag_y | flag_z;
 constexpr uint16_t cmd_cut_abs_xyzu = flag_cut_abs | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_cut_abs_abc = flag_cut_abs | flag_a | flag_b | flag_c;
+constexpr uint16_t cmd_cut_abs_xyzabc = flag_cut_abs | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c;
 
 // Dwell
 constexpr uint16_t cmd_dwell = flag_move | 0x0D00; // int32 duration (microseconds)
@@ -333,11 +407,17 @@ constexpr uint16_t flag_pos = flag_state | 0x0100;
 constexpr uint16_t cmd_pos_x = flag_pos | flag_x; // return int32 micrometers
 constexpr uint16_t cmd_pos_y = flag_pos | flag_y; // return int32 micrometers
 constexpr uint16_t cmd_pos_z = flag_pos | flag_z; // return int32 micrometers
+constexpr uint16_t cmd_pos_a = flag_pos | flag_a; // return int32 micrometers
+constexpr uint16_t cmd_pos_b = flag_pos | flag_b; // return int32 micrometers
+constexpr uint16_t cmd_pos_c = flag_pos | flag_c; // return int32 micrometers
 constexpr uint16_t cmd_pos_u = flag_pos | flag_u; // return int32 micrometers
+constexpr uint16_t cmd_pos_v = flag_pos | flag_v; // return int32 micrometers
 
 constexpr uint16_t cmd_pos_xy = flag_pos | flag_x | flag_y; // return int32 micrometers (x, y)
 constexpr uint16_t cmd_pos_xyz = flag_pos | flag_x | flag_y | flag_z; // return int32 micrometers (x, y, z)
 constexpr uint16_t cmd_pos_xyzu = flag_pos | flag_x | flag_y | flag_z | flag_u; // return int32 micrometers (x, y, z, u)
+constexpr uint16_t cmd_pos_abc = flag_pos | flag_a | flag_b | flag_c; // return int32 micrometers (a, b, c)
+constexpr uint16_t cmd_pos_xyzabc = flag_pos | flag_x | flag_y | flag_z | flag_a | flag_b | flag_c; // return int32 micrometers (x, y, z, a, b, c)
 
 // TODO: machine lifespan queries
 constexpr uint16_t flag_total_time = flag_state | 0x0800;
@@ -349,7 +429,11 @@ constexpr uint16_t flag_total_travel = flag_state | 0x0900;
 constexpr uint16_t cmd_total_travel_x = flag_total_travel | flag_x; // TODO: return uint32 meters
 constexpr uint16_t cmd_total_travel_y = flag_total_travel | flag_y; // TODO: return uint32 meters
 constexpr uint16_t cmd_total_travel_z = flag_total_travel | flag_z; // TODO: return uint32 meters
+constexpr uint16_t cmd_total_travel_a = flag_total_travel | flag_a; // TODO: return uint32 meters
+constexpr uint16_t cmd_total_travel_b = flag_total_travel | flag_b; // TODO: return uint32 meters
+constexpr uint16_t cmd_total_travel_c = flag_total_travel | flag_c; // TODO: return uint32 meters
 constexpr uint16_t cmd_total_travel_u = flag_total_travel | flag_u; // TODO: return uint32 meters
+constexpr uint16_t cmd_total_travel_v = flag_total_travel | flag_v; // TODO: return uint32 meters
 
 // ----------------------------------------------------------------------------
 // 0xC000: Configuration ------------------------------------------------------
@@ -501,9 +585,12 @@ constexpr uint16_t cfg_rotary_diameter = flag_cfg | 0x0223; // micrometers
 constexpr uint16_t cfg_wireless_panel_fast = flag_cfg | 0x0224; // micrometers/sec
 constexpr uint16_t cfg_wireless_panel_slow = flag_cfg | 0x0225; // micrometers/sec
 
-// Configurables - Axis and Autolayout
-constexpr uint16_t cfg_autolayout = flag_cfg | 0x0401;
+// Configurables - Axis
 constexpr uint16_t cfg_axis_auto_home = flag_cfg | 0x0402;
+
+// Other boolean settings
+// Laser 1 Output Signal
+// Laser 2 Output Signal
 
 } // namespace lbp
 

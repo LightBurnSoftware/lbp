@@ -192,7 +192,6 @@ static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
 										   cfg_rotary_diameter,
 										   cfg_wireless_panel_fast,
 										   cfg_wireless_panel_slow,
-										   cfg_autolayout,
 										   cfg_axis_auto_home,
 										   cfg_user_origin_x,
 										   cfg_user_origin_y};
@@ -495,9 +494,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_wireless_panel_slow:
 		name = "cfg_wireless_panel_slow";
 		return true;
-	case cfg_autolayout:
-		name = "cfg_autolayout";
-		return true;
 	case cfg_axis_auto_home:
 		name = "cfg_axis_auto_home";
 		return true;
@@ -602,7 +598,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_rotary_diameter:
 	case cfg_wireless_panel_fast:
 	case cfg_wireless_panel_slow:
-	case cfg_autolayout:
 	case cfg_axis_auto_home:
 	case cfg_user_origin_x:
 	case cfg_user_origin_y:
