@@ -134,7 +134,11 @@ When appropriate, the LSB (Least Significant Nibble) of certain commands may con
 - `0x0001`: X Axis
 - `0x0002`: Y Axis
 - `0x0004`: Z Axis
-- `0x0008`: U Axis
+- `0x0008`: A Axis
+- `0x0010`: B Axis
+- `0x0020`: C Axis
+- `0x0040`: U Axis
+- `0x0080`: V Axis
 
 or some bitwise-OR combinations thereof.
 
@@ -142,11 +146,17 @@ or some bitwise-OR combinations thereof.
 Consider the command `cmd_cut_abs_xy` ("Move to absolute X and Y position while cutting"):
 
 `0x6A03` is composed of:
-- `0x6000`: MSB for "movement."
-- `0x0A00`: Indicates an "absolute cut" move (within the "movement" category).
+- `0x6000`: MSN for "movement."
+- `0x0B00`: Indicates an "absolute cut" move (within the "movement" category).
 - `0x0003`: Flags for both X and Y axes are set.
 
 Put together, a developer inspecting LBP messages on the wire can read this quite easily.
+
+
+## TODO : Describe arbitrary movement combinatorics
+**NOTE:** While common examples will be given in the tables below, these tables are not exhaustive.
+Any command whose MSB is a valid movement category and whose LSB is a bitwise combination of independent
+axis flags can be valid, provided the machine supports movement along the specified axes.
 
 ## Moving the Laser
 LBP provides many categories of movement commands. This is to give the firmware **context** for the movement.
@@ -181,10 +191,6 @@ configuration of default speeds and movement behaviors. The intention is to help
 **Note**: These **programmed movement** commands **do not** automatically turn the laser on or off. The user is expected to program those commands separately,
 prior to the movement commands.
 
-#### TODO: Galvanometer Movement
-How these movement commands may differ for galvanometer movement is yet to be designed.
-We may either define different commands, or specify that the same commands are to be interpreted with different units.
-
 ### Movement Speed
 These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands, see below).
 If no speed has been set by the user since the last power cycle, the laser should move at the rate specified by configured defaults.
@@ -205,6 +211,10 @@ It may be useful to define different speed commands for the different kinds of m
 We may do this in the future. For now, `cmd_speed_*` overrides default behavior for all moves,
 and most movement commands are expected to be preceeded with a `cmd_speed_*` if they wish to
 have different speeds than preceding movements.
+
+### Movement Commands
+Movement commands are composed by combining a valid movement category MSB
+
 
 ### Operator Movements
 These commands are expected to originate from a movement panel in the user interface. The user is issuing movement commands to the machine live
@@ -230,10 +240,15 @@ Each command includes one 32-bit integer argument corresponding to the desired a
 | `cmd_goto_x`    | int32 X (μm)                              | 6              |
 | `cmd_goto_y`    | int32 Y (μm)                              | 6              |
 | `cmd_goto_z`    | int32 Z (μm)                              | 6              |
+| `cmd_goto_a`    | int32 A (μm)                              | 6              |
+| `cmd_goto_b`    | int32 B (μm)                              | 6              |
+| `cmd_goto_c`    | int32 C (μm)                              | 6              |
 | `cmd_goto_u`    | int32 U (μm)                              | 6              |
+| `cmd_goto_u`    | int32 V (μm)                              | 6              |
 | `cmd_goto_xy`   | int32 X, int32 Y (μm)                     | 10             |
 | `cmd_goto_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
 | `cmd_goto_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| `cmd_goto_abc`  | int32 A, int32 B, int32 C (μm)            | 14             |
 
 **Note**: Go To command coordinates are to be interpreted relative to the machine's absolute zero.
 
