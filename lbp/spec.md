@@ -66,7 +66,7 @@ The firmware responds to the handshake command in the same way it responds to al
 
 ### Position Query
 
-Here we use the code command code `cmd_pos_axis_x`, defined in `lbp/spec.h` to ask for the current x position of the laser in micrometers:
+Here we use the code command code `cmd_pos_x`, defined in `lbp/spec.h` to ask for the current x position of the laser in micrometers:
 
 **LightBurn Sends:**
 
@@ -142,21 +142,31 @@ When appropriate, the LSB (Least Significant Nibble) of certain commands may con
 
 or some bitwise-OR combinations thereof.
 
+#### Notes on Axes
+Most laser engravers will have at maximum three or four degrees of freedom.
+However, some fancier machines may have "flying galvonometer" operations, or specialized rotary or feed mechanisms.
+Thus we reserve 8 axis flags, enabling terse yet expressive commands for simultaneous movements via bitwise flag
+combinations, with reasonable headroom for the future.
+Generally speaking, we expect most machines to use X,Y,Z, and possibly either A or U:
+XYZ for primary positional control, and either A for rotary or U for feed.
+
+We expect XYZABC configurations to be utilized for true 6-axis positioning, such as flying galvonometer systems.
+
+That said, we plan to allow full configuration of all axes. Each will be configurable to accept values of either:
+
+- `unit_micrometers`, for linear systems.
+- `unit_millidegrees`, for rotational systems.
+- `unit_steps`, for stepper motors.
+
 ### Composition Example:
 Consider the command `cmd_cut_abs_xy` ("Move to absolute X and Y position while cutting"):
 
-`0x6A03` is composed of:
+`0x6B03` is composed of:
 - `0x6000`: MSN for "movement."
 - `0x0B00`: Indicates an "absolute cut" move (within the "movement" category).
 - `0x0003`: Flags for both X and Y axes are set.
 
 Put together, a developer inspecting LBP messages on the wire can read this quite easily.
-
-
-## TODO : Describe arbitrary movement combinatorics
-**NOTE:** While common examples will be given in the tables below, these tables are not exhaustive.
-Any command whose MSB is a valid movement category and whose LSB is a bitwise combination of independent
-axis flags can be valid, provided the machine supports movement along the specified axes.
 
 ## Moving the Laser
 LBP provides many categories of movement commands. This is to give the firmware **context** for the movement.
@@ -195,13 +205,17 @@ prior to the movement commands.
 These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands, see below).
 If no speed has been set by the user since the last power cycle, the laser should move at the rate specified by configured defaults.
 
-| Command        | Arguments (speed in micrometers / second) | Payload Length |
+| Command        | Arguments (speed in axis units / second)  | Payload Length |
 |----------------|-------------------------------------------|----------------|
 | `cmd_speed_xy` | int32 movement speed in the xy plane      | 6              |
-| `cmd_speed_z`  | int32 movement speed along the z axis     | 6              |
-| `cmd_speed_u`  | int32 movement speed along the u axis     | 6              |
 | `cmd_speed_x`  | int32 movement speed along the x axis*    | 6              |
 | `cmd_speed_y`  | int32 movement speed along the y axis*    | 6              |
+| `cmd_speed_z`  | int32 movement speed along the z axis     | 6              |
+| `cmd_speed_a`  | int32 movement speed along the a axis     | 6              |
+| `cmd_speed_b`  | int32 movement speed along the b axis     | 6              |
+| `cmd_speed_c`  | int32 movement speed along the c axis     | 6              |
+| `cmd_speed_u`  | int32 movement speed along the u axis     | 6              |
+| `cmd_speed_v`  | int32 movement speed along the v axis     | 6              |
 
 `cmd_speed_x` and `cmd_speed_y` are provided for machines that cannot move diagonally,
 or whose x and y axis movement mechanisms meaningfully differ.
@@ -213,8 +227,17 @@ and most movement commands are expected to be preceeded with a `cmd_speed_*` if 
 have different speeds than preceding movements.
 
 ### Movement Commands
-Movement commands are composed by combining a valid movement category MSB
+Movement commands are composed of valid movement categories in the MSB and bitwise combinations of axis flags in the LSB.
+Common commands will be listed in the tables below, but any such combination is a valid command according to the specification.
 
+A movement command will have one 32-bit integer argument for each axis flag that is set in the command lsb, in the following order:
+`x`, `y`, `z`, `a`, `b`, `c`, `u`, `v`.
+
+For example the command `0x6B41` would have two 32-bit arguments - X position followed by U position.
+In practice, such unusual commands would be vanishingly unlikely to originate from Lightburn, but are valid for the purposes of this specification.
+
+#### TODO: Axis unit configuration
+A, B, C are conventionally rotational axes. A design decision must be made about what units to send along.
 
 ### Operator Movements
 These commands are expected to originate from a movement panel in the user interface. The user is issuing movement commands to the machine live
@@ -244,10 +267,10 @@ Each command includes one 32-bit integer argument corresponding to the desired a
 | `cmd_goto_b`    | int32 B (μm)                              | 6              |
 | `cmd_goto_c`    | int32 C (μm)                              | 6              |
 | `cmd_goto_u`    | int32 U (μm)                              | 6              |
-| `cmd_goto_u`    | int32 V (μm)                              | 6              |
+| `cmd_goto_v`    | int32 V (μm)                              | 6              |
 | `cmd_goto_xy`   | int32 X, int32 Y (μm)                     | 10             |
 | `cmd_goto_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_goto_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| `cmd_goto_xyza` | int32 X, int32 Y, int32 Z, int32 A (μm)   | 18             |
 | `cmd_goto_abc`  | int32 A, int32 B, int32 C (μm)            | 14             |
 
 **Note**: Go To command coordinates are to be interpreted relative to the machine's absolute zero.
@@ -262,6 +285,9 @@ representing the distance to move from the current location along that axis.
 | `cmd_jog_step_x`    | int32 X (μm)                              | 6              |
 | `cmd_jog_step_y`    | int32 Y (μm)                              | 6              |
 | `cmd_jog_step_z`    | int32 Z (μm)                              | 6              |
+| `cmd_jog_step_a`    | int32 A (μm)                              | 6              |
+| `cmd_jog_step_b`    | int32 B (μm)                              | 6              |
+| `cmd_jog_step_c`    | int32 C (μm)                              | 6              |
 | `cmd_jog_step_u`    | int32 U (μm)                              | 6              |
 | `cmd_jog_step_xy`   | int32 X, int32 Y (μm)                     | 10             |
 | `cmd_jog_step_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
