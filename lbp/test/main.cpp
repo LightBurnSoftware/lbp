@@ -12,7 +12,7 @@ int main()
 	std::cout << "lbp test suite: start" << std::endl;
 	lbp::Parser<128> parser;
 
-	lbp::CmdMsg msg(lbp::cmd_goto_xy, 8);
+	lbp::CmdMsg msg(lbp::cmd_jog_to_xy, 8);
 
 	msg.writeInt(333);
 	msg.writeInt(444);
@@ -25,7 +25,7 @@ int main()
 	lbp::MaxPayload &mp = parser.payload();
 
 	assert(mp.size() == 10);
-	assert(mp.cmd() == lbp::cmd_goto_xy);
+	assert(mp.cmd() == lbp::cmd_jog_to_xy);
 	assert(mp.readIntArg() == 333);
 	assert(mp.readIntArg() == 444);
 
@@ -36,7 +36,7 @@ int main()
 	lbp::CmdPayload cp = queue.pop();
 
 	assert(cp.size() == 10);
-	assert(cp.cmd() == lbp::cmd_goto_xy);
+	assert(cp.cmd() == lbp::cmd_jog_to_xy);
 	assert(cp.readIntArg() == 333);
 	assert(cp.readIntArg() == 444);
 

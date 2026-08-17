@@ -105,96 +105,156 @@ int32_t Configuration::get(uint16_t key, int32_t &value) const
 	return true;
 }
 
-static constexpr uint16_t cgf_codes[99] = {cfg_head_dist,
-										   cfg_laser1_freq,
-										   cfg_laser1_min_power,
-										   cfg_laser1_max_power,
-										   cfg_laser1_preig_freq,
-										   cfg_laser1_preig_pct,
-										   cfg_laser2_freq,
-										   cfg_laser2_min_power,
-										   cfg_laser2_max_power,
-										   cfg_laser2_preig_freq,
-										   cfg_laser2_preig_pct,
-										   cfg_x_step_length,
-										   cfg_x_max_speed,
-										   cfg_x_jumpoff_speed,
-										   cfg_x_max_accel,
-										   cfg_x_breadth,
-										   cfg_x_key_jumpoff_speed,
-										   cfg_x_key_accel,
-										   cfg_x_estop_accel,
-										   cfg_x_home_offset,
-										   cfg_x_backlash,
-										   cfg_y_step_length,
-										   cfg_y_max_speed,
-										   cfg_y_jumpoff_speed,
-										   cfg_y_max_accel,
-										   cfg_y_breadth,
-										   cfg_y_key_jumpoff_speed,
-										   cfg_y_key_accel,
-										   cfg_y_estop_accel,
-										   cfg_y_home_offset,
-										   cfg_y_backlash,
-										   cfg_z_step_length,
-										   cfg_z_max_speed,
-										   cfg_z_jumpoff_speed,
-										   cfg_z_max_accel,
-										   cfg_z_breadth,
-										   cfg_z_key_jumpoff_speed,
-										   cfg_z_key_accel,
-										   cfg_z_estop_accel,
-										   cfg_z_home_offset,
-										   cfg_z_backlash,
-										   cfg_u_step_length,
-										   cfg_u_max_speed,
-										   cfg_u_jumpoff_speed,
-										   cfg_u_max_accel,
-										   cfg_u_breadth,
-										   cfg_u_key_jumpoff_speed,
-										   cfg_u_key_accel,
-										   cfg_u_estop_accel,
-										   cfg_u_home_offset,
-										   cfg_u_backlash,
-										   cfg_idle_speed,
-										   cfg_idle_acc,
-										   cfg_idle_delay,
-										   cfg_start_speed,
-										   cfg_min_acc,
-										   cfg_max_acc,
-										   cfg_acc_factor_pct,
-										   cfg_G0_acc_factor_pct,
-                                           cfg_speed_factor_pct,
-										   cfg_engrave_x_start_speed,
-										   cfg_engrave_y_start_speed,
-										   cfg_engrave_x_acc,
-										   cfg_engrave_y_acc,
-										   cfg_line_shift_speed,
-										   cfg_facula_size_pct,
-										   cfg_engrave_factor_pct,
-										   cfg_xy_home_speed,
-										   cfg_z_home_speed,
-										   cfg_z_work_speed,
-										   cfg_u_home_speed,
-										   cfg_u_work_speed,
-										   cfg_material_thick,
-										   cfg_focus_distance,
-										   cfg_return_location,
-										   cfg_reset_delay,
-										   cfg_status_on_delay,
-										   cfg_status_off_delay,
-										   cfg_finish_delay,
-										   cfg_feed_pre_delay,
-										   cfg_feed_post_delay,
-										   cfg_feed_backlash,
-										   cfg_rotary_enable,
-										   cfg_rotary_pulses_per_rotation,
-										   cfg_rotary_diameter,
-										   cfg_wireless_panel_fast,
-										   cfg_wireless_panel_slow,
-										   cfg_axis_auto_home,
-										   cfg_user_origin_x,
-										   cfg_user_origin_y};
+static constexpr uint16_t cgf_codes[148] = {
+	cfg_x_settings,
+	cfg_x_unit,
+	cfg_x_size,
+	cfg_x_home_offset,
+	cfg_x_max_speed,
+	cfg_x_jumpoff_speed,
+	cfg_x_key_jumpoff_speed,
+	cfg_x_max_accel,
+	cfg_x_key_accel,
+	cfg_x_estol_accel,
+	cfg_x_backlash,
+	cfg_x_docking_pos,
+	cfg_y_settings,
+	cfg_y_unit,
+	cfg_y_size,
+	cfg_y_home_offset,
+	cfg_y_max_speed,
+	cfg_y_jumpoff_speed,
+	cfg_y_key_jumpoff_speed,
+	cfg_y_max_accel,
+	cfg_y_key_accel,
+	cfg_y_estol_accel,
+	cfg_y_backlash,
+	cfg_y_docking_pos,
+	cfg_z_settings,
+	cfg_z_unit,
+	cfg_z_size,
+	cfg_z_home_offset,
+	cfg_z_max_speed,
+	cfg_z_jumpoff_speed,
+	cfg_z_key_jumpoff_speed,
+	cfg_z_max_accel,
+	cfg_z_key_accel,
+	cfg_z_estol_accel,
+	cfg_z_backlash,
+	cfg_z_docking_pos,
+	cfg_a_settings,
+	cfg_a_unit,
+	cfg_a_size,
+	cfg_a_home_offset,
+	cfg_a_max_speed,
+	cfg_a_jumpoff_speed,
+	cfg_a_key_jumpoff_speed,
+	cfg_a_max_accel,
+	cfg_a_key_accel,
+	cfg_a_estol_accel,
+	cfg_a_backlash,
+	cfg_a_docking_pos,
+	cfg_b_settings,
+	cfg_b_unit,
+	cfg_b_size,
+	cfg_b_home_offset,
+	cfg_b_max_speed,
+	cfg_b_jumpoff_speed,
+	cfg_b_key_jumpoff_speed,
+	cfg_b_max_accel,
+	cfg_b_key_accel,
+	cfg_b_estol_accel,
+	cfg_b_backlash,
+	cfg_b_docking_pos,
+	cfg_c_settings,
+	cfg_c_unit,
+	cfg_c_size,
+	cfg_c_home_offset,
+	cfg_c_max_speed,
+	cfg_c_jumpoff_speed,
+	cfg_c_key_jumpoff_speed,
+	cfg_c_max_accel,
+	cfg_c_key_accel,
+	cfg_c_estol_accel,
+	cfg_c_backlash,
+	cfg_c_docking_pos,
+	cfg_u_settings,
+	cfg_u_unit,
+	cfg_u_size,
+	cfg_u_home_offset,
+	cfg_u_max_speed,
+	cfg_u_jumpoff_speed,
+	cfg_u_key_jumpoff_speed,
+	cfg_u_max_accel,
+	cfg_u_key_accel,
+	cfg_u_estol_accel,
+	cfg_u_backlash,
+	cfg_u_docking_pos,
+	cfg_v_settings,
+	cfg_v_unit,
+	cfg_v_size,
+	cfg_v_home_offset,
+	cfg_v_max_speed,
+	cfg_v_jumpoff_speed,
+	cfg_v_key_jumpoff_speed,
+	cfg_v_max_accel,
+	cfg_v_key_accel,
+	cfg_v_estol_accel,
+	cfg_v_backlash,
+	cfg_v_docking_pos,
+	cfg_user_origin_x,
+	cfg_user_origin_y,
+	cfg_head_dist,
+	cfg_laser1_freq,
+	cfg_laser1_min_power,
+	cfg_laser1_max_power,
+	cfg_laser1_preig_freq,
+	cfg_laser1_preig_pct,
+	cfg_laser1_type,
+	cfg_laser2_freq,
+	cfg_laser2_min_power,
+	cfg_laser2_max_power,
+	cfg_laser2_preig_freq,
+	cfg_laser2_preig_pct,
+	cfg_laser2_type,
+	cfg_idle_speed,
+	cfg_idle_acc,
+	cfg_idle_delay,
+	cfg_start_speed,
+	cfg_min_acc,
+	cfg_max_acc,
+	cfg_acc_factor_pct,
+	cfg_G0_acc_factor_pct,
+	cfg_speed_factor_pct,
+	cfg_engrave_x_start_speed,
+	cfg_engrave_y_start_speed,
+	cfg_engrave_x_acc,
+	cfg_engrave_y_acc,
+	cfg_line_shift_speed,
+	cfg_facula_size_pct,
+	cfg_engrave_factor_pct,
+	cfg_xy_home_speed,
+	cfg_z_home_speed,
+	cfg_z_work_speed,
+	cfg_u_home_speed,
+	cfg_u_work_speed,
+	cfg_material_thick,
+	cfg_focus_distance,
+	cfg_return_location,
+	cfg_reset_delay,
+	cfg_status_on_delay,
+	cfg_status_off_delay,
+	cfg_finish_delay,
+	cfg_feed_pre_delay,
+	cfg_feed_post_delay,
+	cfg_feed_backlash,
+	cfg_rotary_enable,
+	cfg_rotary_pulses_per_rotation,
+	cfg_rotary_diameter,
+	cfg_wireless_panel_fast,
+	cfg_wireless_panel_slow,
+	cfg_axis_auto_home,
+};
 
 using NameToCmdMap = std::unordered_map<std::string_view, uint16_t>;
 
@@ -233,6 +293,300 @@ bool isCfg(uint16_t cmd)
 bool cmdToName(std::uint16_t cmd, std::string_view &name)
 {
 	switch (cmd) {
+	case cfg_x_settings:
+		name = "cfg_x_settings";
+		return true;
+	case cfg_x_unit:
+		name = "cfg_x_unit";
+		return true;
+	case cfg_x_size:
+		name = "cfg_x_size";
+		return true;
+	case cfg_x_home_offset:
+		name = "cfg_x_home_offset";
+		return true;
+	case cfg_x_max_speed:
+		name = "cfg_x_max_speed";
+		return true;
+	case cfg_x_jumpoff_speed:
+		name = "cfg_x_jumpoff_speed";
+		return true;
+	case cfg_x_key_jumpoff_speed:
+		name = "cfg_x_key_jumpoff_speed";
+		return true;
+	case cfg_x_max_accel:
+		name = "cfg_x_max_accel";
+		return true;
+	case cfg_x_key_accel:
+		name = "cfg_x_key_accel";
+		return true;
+	case cfg_x_estol_accel:
+		name = "cfg_x_estol_accel";
+		return true;
+	case cfg_x_backlash:
+		name = "cfg_x_backlash";
+		return true;
+	case cfg_x_docking_pos:
+		name = "cfg_x_docking_pos";
+		return true;
+	case cfg_y_settings:
+		name = "cfg_y_settings";
+		return true;
+	case cfg_y_unit:
+		name = "cfg_y_unit";
+		return true;
+	case cfg_y_size:
+		name = "cfg_y_size";
+		return true;
+	case cfg_y_home_offset:
+		name = "cfg_y_home_offset";
+		return true;
+	case cfg_y_max_speed:
+		name = "cfg_y_max_speed";
+		return true;
+	case cfg_y_jumpoff_speed:
+		name = "cfg_y_jumpoff_speed";
+		return true;
+	case cfg_y_key_jumpoff_speed:
+		name = "cfg_y_key_jumpoff_speed";
+		return true;
+	case cfg_y_max_accel:
+		name = "cfg_y_max_accel";
+		return true;
+	case cfg_y_key_accel:
+		name = "cfg_y_key_accel";
+		return true;
+	case cfg_y_estol_accel:
+		name = "cfg_y_estol_accel";
+		return true;
+	case cfg_y_backlash:
+		name = "cfg_y_backlash";
+		return true;
+	case cfg_y_docking_pos:
+		name = "cfg_y_docking_pos";
+		return true;
+	case cfg_z_settings:
+		name = "cfg_z_settings";
+		return true;
+	case cfg_z_unit:
+		name = "cfg_z_unit";
+		return true;
+	case cfg_z_size:
+		name = "cfg_z_size";
+		return true;
+	case cfg_z_home_offset:
+		name = "cfg_z_home_offset";
+		return true;
+	case cfg_z_max_speed:
+		name = "cfg_z_max_speed";
+		return true;
+	case cfg_z_jumpoff_speed:
+		name = "cfg_z_jumpoff_speed";
+		return true;
+	case cfg_z_key_jumpoff_speed:
+		name = "cfg_z_key_jumpoff_speed";
+		return true;
+	case cfg_z_max_accel:
+		name = "cfg_z_max_accel";
+		return true;
+	case cfg_z_key_accel:
+		name = "cfg_z_key_accel";
+		return true;
+	case cfg_z_estol_accel:
+		name = "cfg_z_estol_accel";
+		return true;
+	case cfg_z_backlash:
+		name = "cfg_z_backlash";
+		return true;
+	case cfg_z_docking_pos:
+		name = "cfg_z_docking_pos";
+		return true;
+	case cfg_a_settings:
+		name = "cfg_a_settings";
+		return true;
+	case cfg_a_unit:
+		name = "cfg_a_unit";
+		return true;
+	case cfg_a_size:
+		name = "cfg_a_size";
+		return true;
+	case cfg_a_home_offset:
+		name = "cfg_a_home_offset";
+		return true;
+	case cfg_a_max_speed:
+		name = "cfg_a_max_speed";
+		return true;
+	case cfg_a_jumpoff_speed:
+		name = "cfg_a_jumpoff_speed";
+		return true;
+	case cfg_a_key_jumpoff_speed:
+		name = "cfg_a_key_jumpoff_speed";
+		return true;
+	case cfg_a_max_accel:
+		name = "cfg_a_max_accel";
+		return true;
+	case cfg_a_key_accel:
+		name = "cfg_a_key_accel";
+		return true;
+	case cfg_a_estol_accel:
+		name = "cfg_a_estol_accel";
+		return true;
+	case cfg_a_backlash:
+		name = "cfg_a_backlash";
+		return true;
+	case cfg_a_docking_pos:
+		name = "cfg_a_docking_pos";
+		return true;
+	case cfg_b_settings:
+		name = "cfg_b_settings";
+		return true;
+	case cfg_b_unit:
+		name = "cfg_b_unit";
+		return true;
+	case cfg_b_size:
+		name = "cfg_b_size";
+		return true;
+	case cfg_b_home_offset:
+		name = "cfg_b_home_offset";
+		return true;
+	case cfg_b_max_speed:
+		name = "cfg_b_max_speed";
+		return true;
+	case cfg_b_jumpoff_speed:
+		name = "cfg_b_jumpoff_speed";
+		return true;
+	case cfg_b_key_jumpoff_speed:
+		name = "cfg_b_key_jumpoff_speed";
+		return true;
+	case cfg_b_max_accel:
+		name = "cfg_b_max_accel";
+		return true;
+	case cfg_b_key_accel:
+		name = "cfg_b_key_accel";
+		return true;
+	case cfg_b_estol_accel:
+		name = "cfg_b_estol_accel";
+		return true;
+	case cfg_b_backlash:
+		name = "cfg_b_backlash";
+		return true;
+	case cfg_b_docking_pos:
+		name = "cfg_b_docking_pos";
+		return true;
+	case cfg_c_settings:
+		name = "cfg_c_settings";
+		return true;
+	case cfg_c_unit:
+		name = "cfg_c_unit";
+		return true;
+	case cfg_c_size:
+		name = "cfg_c_size";
+		return true;
+	case cfg_c_home_offset:
+		name = "cfg_c_home_offset";
+		return true;
+	case cfg_c_max_speed:
+		name = "cfg_c_max_speed";
+		return true;
+	case cfg_c_jumpoff_speed:
+		name = "cfg_c_jumpoff_speed";
+		return true;
+	case cfg_c_key_jumpoff_speed:
+		name = "cfg_c_key_jumpoff_speed";
+		return true;
+	case cfg_c_max_accel:
+		name = "cfg_c_max_accel";
+		return true;
+	case cfg_c_key_accel:
+		name = "cfg_c_key_accel";
+		return true;
+	case cfg_c_estol_accel:
+		name = "cfg_c_estol_accel";
+		return true;
+	case cfg_c_backlash:
+		name = "cfg_c_backlash";
+		return true;
+	case cfg_c_docking_pos:
+		name = "cfg_c_docking_pos";
+		return true;
+	case cfg_u_settings:
+		name = "cfg_u_settings";
+		return true;
+	case cfg_u_unit:
+		name = "cfg_u_unit";
+		return true;
+	case cfg_u_size:
+		name = "cfg_u_size";
+		return true;
+	case cfg_u_home_offset:
+		name = "cfg_u_home_offset";
+		return true;
+	case cfg_u_max_speed:
+		name = "cfg_u_max_speed";
+		return true;
+	case cfg_u_jumpoff_speed:
+		name = "cfg_u_jumpoff_speed";
+		return true;
+	case cfg_u_key_jumpoff_speed:
+		name = "cfg_u_key_jumpoff_speed";
+		return true;
+	case cfg_u_max_accel:
+		name = "cfg_u_max_accel";
+		return true;
+	case cfg_u_key_accel:
+		name = "cfg_u_key_accel";
+		return true;
+	case cfg_u_estol_accel:
+		name = "cfg_u_estol_accel";
+		return true;
+	case cfg_u_backlash:
+		name = "cfg_u_backlash";
+		return true;
+	case cfg_u_docking_pos:
+		name = "cfg_u_docking_pos";
+		return true;
+	case cfg_v_settings:
+		name = "cfg_v_settings";
+		return true;
+	case cfg_v_unit:
+		name = "cfg_v_unit";
+		return true;
+	case cfg_v_size:
+		name = "cfg_v_size";
+		return true;
+	case cfg_v_home_offset:
+		name = "cfg_v_home_offset";
+		return true;
+	case cfg_v_max_speed:
+		name = "cfg_v_max_speed";
+		return true;
+	case cfg_v_jumpoff_speed:
+		name = "cfg_v_jumpoff_speed";
+		return true;
+	case cfg_v_key_jumpoff_speed:
+		name = "cfg_v_key_jumpoff_speed";
+		return true;
+	case cfg_v_max_accel:
+		name = "cfg_v_max_accel";
+		return true;
+	case cfg_v_key_accel:
+		name = "cfg_v_key_accel";
+		return true;
+	case cfg_v_estol_accel:
+		name = "cfg_v_estol_accel";
+		return true;
+	case cfg_v_backlash:
+		name = "cfg_v_backlash";
+		return true;
+	case cfg_v_docking_pos:
+		name = "cfg_v_docking_pos";
+		return true;
+	case cfg_user_origin_x:
+		name = "cfg_user_origin_x";
+		return true;
+	case cfg_user_origin_y:
+		name = "cfg_user_origin_y";
+		return true;
 	case cfg_head_dist:
 		name = "cfg_head_dist";
 		return true;
@@ -251,6 +605,9 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_laser1_preig_pct:
 		name = "cfg_laser1_preig_pct";
 		return true;
+	case cfg_laser1_type:
+		name = "cfg_laser1_type";
+		return true;
 	case cfg_laser2_freq:
 		name = "cfg_laser2_freq";
 		return true;
@@ -266,125 +623,8 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_laser2_preig_pct:
 		name = "cfg_laser2_preig_pct";
 		return true;
-	case cfg_x_step_length:
-		name = "cfg_x_step_length";
-		return true;
-	case cfg_x_max_speed:
-		name = "cfg_x_max_speed";
-		return true;
-	case cfg_x_jumpoff_speed:
-		name = "cfg_x_jumpoff_speed";
-		return true;
-	case cfg_x_max_accel:
-		name = "cfg_x_max_accel";
-		return true;
-	case cfg_x_breadth:
-		name = "cfg_x_breadth";
-		return true;
-	case cfg_x_key_jumpoff_speed:
-		name = "cfg_x_key_jumpoff_speed";
-		return true;
-	case cfg_x_key_accel:
-		name = "cfg_x_key_accel";
-		return true;
-	case cfg_x_estop_accel:
-		name = "cfg_x_estop_accel";
-		return true;
-	case cfg_x_home_offset:
-		name = "cfg_x_home_offset";
-		return true;
-	case cfg_x_backlash:
-		name = "cfg_x_backlash";
-		return true;
-	case cfg_y_step_length:
-		name = "cfg_y_step_length";
-		return true;
-	case cfg_y_max_speed:
-		name = "cfg_y_max_speed";
-		return true;
-	case cfg_y_jumpoff_speed:
-		name = "cfg_y_jumpoff_speed";
-		return true;
-	case cfg_y_max_accel:
-		name = "cfg_y_max_accel";
-		return true;
-	case cfg_y_breadth:
-		name = "cfg_y_breadth";
-		return true;
-	case cfg_y_key_jumpoff_speed:
-		name = "cfg_y_key_jumpoff_speed";
-		return true;
-	case cfg_y_key_accel:
-		name = "cfg_y_key_accel";
-		return true;
-	case cfg_y_estop_accel:
-		name = "cfg_y_estop_accel";
-		return true;
-	case cfg_y_home_offset:
-		name = "cfg_y_home_offset";
-		return true;
-	case cfg_y_backlash:
-		name = "cfg_y_backlash";
-		return true;
-	case cfg_z_step_length:
-		name = "cfg_z_step_length";
-		return true;
-	case cfg_z_max_speed:
-		name = "cfg_z_max_speed";
-		return true;
-	case cfg_z_jumpoff_speed:
-		name = "cfg_z_jumpoff_speed";
-		return true;
-	case cfg_z_max_accel:
-		name = "cfg_z_max_accel";
-		return true;
-	case cfg_z_breadth:
-		name = "cfg_z_breadth";
-		return true;
-	case cfg_z_key_jumpoff_speed:
-		name = "cfg_z_key_jumpoff_speed";
-		return true;
-	case cfg_z_key_accel:
-		name = "cfg_z_key_accel";
-		return true;
-	case cfg_z_estop_accel:
-		name = "cfg_z_estop_accel";
-		return true;
-	case cfg_z_home_offset:
-		name = "cfg_z_home_offset";
-		return true;
-	case cfg_z_backlash:
-		name = "cfg_z_backlash";
-		return true;
-	case cfg_u_step_length:
-		name = "cfg_u_step_length";
-		return true;
-	case cfg_u_max_speed:
-		name = "cfg_u_max_speed";
-		return true;
-	case cfg_u_jumpoff_speed:
-		name = "cfg_u_jumpoff_speed";
-		return true;
-	case cfg_u_max_accel:
-		name = "cfg_u_max_accel";
-		return true;
-	case cfg_u_breadth:
-		name = "cfg_u_breadth";
-		return true;
-	case cfg_u_key_jumpoff_speed:
-		name = "cfg_u_key_jumpoff_speed";
-		return true;
-	case cfg_u_key_accel:
-		name = "cfg_u_key_accel";
-		return true;
-	case cfg_u_estop_accel:
-		name = "cfg_u_estop_accel";
-		return true;
-	case cfg_u_home_offset:
-		name = "cfg_u_home_offset";
-		return true;
-	case cfg_u_backlash:
-		name = "cfg_u_backlash";
+	case cfg_laser2_type:
+		name = "cfg_laser2_type";
 		return true;
 	case cfg_idle_speed:
 		name = "cfg_idle_speed";
@@ -497,12 +737,6 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_axis_auto_home:
 		name = "cfg_axis_auto_home";
 		return true;
-	case cfg_user_origin_x:
-		name = "cfg_user_origin_x";
-		return true;
-	case cfg_user_origin_y:
-		name = "cfg_user_origin_y";
-		return true;
 	default:
 		return false;
 	}
@@ -511,57 +745,117 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 bool getConfigDefault(uint16_t cmd, int32_t &value)
 {
 	switch (cmd) {
+	case cfg_x_settings:
+	case cfg_x_unit:
+	case cfg_x_size:
+	case cfg_x_home_offset:
+	case cfg_x_max_speed:
+	case cfg_x_jumpoff_speed:
+	case cfg_x_key_jumpoff_speed:
+	case cfg_x_max_accel:
+	case cfg_x_key_accel:
+	case cfg_x_estol_accel:
+	case cfg_x_backlash:
+	case cfg_x_docking_pos:
+	case cfg_y_settings:
+	case cfg_y_unit:
+	case cfg_y_size:
+	case cfg_y_home_offset:
+	case cfg_y_max_speed:
+	case cfg_y_jumpoff_speed:
+	case cfg_y_key_jumpoff_speed:
+	case cfg_y_max_accel:
+	case cfg_y_key_accel:
+	case cfg_y_estol_accel:
+	case cfg_y_backlash:
+	case cfg_y_docking_pos:
+	case cfg_z_settings:
+	case cfg_z_unit:
+	case cfg_z_size:
+	case cfg_z_home_offset:
+	case cfg_z_max_speed:
+	case cfg_z_jumpoff_speed:
+	case cfg_z_key_jumpoff_speed:
+	case cfg_z_max_accel:
+	case cfg_z_key_accel:
+	case cfg_z_estol_accel:
+	case cfg_z_backlash:
+	case cfg_z_docking_pos:
+	case cfg_a_settings:
+	case cfg_a_unit:
+	case cfg_a_size:
+	case cfg_a_home_offset:
+	case cfg_a_max_speed:
+	case cfg_a_jumpoff_speed:
+	case cfg_a_key_jumpoff_speed:
+	case cfg_a_max_accel:
+	case cfg_a_key_accel:
+	case cfg_a_estol_accel:
+	case cfg_a_backlash:
+	case cfg_a_docking_pos:
+	case cfg_b_settings:
+	case cfg_b_unit:
+	case cfg_b_size:
+	case cfg_b_home_offset:
+	case cfg_b_max_speed:
+	case cfg_b_jumpoff_speed:
+	case cfg_b_key_jumpoff_speed:
+	case cfg_b_max_accel:
+	case cfg_b_key_accel:
+	case cfg_b_estol_accel:
+	case cfg_b_backlash:
+	case cfg_b_docking_pos:
+	case cfg_c_settings:
+	case cfg_c_unit:
+	case cfg_c_size:
+	case cfg_c_home_offset:
+	case cfg_c_max_speed:
+	case cfg_c_jumpoff_speed:
+	case cfg_c_key_jumpoff_speed:
+	case cfg_c_max_accel:
+	case cfg_c_key_accel:
+	case cfg_c_estol_accel:
+	case cfg_c_backlash:
+	case cfg_c_docking_pos:
+	case cfg_u_settings:
+	case cfg_u_unit:
+	case cfg_u_size:
+	case cfg_u_home_offset:
+	case cfg_u_max_speed:
+	case cfg_u_jumpoff_speed:
+	case cfg_u_key_jumpoff_speed:
+	case cfg_u_max_accel:
+	case cfg_u_key_accel:
+	case cfg_u_estol_accel:
+	case cfg_u_backlash:
+	case cfg_u_docking_pos:
+	case cfg_v_settings:
+	case cfg_v_unit:
+	case cfg_v_size:
+	case cfg_v_home_offset:
+	case cfg_v_max_speed:
+	case cfg_v_jumpoff_speed:
+	case cfg_v_key_jumpoff_speed:
+	case cfg_v_max_accel:
+	case cfg_v_key_accel:
+	case cfg_v_estol_accel:
+	case cfg_v_backlash:
+	case cfg_v_docking_pos:
+	case cfg_user_origin_x:
+	case cfg_user_origin_y:
 	case cfg_head_dist:
 	case cfg_laser1_freq:
 	case cfg_laser1_min_power:
 	case cfg_laser1_max_power:
 	case cfg_laser1_preig_freq:
 	case cfg_laser1_preig_pct:
+	case cfg_laser1_type:
 	case cfg_laser2_freq:
 	case cfg_laser2_min_power:
 	case cfg_laser2_max_power:
 	case cfg_laser2_preig_freq:
 	case cfg_laser2_preig_pct:
-	case cfg_x_step_length:
-	case cfg_x_max_speed:
-	case cfg_x_jumpoff_speed:
-	case cfg_x_max_accel:
-	case cfg_x_breadth:
-	case cfg_x_key_jumpoff_speed:
-	case cfg_x_key_accel:
-	case cfg_x_estop_accel:
-	case cfg_x_home_offset:
-	case cfg_x_backlash:
-	case cfg_y_step_length:
-	case cfg_y_max_speed:
-	case cfg_y_jumpoff_speed:
-	case cfg_y_max_accel:
-	case cfg_y_breadth:
-	case cfg_y_key_jumpoff_speed:
-	case cfg_y_key_accel:
-	case cfg_y_estop_accel:
-	case cfg_y_home_offset:
-	case cfg_y_backlash:
-	case cfg_z_step_length:
-	case cfg_z_max_speed:
-	case cfg_z_jumpoff_speed:
-	case cfg_z_max_accel:
-	case cfg_z_breadth:
-	case cfg_z_key_jumpoff_speed:
-	case cfg_z_key_accel:
-	case cfg_z_estop_accel:
-	case cfg_z_home_offset:
-	case cfg_z_backlash:
-	case cfg_u_step_length:
-	case cfg_u_max_speed:
-	case cfg_u_jumpoff_speed:
-	case cfg_u_max_accel:
-	case cfg_u_breadth:
-	case cfg_u_key_jumpoff_speed:
-	case cfg_u_key_accel:
-	case cfg_u_estop_accel:
-	case cfg_u_home_offset:
-	case cfg_u_backlash:
+	case cfg_laser2_type:
 	case cfg_idle_speed:
 	case cfg_idle_acc:
 	case cfg_idle_delay:
@@ -599,8 +893,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_wireless_panel_fast:
 	case cfg_wireless_panel_slow:
 	case cfg_axis_auto_home:
-	case cfg_user_origin_x:
-	case cfg_user_origin_y:
 		value = 0;
 		return true;
 	default:

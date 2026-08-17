@@ -267,7 +267,7 @@ constexpr uint16_t cmd_jog_stop_neg_v = move_jog_stop_neg | axis_v;
 // For the next few movement types, we can use this flag for composing absolute or relative moves.
 constexpr uint16_t flag_abs = 0x0100;
 
-// Operator Moves: Jog Step (relative) 
+// Operator Moves: Jog Step (relative)
 constexpr uint16_t move_jog = cls_move | 0x0600;
 constexpr uint16_t move_jog_step = move_jog; // relative jog
 
@@ -459,26 +459,29 @@ constexpr uint16_t axis_index_b = 0x05;
 constexpr uint16_t axis_index_c = 0x06;
 constexpr uint16_t axis_index_u = 0x07;
 constexpr uint16_t axis_index_v = 0x08;
+constexpr uint16_t axis_index_xy = 0x0A;
+constexpr uint16_t axis_index_ab = 0x0B;
 
 // Axis units
-const uint8_t unit_none = 0x00;
-const uint8_t unit_micrometers = 0x01;
-const uint8_t unit_steps = 0x02;
-const uint8_t unit_millidegrees = 0x03;
+constexpr uint8_t unit_none = 0x00;
+constexpr uint8_t unit_micrometers = 0x01;
+constexpr uint8_t unit_steps = 0x02;
+constexpr uint8_t unit_millidegrees = 0x03;
 
 // Axis Configurations
-static constexpr uint16_t axis_cfg_settings				= cls_cfg | 0x0A10;
-static constexpr uint16_t axis_cfg_unit					= cls_cfg | 0x0A20;
-static constexpr uint16_t axis_cfg_size					= cls_cfg | 0x0A30;
-static constexpr uint16_t axis_cfg_home_offset			= cls_cfg | 0x0A40;
-static constexpr uint16_t axis_cfg_max_speed			= cls_cfg | 0x0A50;
-static constexpr uint16_t axis_cfg_jumpoff_speed		= cls_cfg | 0x0A60;
-static constexpr uint16_t axis_cfg_key_jumpoff_speed	= cls_cfg | 0x0A80;
-static constexpr uint16_t axis_cfg_max_accel			= cls_cfg | 0x0A90;
-static constexpr uint16_t axis_cfg_key_accel			= cls_cfg | 0x0AA0;
-static constexpr uint16_t axis_cfg_estop_accel			= cls_cfg | 0x0AB0;
-static constexpr uint16_t axis_cfg_backlash				= cls_cfg | 0x0AC0;
-static constexpr uint16_t axis_cfg_docking_pos			= cls_cfg | 0x0AD0;
+static constexpr uint16_t axis_settings				= cls_cfg | 0x0A10;
+static constexpr uint16_t axis_unit					= cls_cfg | 0x0A20;
+static constexpr uint16_t axis_size					= cls_cfg | 0x0A30;
+static constexpr uint16_t axis_home_offset			= cls_cfg | 0x0A40;
+static constexpr uint16_t axis_max_speed			= cls_cfg | 0x0A50;
+static constexpr uint16_t axis_jumpoff_speed		= cls_cfg | 0x0A60;
+static constexpr uint16_t axis_key_jumpoff_speed	= cls_cfg | 0x0A80;
+static constexpr uint16_t axis_max_accel			= cls_cfg | 0x0A90;
+static constexpr uint16_t axis_key_accel			= cls_cfg | 0x0AA0;
+static constexpr uint16_t axis_estop_accel			= cls_cfg | 0x0AB0;
+static constexpr uint16_t axis_backlash				= cls_cfg | 0x0AC0;
+static constexpr uint16_t axis_docking_pos			= cls_cfg | 0x0AD0;
+static constexpr uint16_t axis_step_length			= cls_cfg | 0x0AE0;
 
 constexpr uint16_t cfg_x_settings			= axis_index_x | axis_settings;
 constexpr uint16_t cfg_x_unit				= axis_index_x | axis_unit;
@@ -489,9 +492,10 @@ constexpr uint16_t cfg_x_jumpoff_speed		= axis_index_x | axis_jumpoff_speed;
 constexpr uint16_t cfg_x_key_jumpoff_speed	= axis_index_x | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_x_max_accel			= axis_index_x | axis_max_accel;
 constexpr uint16_t cfg_x_key_accel			= axis_index_x | axis_key_accel;
-constexpr uint16_t cfg_x_estol_accel		= axis_index_x | axis_estop_accel;
+constexpr uint16_t cfg_x_estop_accel		= axis_index_x | axis_estop_accel;
 constexpr uint16_t cfg_x_backlash			= axis_index_x | axis_backlash;
 constexpr uint16_t cfg_x_docking_pos		= axis_index_x | axis_docking_pos;
+constexpr uint16_t cfg_x_step_length		= axis_index_x | axis_step_length;
 
 constexpr uint16_t cfg_y_settings			= axis_index_y | axis_settings;
 constexpr uint16_t cfg_y_unit				= axis_index_y | axis_unit;
@@ -502,9 +506,10 @@ constexpr uint16_t cfg_y_jumpoff_speed		= axis_index_y | axis_jumpoff_speed;
 constexpr uint16_t cfg_y_key_jumpoff_speed	= axis_index_y | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_y_max_accel			= axis_index_y | axis_max_accel;
 constexpr uint16_t cfg_y_key_accel			= axis_index_y | axis_key_accel;
-constexpr uint16_t cfg_y_estol_accel		= axis_index_y | axis_estop_accel;
+constexpr uint16_t cfg_y_estop_accel		= axis_index_y | axis_estop_accel;
 constexpr uint16_t cfg_y_backlash			= axis_index_y | axis_backlash;
 constexpr uint16_t cfg_y_docking_pos		= axis_index_y | axis_docking_pos;
+constexpr uint16_t cfg_y_step_length		= axis_index_y | axis_step_length;
 
 constexpr uint16_t cfg_z_settings			= axis_index_z | axis_settings;
 constexpr uint16_t cfg_z_unit				= axis_index_z | axis_unit;
@@ -515,9 +520,10 @@ constexpr uint16_t cfg_z_jumpoff_speed		= axis_index_z | axis_jumpoff_speed;
 constexpr uint16_t cfg_z_key_jumpoff_speed	= axis_index_z | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_z_max_accel			= axis_index_z | axis_max_accel;
 constexpr uint16_t cfg_z_key_accel			= axis_index_z | axis_key_accel;
-constexpr uint16_t cfg_z_estol_accel		= axis_index_z | axis_estop_accel;
+constexpr uint16_t cfg_z_estop_accel		= axis_index_z | axis_estop_accel;
 constexpr uint16_t cfg_z_backlash			= axis_index_z | axis_backlash;
 constexpr uint16_t cfg_z_docking_pos		= axis_index_z | axis_docking_pos;
+constexpr uint16_t cfg_z_step_length		= axis_index_z | axis_step_length;
 
 constexpr uint16_t cfg_a_settings			= axis_index_a | axis_settings;
 constexpr uint16_t cfg_a_unit				= axis_index_a | axis_unit;
@@ -528,9 +534,10 @@ constexpr uint16_t cfg_a_jumpoff_speed		= axis_index_a | axis_jumpoff_speed;
 constexpr uint16_t cfg_a_key_jumpoff_speed	= axis_index_a | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_a_max_accel			= axis_index_a | axis_max_accel;
 constexpr uint16_t cfg_a_key_accel			= axis_index_a | axis_key_accel;
-constexpr uint16_t cfg_a_estol_accel		= axis_index_a | axis_estop_accel;
+constexpr uint16_t cfg_a_estop_accel		= axis_index_a | axis_estop_accel;
 constexpr uint16_t cfg_a_backlash			= axis_index_a | axis_backlash;
 constexpr uint16_t cfg_a_docking_pos		= axis_index_a | axis_docking_pos;
+constexpr uint16_t cfg_a_step_length		= axis_index_a | axis_step_length;
 
 constexpr uint16_t cfg_b_settings			= axis_index_b | axis_settings;
 constexpr uint16_t cfg_b_unit				= axis_index_b | axis_unit;
@@ -541,9 +548,10 @@ constexpr uint16_t cfg_b_jumpoff_speed		= axis_index_b | axis_jumpoff_speed;
 constexpr uint16_t cfg_b_key_jumpoff_speed	= axis_index_b | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_b_max_accel			= axis_index_b | axis_max_accel;
 constexpr uint16_t cfg_b_key_accel			= axis_index_b | axis_key_accel;
-constexpr uint16_t cfg_b_estol_accel		= axis_index_b | axis_estop_accel;
+constexpr uint16_t cfg_b_estop_accel		= axis_index_b | axis_estop_accel;
 constexpr uint16_t cfg_b_backlash			= axis_index_b | axis_backlash;
 constexpr uint16_t cfg_b_docking_pos		= axis_index_b | axis_docking_pos;
+constexpr uint16_t cfg_b_step_length		= axis_index_b | axis_step_length;
 
 constexpr uint16_t cfg_c_settings			= axis_index_c | axis_settings;
 constexpr uint16_t cfg_c_unit				= axis_index_c | axis_unit;
@@ -554,9 +562,10 @@ constexpr uint16_t cfg_c_jumpoff_speed		= axis_index_c | axis_jumpoff_speed;
 constexpr uint16_t cfg_c_key_jumpoff_speed	= axis_index_c | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_c_max_accel			= axis_index_c | axis_max_accel;
 constexpr uint16_t cfg_c_key_accel			= axis_index_c | axis_key_accel;
-constexpr uint16_t cfg_c_estol_accel		= axis_index_c | axis_estop_accel;
+constexpr uint16_t cfg_c_estop_accel		= axis_index_c | axis_estop_accel;
 constexpr uint16_t cfg_c_backlash			= axis_index_c | axis_backlash;
 constexpr uint16_t cfg_c_docking_pos		= axis_index_c | axis_docking_pos;
+constexpr uint16_t cfg_c_step_length		= axis_index_c | axis_step_length;
 
 constexpr uint16_t cfg_u_settings			= axis_index_u | axis_settings;
 constexpr uint16_t cfg_u_unit				= axis_index_u | axis_unit;
@@ -567,9 +576,10 @@ constexpr uint16_t cfg_u_jumpoff_speed		= axis_index_u | axis_jumpoff_speed;
 constexpr uint16_t cfg_u_key_jumpoff_speed	= axis_index_u | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_u_max_accel			= axis_index_u | axis_max_accel;
 constexpr uint16_t cfg_u_key_accel			= axis_index_u | axis_key_accel;
-constexpr uint16_t cfg_u_estol_accel		= axis_index_u | axis_estop_accel;
+constexpr uint16_t cfg_u_estop_accel		= axis_index_u | axis_estop_accel;
 constexpr uint16_t cfg_u_backlash			= axis_index_u | axis_backlash;
 constexpr uint16_t cfg_u_docking_pos		= axis_index_u | axis_docking_pos;
+constexpr uint16_t cfg_u_step_length		= axis_index_u | axis_step_length;
 
 constexpr uint16_t cfg_v_settings			= axis_index_v | axis_settings;
 constexpr uint16_t cfg_v_unit				= axis_index_v | axis_unit;
@@ -580,9 +590,10 @@ constexpr uint16_t cfg_v_jumpoff_speed		= axis_index_v | axis_jumpoff_speed;
 constexpr uint16_t cfg_v_key_jumpoff_speed	= axis_index_v | axis_key_jumpoff_speed;
 constexpr uint16_t cfg_v_max_accel			= axis_index_v | axis_max_accel;
 constexpr uint16_t cfg_v_key_accel			= axis_index_v | axis_key_accel;
-constexpr uint16_t cfg_v_estol_accel		= axis_index_v | axis_estop_accel;
+constexpr uint16_t cfg_v_estop_accel		= axis_index_v | axis_estop_accel;
 constexpr uint16_t cfg_v_backlash			= axis_index_v | axis_backlash;
 constexpr uint16_t cfg_v_docking_pos		= axis_index_v | axis_docking_pos;
+constexpr uint16_t cfg_v_step_length		= axis_index_v | axis_step_length;
 
 // User Origin
 constexpr uint16_t cfg_user_origin_x = cls_cfg | 0x0060 | axis_index_x;
@@ -616,21 +627,21 @@ constexpr uint16_t cfg_G0_acc_factor_pct = cls_cfg | 0x0208; // percent
 constexpr uint16_t cfg_speed_factor_pct = cls_cfg | 0x0209; // percent
 
 // Configurables - engrave:
-constexpr uint16_t cfg_engrave_x_start_speed = cls_cfg | 0x0E50 | axis_x; // micrometers/sec
-constexpr uint16_t cfg_engrave_y_start_speed = cls_cfg | 0x0E50 | axis_y; // micrometers/sec
+constexpr uint16_t cfg_engrave_x_start_speed = cls_cfg | 0x0E50 | axis_index_x;
+constexpr uint16_t cfg_engrave_y_start_speed = cls_cfg | 0x0E50 | axis_index_y;
 
-constexpr uint16_t cfg_engrave_x_acc		= cls_cfg | 0x0EA0 | axis_x; // micrometers/sec^2
-constexpr uint16_t cfg_engrave_y_acc		= cls_cfg | 0x0EA0 | axis_y; // micrometers/sec^2
+constexpr uint16_t cfg_engrave_x_acc		= cls_cfg | 0x0EA0 | axis_index_x; // micrometers/sec^2
+constexpr uint16_t cfg_engrave_y_acc		= cls_cfg | 0x0EA0 | axis_index_y; // micrometers/sec^2
 constexpr uint16_t cfg_line_shift_speed		= cls_cfg | 0x0E01; // micrometers/sec
 constexpr uint16_t cfg_facula_size_pct		= cls_cfg | 0x0E02; // precent*10.0
 constexpr uint16_t cfg_engrave_factor_pct	= cls_cfg | 0x0E03; // percent
 
 // Configurables - Homing
-constexpr uint16_t cfg_xy_home_speed = cls_cfg | 0x0AC0 | axis_index_x | axis_index_y; // micrometers/sec
-constexpr uint16_t cfg_z_home_speed = cls_cfg | 0x0AC0 | axis_index_z; // micrometers/sec
-constexpr uint16_t cfg_z_work_speed = cls_cfg | 0x0AD0 | axis_index_z; // micrometers/sec
-constexpr uint16_t cfg_u_home_speed = cls_cfg | 0x0AC0 | axis_index_u; // micrometers/sec
-constexpr uint16_t cfg_u_work_speed = cls_cfg | 0x0AD0 | axis_index_u; // micrometers/sec
+constexpr uint16_t cfg_xy_home_speed = cls_cfg | 0x0B10 | axis_index_xy;
+constexpr uint16_t cfg_z_home_speed = cls_cfg | 0x0B0 | axis_index_z;
+constexpr uint16_t cfg_z_work_speed = cls_cfg | 0x0BD0 | axis_index_z;
+constexpr uint16_t cfg_u_home_speed = cls_cfg | 0x0BC0 | axis_index_u;
+constexpr uint16_t cfg_u_work_speed = cls_cfg | 0x0BD0 | axis_index_u;
 
 // Configurables - Material
 constexpr uint16_t cfg_material_thick = cls_cfg | 0x0301; // micrometers

@@ -168,13 +168,13 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_jog_step_xy:
 	case lbp::cmd_jog_step_xyz:
 	case lbp::cmd_jog_step_xyzu:
-	case lbp::cmd_goto_x:
-	case lbp::cmd_goto_y:
-	case lbp::cmd_goto_z:
-	case lbp::cmd_goto_u:
-	case lbp::cmd_goto_xy:
-	case lbp::cmd_goto_xyz:
-	case lbp::cmd_goto_xyzu:
+	case lbp::cmd_jog_to_x:
+	case lbp::cmd_jog_to_y:
+	case lbp::cmd_jog_to_z:
+	case lbp::cmd_jog_to_u:
+	case lbp::cmd_jog_to_xy:
+	case lbp::cmd_jog_to_xyz:
+	case lbp::cmd_jog_to_xyzu:
 	case lbp::cmd_cut_abs_x:
 	case lbp::cmd_cut_abs_y:
 	case lbp::cmd_cut_abs_z:
@@ -189,20 +189,20 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_cut_rel_xy:
 	case lbp::cmd_cut_rel_xyz:
 	case lbp::cmd_cut_rel_xyzu:
-	case lbp::cmd_rapid_abs_x:
-	case lbp::cmd_rapid_abs_y:
-	case lbp::cmd_rapid_abs_z:
-	case lbp::cmd_rapid_abs_u:
-	case lbp::cmd_rapid_abs_xy:
-	case lbp::cmd_rapid_abs_xyz:
-	case lbp::cmd_rapid_abs_xyzu:
-	case lbp::cmd_rapid_rel_x:
-	case lbp::cmd_rapid_rel_y:
-	case lbp::cmd_rapid_rel_z:
-	case lbp::cmd_rapid_rel_u:
-	case lbp::cmd_rapid_rel_xy:
-	case lbp::cmd_rapid_rel_xyz:
-	case lbp::cmd_rapid_rel_xyzu:
+	case lbp::cmd_travel_abs_x:
+	case lbp::cmd_travel_abs_y:
+	case lbp::cmd_travel_abs_z:
+	case lbp::cmd_travel_abs_u:
+	case lbp::cmd_travel_abs_xy:
+	case lbp::cmd_travel_abs_xyz:
+	case lbp::cmd_travel_abs_xyzu:
+	case lbp::cmd_travel_rel_x:
+	case lbp::cmd_travel_rel_y:
+	case lbp::cmd_travel_rel_z:
+	case lbp::cmd_travel_rel_u:
+	case lbp::cmd_travel_rel_xy:
+	case lbp::cmd_travel_rel_xyz:
+	case lbp::cmd_travel_rel_xyzu:
 	case lbp::cmd_laser_power_min:
 	case lbp::cmd_laser_power_max:
 	case lbp::cmd_laser_freq:
@@ -245,75 +245,75 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_home_z:
 			target.z = 0;
 			break;
-		case lbp::cmd_goto_x:
+		case lbp::cmd_jog_to_x:
 		case lbp::cmd_cut_abs_x:
-		case lbp::cmd_rapid_abs_x:
+		case lbp::cmd_travel_abs_x:
 			target.x = p.readIntArg() + m_job_origin.x;
 			break;
 		case lbp::cmd_jog_step_x:
 		case lbp::cmd_cut_rel_x:
-		case lbp::cmd_rapid_rel_x:
+		case lbp::cmd_travel_rel_x:
 			target.x += p.readIntArg();
 			break;
-		case lbp::cmd_goto_y:
+		case lbp::cmd_jog_to_y:
 		case lbp::cmd_cut_abs_y:
-		case lbp::cmd_rapid_abs_y:
+		case lbp::cmd_travel_abs_y:
 			target.y = p.readIntArg() + m_job_origin.y;
 			break;
 		case lbp::cmd_jog_step_y:
 		case lbp::cmd_cut_rel_y:
-		case lbp::cmd_rapid_rel_y:
+		case lbp::cmd_travel_rel_y:
 			target.y += p.readIntArg();
 			break;
-		case lbp::cmd_goto_z:
+		case lbp::cmd_jog_to_z:
 		case lbp::cmd_cut_abs_z:
-		case lbp::cmd_rapid_abs_z:
+		case lbp::cmd_travel_abs_z:
 			target.z = p.readIntArg();
 			break;
 		case lbp::cmd_jog_step_z:
 		case lbp::cmd_cut_rel_z:
-		case lbp::cmd_rapid_rel_z:
+		case lbp::cmd_travel_rel_z:
 			target.z += p.readIntArg();
 			break;
-		case lbp::cmd_goto_u:
+		case lbp::cmd_jog_to_u:
 		case lbp::cmd_cut_abs_u:
-		case lbp::cmd_rapid_abs_u:
+		case lbp::cmd_travel_abs_u:
 			target.u = p.readIntArg();
 			break;
 		case lbp::cmd_jog_step_u:
 		case lbp::cmd_cut_rel_u:
-		case lbp::cmd_rapid_rel_u:
+		case lbp::cmd_travel_rel_u:
 			target.u += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xy:
+		case lbp::cmd_jog_to_xy:
 		case lbp::cmd_cut_abs_xy:
-		case lbp::cmd_rapid_abs_xy:
+		case lbp::cmd_travel_abs_xy:
 			target.x = p.readIntArg() + m_job_origin.x;
 			target.y = p.readIntArg() + m_job_origin.y;
 			break;
 		case lbp::cmd_jog_step_xy:
 		case lbp::cmd_cut_rel_xy:
-		case lbp::cmd_rapid_rel_xy:
+		case lbp::cmd_travel_rel_xy:
 			target.x += p.readIntArg();
 			target.y += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xyz:
+		case lbp::cmd_jog_to_xyz:
 		case lbp::cmd_cut_abs_xyz:
-		case lbp::cmd_rapid_abs_xyz:
+		case lbp::cmd_travel_abs_xyz:
 			target.x = p.readIntArg() + m_job_origin.x;
 			target.y = p.readIntArg() + m_job_origin.y;
 			target.z = p.readIntArg();
 			break;
 		case lbp::cmd_jog_step_xyz:
 		case lbp::cmd_cut_rel_xyz:
-		case lbp::cmd_rapid_rel_xyz:
+		case lbp::cmd_travel_rel_xyz:
 			target.x += p.readIntArg();
 			target.y += p.readIntArg();
 			target.z += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xyzu:
+		case lbp::cmd_jog_to_xyzu:
 		case lbp::cmd_cut_abs_xyzu:
-		case lbp::cmd_rapid_abs_xyzu:
+		case lbp::cmd_travel_abs_xyzu:
 			target.x = p.readIntArg() + m_job_origin.x;
 			target.y = p.readIntArg() + m_job_origin.y;
 			target.z = p.readIntArg();
@@ -321,7 +321,7 @@ MovementSim::State MovementSim::updateTarget()
 			break;
 		case lbp::cmd_jog_step_xyzu:
 		case lbp::cmd_cut_rel_xyzu:
-		case lbp::cmd_rapid_rel_xyzu:
+		case lbp::cmd_travel_rel_xyzu:
 			target.x += p.readIntArg();
 			target.y += p.readIntArg();
 			target.z += p.readIntArg();
