@@ -105,7 +105,7 @@ int32_t Configuration::get(uint16_t key, int32_t &value) const
 	return true;
 }
 
-static constexpr uint16_t cgf_codes[148] = {
+static constexpr uint16_t cgf_codes[156] = {
 	cfg_x_settings,
 	cfg_x_unit,
 	cfg_x_size,
@@ -115,9 +115,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_x_key_jumpoff_speed,
 	cfg_x_max_accel,
 	cfg_x_key_accel,
-	cfg_x_estol_accel,
+	cfg_x_estop_accel,
 	cfg_x_backlash,
 	cfg_x_docking_pos,
+	cfg_x_step_length,
 	cfg_y_settings,
 	cfg_y_unit,
 	cfg_y_size,
@@ -127,9 +128,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_y_key_jumpoff_speed,
 	cfg_y_max_accel,
 	cfg_y_key_accel,
-	cfg_y_estol_accel,
+	cfg_y_estop_accel,
 	cfg_y_backlash,
 	cfg_y_docking_pos,
+	cfg_y_step_length,
 	cfg_z_settings,
 	cfg_z_unit,
 	cfg_z_size,
@@ -139,9 +141,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_z_key_jumpoff_speed,
 	cfg_z_max_accel,
 	cfg_z_key_accel,
-	cfg_z_estol_accel,
+	cfg_z_estop_accel,
 	cfg_z_backlash,
 	cfg_z_docking_pos,
+	cfg_z_step_length,
 	cfg_a_settings,
 	cfg_a_unit,
 	cfg_a_size,
@@ -151,9 +154,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_a_key_jumpoff_speed,
 	cfg_a_max_accel,
 	cfg_a_key_accel,
-	cfg_a_estol_accel,
+	cfg_a_estop_accel,
 	cfg_a_backlash,
 	cfg_a_docking_pos,
+	cfg_a_step_length,
 	cfg_b_settings,
 	cfg_b_unit,
 	cfg_b_size,
@@ -163,9 +167,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_b_key_jumpoff_speed,
 	cfg_b_max_accel,
 	cfg_b_key_accel,
-	cfg_b_estol_accel,
+	cfg_b_estop_accel,
 	cfg_b_backlash,
 	cfg_b_docking_pos,
+	cfg_b_step_length,
 	cfg_c_settings,
 	cfg_c_unit,
 	cfg_c_size,
@@ -175,9 +180,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_c_key_jumpoff_speed,
 	cfg_c_max_accel,
 	cfg_c_key_accel,
-	cfg_c_estol_accel,
+	cfg_c_estop_accel,
 	cfg_c_backlash,
 	cfg_c_docking_pos,
+	cfg_c_step_length,
 	cfg_u_settings,
 	cfg_u_unit,
 	cfg_u_size,
@@ -187,9 +193,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_u_key_jumpoff_speed,
 	cfg_u_max_accel,
 	cfg_u_key_accel,
-	cfg_u_estol_accel,
+	cfg_u_estop_accel,
 	cfg_u_backlash,
 	cfg_u_docking_pos,
+	cfg_u_step_length,
 	cfg_v_settings,
 	cfg_v_unit,
 	cfg_v_size,
@@ -199,9 +206,10 @@ static constexpr uint16_t cgf_codes[148] = {
 	cfg_v_key_jumpoff_speed,
 	cfg_v_max_accel,
 	cfg_v_key_accel,
-	cfg_v_estol_accel,
+	cfg_v_estop_accel,
 	cfg_v_backlash,
 	cfg_v_docking_pos,
+	cfg_v_step_length,
 	cfg_user_origin_x,
 	cfg_user_origin_y,
 	cfg_head_dist,
@@ -320,14 +328,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_x_key_accel:
 		name = "cfg_x_key_accel";
 		return true;
-	case cfg_x_estol_accel:
-		name = "cfg_x_estol_accel";
+	case cfg_x_estop_accel:
+		name = "cfg_x_estop_accel";
 		return true;
 	case cfg_x_backlash:
 		name = "cfg_x_backlash";
 		return true;
 	case cfg_x_docking_pos:
 		name = "cfg_x_docking_pos";
+		return true;
+	case cfg_x_step_length:
+		name = "cfg_x_step_length";
 		return true;
 	case cfg_y_settings:
 		name = "cfg_y_settings";
@@ -356,14 +367,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_y_key_accel:
 		name = "cfg_y_key_accel";
 		return true;
-	case cfg_y_estol_accel:
-		name = "cfg_y_estol_accel";
+	case cfg_y_estop_accel:
+		name = "cfg_y_estop_accel";
 		return true;
 	case cfg_y_backlash:
 		name = "cfg_y_backlash";
 		return true;
 	case cfg_y_docking_pos:
 		name = "cfg_y_docking_pos";
+		return true;
+	case cfg_y_step_length:
+		name = "cfg_y_step_length";
 		return true;
 	case cfg_z_settings:
 		name = "cfg_z_settings";
@@ -392,14 +406,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_z_key_accel:
 		name = "cfg_z_key_accel";
 		return true;
-	case cfg_z_estol_accel:
-		name = "cfg_z_estol_accel";
+	case cfg_z_estop_accel:
+		name = "cfg_z_estop_accel";
 		return true;
 	case cfg_z_backlash:
 		name = "cfg_z_backlash";
 		return true;
 	case cfg_z_docking_pos:
 		name = "cfg_z_docking_pos";
+		return true;
+	case cfg_z_step_length:
+		name = "cfg_z_step_length";
 		return true;
 	case cfg_a_settings:
 		name = "cfg_a_settings";
@@ -428,14 +445,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_a_key_accel:
 		name = "cfg_a_key_accel";
 		return true;
-	case cfg_a_estol_accel:
-		name = "cfg_a_estol_accel";
+	case cfg_a_estop_accel:
+		name = "cfg_a_estop_accel";
 		return true;
 	case cfg_a_backlash:
 		name = "cfg_a_backlash";
 		return true;
 	case cfg_a_docking_pos:
 		name = "cfg_a_docking_pos";
+		return true;
+	case cfg_a_step_length:
+		name = "cfg_a_step_length";
 		return true;
 	case cfg_b_settings:
 		name = "cfg_b_settings";
@@ -464,14 +484,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_b_key_accel:
 		name = "cfg_b_key_accel";
 		return true;
-	case cfg_b_estol_accel:
-		name = "cfg_b_estol_accel";
+	case cfg_b_estop_accel:
+		name = "cfg_b_estop_accel";
 		return true;
 	case cfg_b_backlash:
 		name = "cfg_b_backlash";
 		return true;
 	case cfg_b_docking_pos:
 		name = "cfg_b_docking_pos";
+		return true;
+	case cfg_b_step_length:
+		name = "cfg_b_step_length";
 		return true;
 	case cfg_c_settings:
 		name = "cfg_c_settings";
@@ -500,14 +523,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_c_key_accel:
 		name = "cfg_c_key_accel";
 		return true;
-	case cfg_c_estol_accel:
-		name = "cfg_c_estol_accel";
+	case cfg_c_estop_accel:
+		name = "cfg_c_estop_accel";
 		return true;
 	case cfg_c_backlash:
 		name = "cfg_c_backlash";
 		return true;
 	case cfg_c_docking_pos:
 		name = "cfg_c_docking_pos";
+		return true;
+	case cfg_c_step_length:
+		name = "cfg_c_step_length";
 		return true;
 	case cfg_u_settings:
 		name = "cfg_u_settings";
@@ -536,14 +562,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_u_key_accel:
 		name = "cfg_u_key_accel";
 		return true;
-	case cfg_u_estol_accel:
-		name = "cfg_u_estol_accel";
+	case cfg_u_estop_accel:
+		name = "cfg_u_estop_accel";
 		return true;
 	case cfg_u_backlash:
 		name = "cfg_u_backlash";
 		return true;
 	case cfg_u_docking_pos:
 		name = "cfg_u_docking_pos";
+		return true;
+	case cfg_u_step_length:
+		name = "cfg_u_step_length";
 		return true;
 	case cfg_v_settings:
 		name = "cfg_v_settings";
@@ -572,14 +601,17 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_v_key_accel:
 		name = "cfg_v_key_accel";
 		return true;
-	case cfg_v_estol_accel:
-		name = "cfg_v_estol_accel";
+	case cfg_v_estop_accel:
+		name = "cfg_v_estop_accel";
 		return true;
 	case cfg_v_backlash:
 		name = "cfg_v_backlash";
 		return true;
 	case cfg_v_docking_pos:
 		name = "cfg_v_docking_pos";
+		return true;
+	case cfg_v_step_length:
+		name = "cfg_v_step_length";
 		return true;
 	case cfg_user_origin_x:
 		name = "cfg_user_origin_x";
@@ -737,6 +769,7 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_axis_auto_home:
 		name = "cfg_axis_auto_home";
 		return true;
+
 	default:
 		return false;
 	}
@@ -754,9 +787,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_x_key_jumpoff_speed:
 	case cfg_x_max_accel:
 	case cfg_x_key_accel:
-	case cfg_x_estol_accel:
+	case cfg_x_estop_accel:
 	case cfg_x_backlash:
 	case cfg_x_docking_pos:
+	case cfg_x_step_length:
 	case cfg_y_settings:
 	case cfg_y_unit:
 	case cfg_y_size:
@@ -766,9 +800,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_y_key_jumpoff_speed:
 	case cfg_y_max_accel:
 	case cfg_y_key_accel:
-	case cfg_y_estol_accel:
+	case cfg_y_estop_accel:
 	case cfg_y_backlash:
 	case cfg_y_docking_pos:
+	case cfg_y_step_length:
 	case cfg_z_settings:
 	case cfg_z_unit:
 	case cfg_z_size:
@@ -778,9 +813,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_z_key_jumpoff_speed:
 	case cfg_z_max_accel:
 	case cfg_z_key_accel:
-	case cfg_z_estol_accel:
+	case cfg_z_estop_accel:
 	case cfg_z_backlash:
 	case cfg_z_docking_pos:
+	case cfg_z_step_length:
 	case cfg_a_settings:
 	case cfg_a_unit:
 	case cfg_a_size:
@@ -790,9 +826,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_a_key_jumpoff_speed:
 	case cfg_a_max_accel:
 	case cfg_a_key_accel:
-	case cfg_a_estol_accel:
+	case cfg_a_estop_accel:
 	case cfg_a_backlash:
 	case cfg_a_docking_pos:
+	case cfg_a_step_length:
 	case cfg_b_settings:
 	case cfg_b_unit:
 	case cfg_b_size:
@@ -802,9 +839,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_b_key_jumpoff_speed:
 	case cfg_b_max_accel:
 	case cfg_b_key_accel:
-	case cfg_b_estol_accel:
+	case cfg_b_estop_accel:
 	case cfg_b_backlash:
 	case cfg_b_docking_pos:
+	case cfg_b_step_length:
 	case cfg_c_settings:
 	case cfg_c_unit:
 	case cfg_c_size:
@@ -814,9 +852,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_c_key_jumpoff_speed:
 	case cfg_c_max_accel:
 	case cfg_c_key_accel:
-	case cfg_c_estol_accel:
+	case cfg_c_estop_accel:
 	case cfg_c_backlash:
 	case cfg_c_docking_pos:
+	case cfg_c_step_length:
 	case cfg_u_settings:
 	case cfg_u_unit:
 	case cfg_u_size:
@@ -826,9 +865,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_u_key_jumpoff_speed:
 	case cfg_u_max_accel:
 	case cfg_u_key_accel:
-	case cfg_u_estol_accel:
+	case cfg_u_estop_accel:
 	case cfg_u_backlash:
 	case cfg_u_docking_pos:
+	case cfg_u_step_length:
 	case cfg_v_settings:
 	case cfg_v_unit:
 	case cfg_v_size:
@@ -838,9 +878,10 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_v_key_jumpoff_speed:
 	case cfg_v_max_accel:
 	case cfg_v_key_accel:
-	case cfg_v_estol_accel:
+	case cfg_v_estop_accel:
 	case cfg_v_backlash:
 	case cfg_v_docking_pos:
+	case cfg_v_step_length:
 	case cfg_user_origin_x:
 	case cfg_user_origin_y:
 	case cfg_head_dist:

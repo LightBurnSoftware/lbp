@@ -158,6 +158,11 @@ That said, we plan to allow full configuration of all axes. Each will be configu
 - `unit_millidegrees`, for rotational systems.
 - `unit_steps`, for stepper motors.
 
+These units will inform the meaning of arguments in movement commands, position queries, and configurations for that axis.
+(See below for configuration)
+
+For now, all XYZ and UV are assumed to use micrometers, and ABC are assumed to use millidegrees.
+
 ### Composition Example:
 Consider the command `cmd_cut_abs_xy` ("Move to absolute X and Y position while cutting"):
 
@@ -177,7 +182,7 @@ in LightBurn to move the laser in real time.
 - **Programmed** moves occur in the context of a job.
 
 Within these categories are further distinctions. Both **operator** and **programmed** moves may be either **absolute** or **relative**,
-with **operator** moves also having the option of being **continuous**. **Programmed** moves provide additional context of **cut** vs **rapid**,
+with **operator** moves also having the option of being **continuous**. **Programmed** moves provide additional context of **cut** vs **travel**,
 which may effect how the firmware plans the movement. In addition, the **homing** is considered an **operator** move.
 So, all together, we have:
 
@@ -186,11 +191,11 @@ So, all together, we have:
 - **jog start**: start a continuous movement on a particular axis.
 - **jog stop**: stop a continuous movement on a particular axis.
 - **jog step**: step the laser by a certain distance from its current position. Think of this as a "relative operator move."
-- **goto**: move the laser directly to a certain absolute position. Think of this as an "absolute operator move."
+- **jog_to**: move the laser directly to a certain absolute position. Think of this as an "absolute operator move."
 
 **Programmed**:
-- **relative rapid**: move the laser a specified distance from its current position. It is **not expected** that the laser is cutting.
-- **absolute rapid**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
+- **relative travel**: move the laser a specified distance from its current position. It is **not expected** that the laser is cutting.
+- **absolute travel**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
 - **relative cut**: move the laser a specified distance from its current position. The laser **is expected** to be active and cutting.
 - **absolute cut**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`).The laser **is expected** to be active and cutting.
 - **dwell**: perform no movement for a specified number of milliseconds.
@@ -236,6 +241,8 @@ A movement command will have one 32-bit integer argument for each axis flag that
 For example the command `0x6B41` would have two 32-bit arguments - X position followed by U position.
 In practice, such unusual commands would be vanishingly unlikely to originate from Lightburn, but are valid for the purposes of this specification.
 
+See the tables below for examples of typical movement commands. The tables are not exhaustive, but should cover common cases.
+
 #### TODO: Axis unit configuration
 A, B, C are conventionally rotational axes. A design decision must be made about what units to send along.
 
@@ -245,11 +252,11 @@ and expects the machine to respond in real time.
 
 #### Movement Command Response
 The firmware responds to all operator movement commands upon receipt with a message consisting of the
-same command and no arguments. For example, the response to a `cmd_goto_xy` message is:
+same command and no arguments. For example, the response to a `cmd_jog_to_xy` message is:
 
-| Command         | Arguments | Payload Length |
-|-----------------|-----------|----------------|
-| `cmd_goto_xy`   | None      | 2              |
+| Command           | Arguments | Payload Length |
+|-------------------|-----------|----------------|
+| `cmd_jog_to_xy`   | None      | 2              |
 
 This response is sent immediately upon receipt of the command, and is sent whether the move
 succeeds or fails. The firmware is not required to send any positional update upon move completion.
@@ -258,20 +265,20 @@ succeeds or fails. The firmware is not required to send any positional update up
 Go To commands move the laser to the specified position along the command's indicated axis.
 Each command includes one 32-bit integer argument corresponding to the desired axis position in micrometers.
 
-| Command         | Arguments (Axis positions in micrometers) | Payload Length |
-|-----------------|-------------------------------------------|----------------|
-| `cmd_goto_x`    | int32 X (μm)                              | 6              |
-| `cmd_goto_y`    | int32 Y (μm)                              | 6              |
-| `cmd_goto_z`    | int32 Z (μm)                              | 6              |
-| `cmd_goto_a`    | int32 A (μm)                              | 6              |
-| `cmd_goto_b`    | int32 B (μm)                              | 6              |
-| `cmd_goto_c`    | int32 C (μm)                              | 6              |
-| `cmd_goto_u`    | int32 U (μm)                              | 6              |
-| `cmd_goto_v`    | int32 V (μm)                              | 6              |
-| `cmd_goto_xy`   | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_goto_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_goto_xyza` | int32 X, int32 Y, int32 Z, int32 A (μm)   | 18             |
-| `cmd_goto_abc`  | int32 A, int32 B, int32 C (μm)            | 14             |
+| Command           | Arguments (positions in axis units)  | Payload Length |
+|-------------------|--------------------------------------|----------------|
+| `cmd_jog_to_x`    | int32 X                              | 6              |
+| `cmd_jog_to_y`    | int32 Y                              | 6              |
+| `cmd_jog_to_z`    | int32 Z                              | 6              |
+| `cmd_jog_to_a`    | int32 A                              | 6              |
+| `cmd_jog_to_b`    | int32 B                              | 6              |
+| `cmd_jog_to_c`    | int32 C                              | 6              |
+| `cmd_jog_to_u`    | int32 U                              | 6              |
+| `cmd_jog_to_v`    | int32 V                              | 6              |
+| `cmd_jog_to_xy`   | int32 X, int32 Y                     | 10             |
+| `cmd_jog_to_xyz`  | int32 X, int32 Y, int32 Z            | 14             |
+| `cmd_jog_to_xyza` | int32 X, int32 Y, int32 Z, int32 A   | 18             |
+| `cmd_jog_to_abc`  | int32 A, int32 B, int32 C            | 14             |
 
 **Note**: Go To command coordinates are to be interpreted relative to the machine's absolute zero.
 
@@ -279,19 +286,21 @@ Each command includes one 32-bit integer argument corresponding to the desired a
 Jog Step commands are named such in order to be familiar to machine operators. They are really
 just relative operator moves. Thus, the argument is to be one 32-bit argument per indicated axis
 representing the distance to move from the current location along that axis.
+Usually the operator will jog only one axis at a time, but if your device allows planar motion then
+Lightburn will expose those commands.
 
-| Command             | Arguments (Axis positions in micrometers) | Payload Length |
-|---------------------|-------------------------------------------|----------------|
-| `cmd_jog_step_x`    | int32 X (μm)                              | 6              |
-| `cmd_jog_step_y`    | int32 Y (μm)                              | 6              |
-| `cmd_jog_step_z`    | int32 Z (μm)                              | 6              |
-| `cmd_jog_step_a`    | int32 A (μm)                              | 6              |
-| `cmd_jog_step_b`    | int32 B (μm)                              | 6              |
-| `cmd_jog_step_c`    | int32 C (μm)                              | 6              |
-| `cmd_jog_step_u`    | int32 U (μm)                              | 6              |
-| `cmd_jog_step_xy`   | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_jog_step_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_jog_step_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| Command          | Arguments (distances in axis units) | Payload Length |
+|------------------|-------------------------------------|----------------|
+| `cmd_jog_step_x` | int32 X                             | 6              |
+| `cmd_jog_step_y` | int32 Y                             | 6              |
+| `cmd_jog_step_z` | int32 Z                             | 6              |
+| `cmd_jog_step_a` | int32 A                             | 6              |
+| `cmd_jog_step_b` | int32 B                             | 6              |
+| `cmd_jog_step_c` | int32 C                             | 6              |
+| `cmd_jog_step_u` | int32 U                             | 6              |
+| `cmd_jog_step_v` | int32 V                             | 6              |
+| `cmd_jog_step_xy`| int32 X, int32 Y                    | 10             |
+| `cmd_jog_step_ab`| int32 A, int32 B                    | 10             |
 
 #### Jog Start/Stop (Continuous Operator Move)
 Continuous movements are different from Absolute (Goto) or Relative (Jog Step) moves in that they have no distance or positional arguments.
@@ -303,22 +312,38 @@ or contradictory command is received, or a fault occurs (such as contact with a 
 
 | Command               | Payload Length | Description                            |
 |-----------------------|----------------|----------------------------------------|
-| `cmd_jog_start_pos_x` | 2              | Start moving along the positive x axis |
-| `cmd_jog_stop_pos_x`  | 2              | Stop moving along the positive x axis  |
-| `cmd_jog_start_neg_x` | 2              | Start moving along the negative x axis |
-| `cmd_jog_stop_neg_x`  | 2              | Stop moving along the negative x axis  |
-| `cmd_jog_start_pos_y` | 2              | Start moving along the positive y axis |
-| `cmd_jog_stop_pos_y`  | 2              | Stop moving along the positive y axis  |
-| `cmd_jog_start_neg_y` | 2              | Start moving along the negative y axis |
-| `cmd_jog_stop_neg_y`  | 2              | Stop moving along the negative y axis  |
-| `cmd_jog_start_pos_z` | 2              | Start moving along the positive z axis |
-| `cmd_jog_stop_pos_z`  | 2              | Stop moving along the positive z axis  |
-| `cmd_jog_start_neg_z` | 2              | Start moving along the negative z axis |
-| `cmd_jog_stop_neg_z`  | 2              | Stop moving along the negative z axis  |
-| `cmd_jog_start_pos_u` | 2              | Start moving along the positive u axis |
-| `cmd_jog_stop_pos_u`  | 2              | Stop moving along the positive u axis  |
-| `cmd_jog_start_neg_u` | 2              | Start moving along the negative u axis |
-| `cmd_jog_stop_neg_u`  | 2              | Stop moving along the negative u axis  |
+| `cmd_jog_start_pos_x` | 2              | Start moving along the positive X axis |
+| `cmd_jog_stop_pos_x`  | 2              | Stop moving along the positive X axis  |
+| `cmd_jog_start_neg_x` | 2              | Start moving along the negative X axis |
+| `cmd_jog_stop_neg_x`  | 2              | Stop moving along the negative X axis  |
+| `cmd_jog_start_pos_y` | 2              | Start moving along the positive Y axis |
+| `cmd_jog_stop_pos_y`  | 2              | Stop moving along the positive Y axis  |
+| `cmd_jog_start_neg_y` | 2              | Start moving along the negative Y axis |
+| `cmd_jog_stop_neg_y`  | 2              | Stop moving along the negative Y axis  |
+| `cmd_jog_start_pos_z` | 2              | Start moving along the positive Z axis |
+| `cmd_jog_stop_pos_z`  | 2              | Stop moving along the positive Z axis  |
+| `cmd_jog_start_neg_z` | 2              | Start moving along the negative Z axis |
+| `cmd_jog_stop_neg_z`  | 2              | Stop moving along the negative Z axis  |
+| `cmd_jog_start_pos_a` | 2              | Start moving along the positive A axis |
+| `cmd_jog_stop_pos_a`  | 2              | Stop moving along the positive A axis  |
+| `cmd_jog_start_neg_a` | 2              | Start moving along the negative A axis |
+| `cmd_jog_stop_neg_a`  | 2              | Stop moving along the negative A axis  |
+| `cmd_jog_start_pos_b` | 2              | Start moving along the positive B axis |
+| `cmd_jog_stop_pos_b`  | 2              | Stop moving along the positive B axis  |
+| `cmd_jog_start_neg_b` | 2              | Start moving along the negative B axis |
+| `cmd_jog_stop_neg_b`  | 2              | Stop moving along the negative B axis  |
+| `cmd_jog_start_pos_c` | 2              | Start moving along the positive C axis |
+| `cmd_jog_stop_pos_c`  | 2              | Stop moving along the positive C axis  |
+| `cmd_jog_start_neg_c` | 2              | Start moving along the negative C axis |
+| `cmd_jog_stop_neg_c`  | 2              | Stop moving along the negative C axis  |
+| `cmd_jog_start_pos_u` | 2              | Start moving along the positive U axis |
+| `cmd_jog_stop_pos_u`  | 2              | Stop moving along the positive U axis  |
+| `cmd_jog_start_neg_u` | 2              | Start moving along the negative U axis |
+| `cmd_jog_stop_neg_u`  | 2              | Stop moving along the negative U axis  |
+| `cmd_jog_start_pos_v` | 2              | Start moving along the positive V axis |
+| `cmd_jog_stop_pos_v`  | 2              | Stop moving along the positive V axis  |
+| `cmd_jog_start_neg_v` | 2              | Start moving along the negative V axis |
+| `cmd_jog_stop_neg_v`  | 2              | Stop moving along the negative V axis  |
 
 This specification neither forbids nor requires the capability for simultaneous axis jogging -
 it simply provides the command definitions.
@@ -332,18 +357,17 @@ These commands are expected to appear in the context of an cutting/engraving job
 #### Cut
 **Cut** commands are programmed moves that signal to the firmware that the laser is expected to be on and cutting during the movement.
 Crucially though, these commands **do not turn on the laser**. They simply tell the firmware to move as if the laser is cutting.
-Cut commands can be either relative or absolute.
+Cut commands can be either relative or absolute. The following tables list the most probably examples of cut commands.
 
 #### Absolute Cut
-| Command               | Arguments (Axis positions in micrometers) | Payload Length |
-|-----------------------|-------------------------------------------|----------------|
-| `cmd_cut_abs_x`       | int32 X (μm)                              | 6              |
-| `cmd_cut_abs_y`       | int32 Y (μm)                              | 6              |
-| `cmd_cut_abs_z`       | int32 Z (μm)                              | 6              |
-| `cmd_cut_abs_u`       | int32 U (μm)                              | 6              |
-| `cmd_cut_abs_xy`      | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_cut_abs_xyz`     | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_cut_abs_xyzu`    | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| Command               | Arguments (positions in axis units) | Payload Length |
+|-----------------------|-------------------------------------|----------------|
+| `cmd_cut_abs_x`       | int32 X                             | 6              |
+| `cmd_cut_abs_y`       | int32 Y                             | 6              |
+| `cmd_cut_abs_a`       | int32 A                             | 6              |
+| `cmd_cut_abs_b`       | int32 B                             | 6              |
+| `cmd_cut_abs_xy`      | int32 X, int32 Y                    | 10             |
+| `cmd_cut_abs_ab`      | int32 A, int32 B                    | 10             |
 
 Absolute moves in X and Y have the option to be sent relative to a specified origin.
 This origin is set with the command `cmd_cut_from` and should be set as part of the **Job Header** (see below).
@@ -352,15 +376,14 @@ This origin is set with the command `cmd_cut_from` and should be set as part of 
 Just like Jog Step, Relative Cut move commands move the laser by a specified distance (or **delta**) from its previous position at the start of the move.
 Each command includes one 32-bit integer argument corresponding to the desired axis delta in micrometers.
 
-| Command               | Arguments (axis distance in micrometers) | Payload Length |
-|-----------------------|------------------------------------------|----------------|
-| `cmd_cut_rel_x`       | int32 X (μm)                             | 6              |
-| `cmd_cut_rel_y`       | int32 Y (μm)                             | 6              |
-| `cmd_cut_rel_z`       | int32 Z (μm)                             | 6              |
-| `cmd_cut_rel_u`       | int32 U (μm)                             | 6              |
-| `cmd_cut_rel_xy`      | int32 X, int32 Y (μm)                    | 10             |
-| `cmd_cut_rel_xyz`     | int32 X, int32 Y, int32 Z (μm)           | 14             |
-| `cmd_cut_rel_xyzu`    | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+| Command               | Arguments (distances in axis units ) | Payload Length |
+|-----------------------|--------------------------------------|----------------|
+| `cmd_cut_rel_x`       | int32 X                              | 6              |
+| `cmd_cut_rel_y`       | int32 Y                              | 6              |
+| `cmd_cut_rel_a`       | int32 A                              | 6              |
+| `cmd_cut_rel_b`       | int32 B                              | 6              |
+| `cmd_cut_rel_xy`      | int32 X, int32 Y                     | 10             |
+| `cmd_cut_rel_ab`      | int32 A, int32 B                     | 10             |
 
 #### Rapid
 **Rapid** Commands are programmed moves that signal to the firmware that the laser is **not expected** to be
@@ -370,26 +393,38 @@ on and cutting during the move. Rapid moves are expected to be faster than cuts.
 Just like Absolute Cuts, Absolute Rapid arguments are axis positions **relative to the jog origin**.
 Job Origin is set in the Job Header using the `cmd_cut_from` message.
 
-| Command               | Arguments (Axis positions in micrometers) | Payload Length |
-|-----------------------|-------------------------------------------|----------------|
-| `cmd_rapid_abs_x`    | int32 X (μm)                              | 6              |
-| `cmd_rapid_abs_y`    | int32 Y (μm)                              | 6              |
-| `cmd_rapid_abs_z`    | int32 Z (μm)                              | 6              |
-| `cmd_rapid_abs_u`    | int32 U (μm)                              | 6              |
-| `cmd_rapid_abs_xy`   | int32 X, int32 Y (μm)                     | 10             |
-| `cmd_rapid_abs_xyz`  | int32 X, int32 Y, int32 Z (μm)            | 14             |
-| `cmd_rapid_abs_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)   | 18             |
+| Command                 | Arguments (positions in axis units)                   | Payload Length |
+|-------------------------|-------------------------------------------------------|----------------|
+| `cmd_travel_abs_x`      | int32 X                                               | 6              |
+| `cmd_travel_abs_y`      | int32 Y                                               | 6              |
+| `cmd_travel_abs_z`      | int32 Z                                               | 6              |
+| `cmd_travel_abs_a`      | int32 A                                               | 6              |
+| `cmd_travel_abs_b`      | int32 B                                               | 6              |
+| `cmd_travel_abs_c`      | int32 C                                               | 6              |
+| `cmd_travel_abs_u`      | int32 U                                               | 6              |
+| `cmd_travel_abs_v`      | int32 V                                               | 6              |
+| `cmd_travel_abs_xy`     | int32 X, int32 Y                                      | 10             |
+| `cmd_travel_abs_xyz`    | int32 X, int32 Y, int32 Z                             | 14             |
+| `cmd_travel_abs_xyza`   | int32 X, int32 Y, int32 Z, int32 A                    | 18             |
+| `cmd_travel_abs_xyzu`   | int32 X, int32 Y, int32 Z, int32 U                    | 18             |
+| `cmd_travel_abs_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C  | 26             |
 
 #### Relative Rapid
-| Command               | Arguments (axis distance in micrometers) | Payload Length |
-|-----------------------|------------------------------------------|----------------|
-| `cmd_rapid_rel_x`    | int32 X (μm)                             | 6              |
-| `cmd_rapid_rel_y`    | int32 Y (μm)                             | 6              |
-| `cmd_rapid_rel_z`    | int32 Z (μm)                             | 6              |
-| `cmd_rapid_rel_u`    | int32 U (μm)                             | 6              |
-| `cmd_rapid_rel_xy`   | int32 X, int32 Y (μm)                    | 10             |
-| `cmd_rapid_rel_xyz`  | int32 X, int32 Y, int32 Z (μm)           | 14             |
-| `cmd_rapid_rel_xyzu` | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+| Command                 | Arguments (distnaces in axis units)                   | Payload Length |
+|-------------------------|-------------------------------------------------------|----------------|
+| `cmd_travel_rel_x`      | int32 X                                               | 6              |
+| `cmd_travel_rel_y`      | int32 Y                                               | 6              |
+| `cmd_travel_rel_z`      | int32 Z                                               | 6              |
+| `cmd_travel_rel_a`      | int32 A                                               | 6              |
+| `cmd_travel_rel_b`      | int32 B                                               | 6              |
+| `cmd_travel_rel_c`      | int32 C                                               | 6              |
+| `cmd_travel_rel_u`      | int32 U                                               | 6              |
+| `cmd_travel_rel_v`      | int32 V                                               | 6              |
+| `cmd_travel_rel_xy`     | int32 X, int32 Y                                      | 10             |
+| `cmd_travel_rel_xyz`    | int32 X, int32 Y, int32 Z                             | 14             |
+| `cmd_travel_rel_xyza`   | int32 X, int32 Y, int32 Z, int32 A                    | 18             |
+| `cmd_travel_rel_xyzu`   | int32 X, int32 Y, int32 Z, int32 U                    | 18             |
+| `cmd_travel_rel_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C  | 26             |
 
 #### Dwell
 While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of milliseconds.
@@ -454,7 +489,7 @@ Where value may be:
 ## Making a Cut
 Generally, cuts or engravings will be programmed in the following pattern:
 1. Settings for the cut, if they differ from those for the previous cut, are sent with respective commands - lasers are enabled or disabled, laser power and frequency are set, movement speed is set, etc.
-2. If the laser is not already positioned at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_rapid_xy`.
+2. If the laser is not already positioned at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_travel_xy`.
 3. `cmd_laser_on` and `cmd_cut_xy` are sent, turning on the laser(s) and performing the cut.
 
 ## Raster Engraving
@@ -612,17 +647,28 @@ We now introduce commands with non-trivial responses. These query commands do no
 Let's start with the most straightforward queries: what is the current laser position?
 
 ### Current Position
-The following queries are received from LightBurn with no arguments. The following table describes the responses.
+The following queries are received from LightBurn with no arguments. Much like movement commands,
+any commands composed of the `cmd_pos` MSB and a bitwise combination of `axis_*` values
+constitutes a valid position query, and responses values should be sent as `int32` values in the following order,
+for each axis present:
+`x`, `y`, `z`, `a`, `b`, `c`, `u`, `v`.
 
-| Command (Query)  | Response Arguments (μm)                  | Payload Length |
-|------------------|------------------------------------------|----------------|
-| `cmd_pos_x`      | int32 X (μm)                             | 6              |
-| `cmd_pos_y`      | int32 Y (μm)                             | 6              |
-| `cmd_pos_z`      | int32 Z (μm)                             | 6              |
-| `cmd_pos_u`      | int32 U (μm)                             | 6              |
-| `cmd_pos_xy`     | int32 X, int32 Y (μm)                    | 10             |
-| `cmd_pos_xyz`    | int32 X, int32 Y, int32 Z (μm)           | 14             |
-| `cmd_pos_xyzu`   | int32 X, int32 Y, int32 Z, int32 U (μm)  | 18             |
+| Command (Query)  | Response Arguments (positions in axis units  | Payload Length |
+|------------------|----------------------------------------------|----------------|
+| `cmd_pos_x`      | int32 X                                      | 6              |
+| `cmd_pos_y`      | int32 Y                                      | 6              |
+| `cmd_pos_z`      | int32 Z                                      | 6              |
+| `cmd_pos_a`      | int32 A                                      | 6              |
+| `cmd_pos_b`      | int32 B                                      | 6              |
+| `cmd_pos_c`      | int32 C                                      | 6              |
+| `cmd_pos_u`      | int32 U                                      | 6              |
+| `cmd_pos_v`      | int32 V                                      | 6              |
+| `cmd_pos_xy`     | int32 X, int32 Y                             | 10             |
+| `cmd_pos_xyz`    | int32 X, int32 Y, int32 Z                    | 14             |
+| `cmd_pos_abc`    | int32 A, int32 B, int32 C                    | 14             |
+| `cmd_pos_xyza`   | int32 X, int32 Y, int32 Z, int32 A           | 18             |
+| `cmd_pos_xyzu`   | int32 X, int32 Y, int32 Z, int32 U           | 18             |
+| `cmd_pos_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C | 26             |
 
 These positions are expected to be reported in machine coordinates, relative to absolute machine zero.
 
