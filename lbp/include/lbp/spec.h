@@ -63,6 +63,10 @@ constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon"
 // 0xF000 - Unused
 //
 
+// NOTE: Only values that begin with the prefix `cmd_` or `cfg_` are valid commands. All other values
+// defined in this header are either partial values used to construct commands codes,
+// dimensional constants (defined above), or pre-set values used as command arguments.
+
 constexpr uint16_t mask_class = 0xF000; // Mask for the MSN, indicating command class/category
 
 // ---- LSN Flags (Least Significant Nibble) ----
