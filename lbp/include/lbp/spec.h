@@ -23,7 +23,7 @@ constexpr uint8_t size_payload_offset = size_start + size_len; // index of the f
 constexpr uint8_t size_arg_offset = size_payload_offset + size_min_payload; // index of the first byte of payload "arguments"
 
 // sizes of common msgs and payloads (defined to facilitate static allocations).
-constexpr int size_max_cmd_args = 16; // no commands require more than four 4-byte integers.
+constexpr int size_max_cmd_args = 32; // no commands require more than eight 4-byte integers.
 constexpr int size_max_cmd_payload = size_max_cmd_args + size_cmd; // largest expected command payload.
 constexpr int size_max_cmd_msg = size_header_footer + size_max_cmd_payload; // largest expected command message.
 constexpr int size_file_msg = 512; // total size of a file message.
@@ -53,7 +53,7 @@ constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon"
 // 0x5000 - Non-persistent Settings (5 = "S", for "Settings")
 // 0x6000 - Movement commands (6 = "G", for "Go")
 // 0x7000 - Tool commands (7 = "T", for "Tool")
-// 0x8000 - Observable State (8 rhymes with "State")
+// 0x8000 - State Queries (8 rhymes with "State")
 // 0x9000 - Unused
 // 0xA000 - Unused
 // 0xB000 - Unused
@@ -61,15 +61,26 @@ constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon"
 // 0xD000 - Reserved: Vender-specific Configuration
 // 0xE000 - Reserved: Extended Future Capabilities
 // 0xF000 - Unused
+//
+
+// NOTE: Only values that begin with the prefix `cmd_` or `cfg_` are valid commands. All other values
+// defined in this header are either partial values used to construct commands codes,
+// dimensional constants (defined above), or pre-set values used as command arguments.
+
+constexpr uint16_t mask_class = 0xF000; // Mask for the MSN, indicating command class/category
 
 // ---- LSN Flags (Least Significant Nibble) ----
 
 // Axis Flags
-constexpr uint16_t flag_x = 0x0001;
-constexpr uint16_t flag_y = 0x0002;
-constexpr uint16_t flag_z = 0x0004;
-constexpr uint16_t flag_u = 0x0008;
-// Reserve 0x00F0 for more axes. (6-axis controllers?)
+constexpr uint16_t mask_axis = 0x00FF; // entire LSB reserved for axis flags in certain movement commands.
+constexpr uint16_t axis_x = 0x0001;
+constexpr uint16_t axis_y = 0x0002;
+constexpr uint16_t axis_z = 0x0004;
+constexpr uint16_t axis_a = 0x0008;
+constexpr uint16_t axis_b = 0x0010;
+constexpr uint16_t axis_c = 0x0020;
+constexpr uint16_t axis_u = 0x0040;
+constexpr uint16_t axis_v = 0x0080;
 
 // ------------------------------------------
 // -------BEGIN COMMAND DEFINITIONS----------
@@ -100,215 +111,295 @@ constexpr uint16_t cmd_commit_cfg = 0x0CCC; // commit changes sent with cfg_ com
 // ----------------------------------------------------------------------------
 // 0x0001: Laser Commands -----------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_laser = 0x1000; // (1 = "L", for "Laser")
+constexpr uint16_t cls_laser = 0x1000; // (1 = "L", for "Laser")
 
-constexpr uint16_t cmd_laser_power_min	= flag_laser | 0x05A0; // int8 laser index, int16 percent of max power
-constexpr uint16_t cmd_laser_power_max	= flag_laser | 0x05A1; // int8 laser index, int16 percent of max power
-constexpr uint16_t cmd_laser_freq 		= flag_laser | 0x05F0; // int8 laser index, int32 frequency (Hz)
-constexpr uint16_t cmd_laser_enable 	= flag_laser | 0x05E1; // int8 laser index (choose which laser(s) is the cut default.)
-constexpr uint16_t cmd_laser_disable 	= flag_laser | 0x05E2; // int8 laser index, (choose which lasers(s) is the cut default.)
+constexpr uint16_t cmd_laser_power_min	= cls_laser | 0x05A0; // int8 laser index, int16 percent of max configured power
+constexpr uint16_t cmd_laser_power_max	= cls_laser | 0x05A1; // int8 laser index, int16 percent of max configured power
+constexpr uint16_t cmd_laser_freq 		= cls_laser | 0x05F0; // int8 laser index, int32 frequency (Hz)
+constexpr uint16_t cmd_laser_enable 	= cls_laser | 0x05E1; // int8 laser index
+constexpr uint16_t cmd_laser_disable 	= cls_laser | 0x05E2; // int8 laser index
 
-constexpr uint16_t cmd_laser_off 		= flag_laser | 0x05C1; // int8 laser index (0 for the lasers enabled with cmd_laser_enable)
-constexpr uint16_t cmd_laser_on 		= flag_laser | 0x05C2; // int8 laser index (0 for the lasers enabled with cmd_laser_enable)
+constexpr uint16_t cmd_laser_off 		= cls_laser | 0x05C1; // int8 laser index
+constexpr uint16_t cmd_laser_on 		= cls_laser | 0x05C2; // int8 laser index
 
-constexpr uint16_t cmd_focus_z 			= flag_laser | 0x0F00 | flag_z; // arguments TODO
-constexpr uint16_t cmd_laser_offset_xy	= flag_laser | 0x05B0 | flag_x | flag_y; // int8 laser index, int32 x, y offsets (um) // TODO
+constexpr uint16_t cmd_focus_z 			= cls_laser | 0x0F00 | axis_z; // arguments TODO
+constexpr uint16_t cmd_laser_offset_xy	= cls_laser | 0x0100 | axis_x | axis_y; // int8 laser index, int32 x, y offsets (um) // TODO
 
-constexpr uint16_t cmd_raster_power = flag_laser | 0x05A2; // up to 8 16-bit power % arguments
+constexpr uint16_t cmd_raster_power = cls_laser | 0x05AA; // int8 laser index, up to fifteen 16-bit power % arguments
 
 // ----------------------------------------------------------------------------
 // 0x0004: Files --------------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_files = 0x4000; // (4 starts with "F", for "Files")
+constexpr uint16_t cls_files = 0x4000; // (4 starts with "F", for "Files")
 
-constexpr uint16_t cmd_file_begin		= flag_files | 0x0401; // Arg: int32 file size
-constexpr uint16_t cmd_file_end			= flag_files | 0x0402; // Marks the end of a sent file.
-constexpr uint16_t cmd_file_chunk		= flag_files | 0x04FC; // Mark a file chunk.
+constexpr uint16_t cmd_file_begin		= cls_files | 0x0401; // Arg: int32 file size
+constexpr uint16_t cmd_file_end			= cls_files | 0x0402; // Marks the end of a sent file.
+constexpr uint16_t cmd_file_chunk		= cls_files | 0x04FC; // Mark a file chunk.
 
 // Filesystem queries:
-constexpr uint16_t cmd_flash_available	= flag_files | 0x05FA; // TODO: return int64 bytes
-constexpr uint16_t cmd_mainboard_version = flag_files | 0x05B0; // TODO
+constexpr uint16_t cmd_flash_available	= cls_files | 0x05FA; // TODO: return int64 bytes
+constexpr uint16_t cmd_mainboard_version = cls_files | 0x05B0; // TODO
 
 // ----------------------------------------------------------------------------
 // 0x5000: Settings -----------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_settings = 0x5000; // (5 = "S", for "Settings")
+constexpr uint16_t cls_settings = 0x5000; // (5 = "S", for "Settings")
 
 // Speed commands
-constexpr uint16_t flag_speed = flag_settings | 0x0100;
+constexpr uint16_t setting_speed = cls_settings | 0x0100;
 
-constexpr uint16_t cmd_speed_xy = flag_speed | flag_x | flag_y;
-constexpr uint16_t cmd_speed_x = flag_speed | flag_x;
-constexpr uint16_t cmd_speed_y = flag_speed | flag_y;
-constexpr uint16_t cmd_speed_z = flag_speed | flag_z;
-constexpr uint16_t cmd_speed_u = flag_speed | flag_u;
+constexpr uint16_t cmd_speed_xy = setting_speed | axis_x | axis_y;
+constexpr uint16_t cmd_speed_ab = setting_speed | axis_a | axis_b;
+constexpr uint16_t cmd_speed_x = setting_speed | axis_x;
+constexpr uint16_t cmd_speed_y = setting_speed | axis_y;
+constexpr uint16_t cmd_speed_z = setting_speed | axis_z;
+constexpr uint16_t cmd_speed_a = setting_speed | axis_a;
+constexpr uint16_t cmd_speed_b = setting_speed | axis_b;
+constexpr uint16_t cmd_speed_c = setting_speed | axis_c;
+constexpr uint16_t cmd_speed_u = setting_speed | axis_u;
+constexpr uint16_t cmd_speed_v = setting_speed | axis_v;
 
 // Boundary commands
-constexpr uint16_t flag_bounds_min = flag_settings | 0x0200;
-constexpr uint16_t flag_bounds_max = flag_settings | 0x0300;
+constexpr uint16_t setting_bounds_min = cls_settings | 0x0200;
+constexpr uint16_t setting_bounds_max = cls_settings | 0x0300;
 
 // Boundary commands: Composed of flags. Argument: one signed int32 (micrometers) per indicated axis.
-constexpr uint16_t cmd_bounds_min_x = flag_bounds_min | flag_x;
-constexpr uint16_t cmd_bounds_max_x = flag_bounds_max | flag_x;
-constexpr uint16_t cmd_bounds_min_y = flag_bounds_min | flag_y;
-constexpr uint16_t cmd_bounds_max_y = flag_bounds_max | flag_y;
-constexpr uint16_t cmd_bounds_min_z = flag_bounds_min | flag_z;
-constexpr uint16_t cmd_bounds_max_z = flag_bounds_max | flag_z;
-constexpr uint16_t cmd_bounds_min_u = flag_bounds_min | flag_u;
-constexpr uint16_t cmd_bounds_max_u = flag_bounds_max | flag_u;
+constexpr uint16_t cmd_bounds_min_x = setting_bounds_min | axis_x;
+constexpr uint16_t cmd_bounds_max_x = setting_bounds_max | axis_x;
+constexpr uint16_t cmd_bounds_min_y = setting_bounds_min | axis_y;
+constexpr uint16_t cmd_bounds_max_y = setting_bounds_max | axis_y;
+constexpr uint16_t cmd_bounds_min_z = setting_bounds_min | axis_z;
+constexpr uint16_t cmd_bounds_max_z = setting_bounds_max | axis_z;
+constexpr uint16_t cmd_bounds_min_a = setting_bounds_min | axis_a;
+constexpr uint16_t cmd_bounds_max_a = setting_bounds_max | axis_a;
+constexpr uint16_t cmd_bounds_min_b = setting_bounds_min | axis_b;
+constexpr uint16_t cmd_bounds_max_b = setting_bounds_max | axis_b;
+constexpr uint16_t cmd_bounds_min_c = setting_bounds_min | axis_c;
+constexpr uint16_t cmd_bounds_max_c = setting_bounds_max | axis_c;
+constexpr uint16_t cmd_bounds_min_u = setting_bounds_min | axis_u;
+constexpr uint16_t cmd_bounds_max_u = setting_bounds_max | axis_u;
+constexpr uint16_t cmd_bounds_min_v = setting_bounds_min | axis_v;
+constexpr uint16_t cmd_bounds_max_v = setting_bounds_max | axis_v;
 
 // When this appears in a job header, all following absolute xy move commands
 // should be interpreted as relative to the following options.
-constexpr uint16_t cmd_cut_from = flag_settings | 0x0CCF; // arg: int8 value, listed below.
+constexpr uint16_t cmd_cut_from = cls_settings | 0x0CCF; // arg: int8 value, listed below.
 // options for cmd_cut_from
 constexpr uint8_t cut_from_current_position = 0x0;
 constexpr uint8_t cut_from_user_origin = 0x1;
 constexpr uint8_t cut_from_absolute = 0x2;
 
 // Cut Type
-constexpr uint16_t cmd_cut_type = flag_settings | 0x0CC7;
-constexpr uint16_t flag_cut_type_scan_uni = 0x0100;
-constexpr uint16_t flag_cut_type_scan_bi = 0x0200;
+constexpr uint16_t cmd_cut_type = cls_settings | 0x0CC7;
+constexpr uint16_t scan_uni = 0x0100;
+constexpr uint16_t scan_bi = 0x0200;
 
 // Possible values for cmd_cut_type
 constexpr uint16_t cut_type_normal = 0x0000;
-constexpr uint16_t cut_type_scan_uni_x = flag_cut_type_scan_uni | flag_x;
-constexpr uint16_t cut_type_scan_uni_y = flag_cut_type_scan_uni | flag_y;
-constexpr uint16_t cut_type_scan_bi_x = flag_cut_type_scan_bi | flag_x;
-constexpr uint16_t cut_type_scan_bi_y = flag_cut_type_scan_bi | flag_y;
+constexpr uint16_t cut_type_scan_uni_x = scan_uni | axis_x;
+constexpr uint16_t cut_type_scan_uni_y = scan_uni | axis_y;
+constexpr uint16_t cut_type_scan_bi_x = scan_bi | axis_x;
+constexpr uint16_t cut_type_scan_bi_y = scan_bi | axis_y;
 
 // ----------------------------------------------------------------------------
 // 0x6000: Movement -----------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_move = 0x6000; // (6 = "G", for "Go")
-
+constexpr uint16_t cls_move = 0x6000; // (6 = "G", for "Go")
 // Home
-constexpr int16_t flag_home = flag_move | 0x0100;
+constexpr int16_t move_home = cls_move | 0x0100;
 
-constexpr int16_t cmd_home_x = flag_home | flag_x;
-constexpr int16_t cmd_home_y = flag_home | flag_y;
-constexpr int16_t cmd_home_z = flag_home | flag_z;
-constexpr int16_t cmd_home_u = flag_home | flag_u;
-constexpr int16_t cmd_home_xy = flag_home | flag_x | flag_y;
-constexpr int16_t cmd_home_xyz = flag_home | flag_x | flag_y | flag_z;
-constexpr int16_t cmd_home_xyzu = flag_home | flag_x | flag_y | flag_z | flag_u;
+constexpr int16_t cmd_home_x = move_home | axis_x;
+constexpr int16_t cmd_home_y = move_home | axis_y;
+constexpr int16_t cmd_home_z = move_home | axis_z;
+constexpr int16_t cmd_home_a = move_home | axis_a;
+constexpr int16_t cmd_home_b = move_home | axis_b;
+constexpr int16_t cmd_home_c = move_home | axis_c;
+constexpr int16_t cmd_home_u = move_home | axis_u;
+constexpr int16_t cmd_home_v = move_home | axis_v;
+constexpr int16_t cmd_home_xy = move_home | axis_x | axis_y;
+constexpr int16_t cmd_home_xyz = move_home | axis_x | axis_y | axis_z;
+constexpr int16_t cmd_home_xyzu = move_home | axis_x | axis_y | axis_z | axis_u;
+constexpr int16_t cmd_home_abc = move_home | axis_a | axis_b | axis_c;
+constexpr int16_t cmd_home_xyzabc = move_home | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
 // Operator Moves: Continuous Jogging
-constexpr uint16_t flag_jog_start_pos = flag_move | 0x0200;
-constexpr uint16_t flag_jog_stop_pos = flag_move | 0x0300;
-constexpr uint16_t flag_jog_start_neg = flag_move | 0x0400;
-constexpr uint16_t flag_jog_stop_neg = flag_move | 0x0500;
+constexpr uint16_t move_jog_start_pos = cls_move | 0x0200;
+constexpr uint16_t move_jog_stop_pos = cls_move | 0x0300;
+constexpr uint16_t move_jog_start_neg = cls_move | 0x0400;
+constexpr uint16_t move_jog_stop_neg = cls_move | 0x0500;
 
-constexpr uint16_t cmd_jog_start_pos_x = flag_jog_start_pos | flag_x;
-constexpr uint16_t cmd_jog_stop_pos_x = flag_jog_stop_pos | flag_x;
-constexpr uint16_t cmd_jog_start_neg_x = flag_jog_start_neg | flag_x;
-constexpr uint16_t cmd_jog_stop_neg_x = flag_jog_stop_neg | flag_x;
+constexpr uint16_t cmd_jog_start_pos_x = move_jog_start_pos | axis_x;
+constexpr uint16_t cmd_jog_stop_pos_x = move_jog_stop_pos | axis_x;
+constexpr uint16_t cmd_jog_start_neg_x = move_jog_start_neg | axis_x;
+constexpr uint16_t cmd_jog_stop_neg_x = move_jog_stop_neg | axis_x;
 
-constexpr uint16_t cmd_jog_start_pos_y = flag_jog_start_pos | flag_y;
-constexpr uint16_t cmd_jog_stop_pos_y = flag_jog_stop_pos | flag_y;
-constexpr uint16_t cmd_jog_start_neg_y = flag_jog_start_neg | flag_y;
-constexpr uint16_t cmd_jog_stop_neg_y = flag_jog_stop_neg | flag_y;
+constexpr uint16_t cmd_jog_start_pos_y = move_jog_start_pos | axis_y;
+constexpr uint16_t cmd_jog_stop_pos_y = move_jog_stop_pos | axis_y;
+constexpr uint16_t cmd_jog_start_neg_y = move_jog_start_neg | axis_y;
+constexpr uint16_t cmd_jog_stop_neg_y = move_jog_stop_neg | axis_y;
 
-constexpr uint16_t cmd_jog_start_pos_z = flag_jog_start_pos | flag_z;
-constexpr uint16_t cmd_jog_stop_pos_z = flag_jog_stop_pos | flag_z;
-constexpr uint16_t cmd_jog_start_neg_z = flag_jog_start_neg | flag_z;
-constexpr uint16_t cmd_jog_stop_neg_z = flag_jog_stop_neg | flag_z;
+constexpr uint16_t cmd_jog_start_pos_z = move_jog_start_pos | axis_z;
+constexpr uint16_t cmd_jog_stop_pos_z = move_jog_stop_pos | axis_z;
+constexpr uint16_t cmd_jog_start_neg_z = move_jog_start_neg | axis_z;
+constexpr uint16_t cmd_jog_stop_neg_z = move_jog_stop_neg | axis_z;
 
-constexpr uint16_t cmd_jog_start_pos_u = flag_jog_start_pos | flag_u;
-constexpr uint16_t cmd_jog_stop_pos_u = flag_jog_stop_pos | flag_u;
-constexpr uint16_t cmd_jog_start_neg_u = flag_jog_start_neg | flag_u;
-constexpr uint16_t cmd_jog_stop_neg_u = flag_jog_stop_neg | flag_u;
+constexpr uint16_t cmd_jog_start_pos_a = move_jog_start_pos | axis_a;
+constexpr uint16_t cmd_jog_stop_pos_a = move_jog_stop_pos | axis_a;
+constexpr uint16_t cmd_jog_start_neg_a = move_jog_start_neg | axis_a;
+constexpr uint16_t cmd_jog_stop_neg_a = move_jog_stop_neg | axis_a;
 
-// Operator Moves: Discrete Jogging (relative)
-constexpr uint16_t flag_jog_step = flag_move | 0x0600;
+constexpr uint16_t cmd_jog_start_pos_b = move_jog_start_pos | axis_b;
+constexpr uint16_t cmd_jog_stop_pos_b = move_jog_stop_pos | axis_b;
+constexpr uint16_t cmd_jog_start_neg_b = move_jog_start_neg | axis_b;
+constexpr uint16_t cmd_jog_stop_neg_b = move_jog_stop_neg | axis_b;
 
-constexpr uint16_t cmd_jog_step_x = flag_jog_step | flag_x;
-constexpr uint16_t cmd_jog_step_y = flag_jog_step | flag_y;
-constexpr uint16_t cmd_jog_step_z = flag_jog_step | flag_z;
-constexpr uint16_t cmd_jog_step_u = flag_jog_step | flag_u;
+constexpr uint16_t cmd_jog_start_pos_c = move_jog_start_pos | axis_c;
+constexpr uint16_t cmd_jog_stop_pos_c = move_jog_stop_pos | axis_c;
+constexpr uint16_t cmd_jog_start_neg_c = move_jog_start_neg | axis_c;
+constexpr uint16_t cmd_jog_stop_neg_c = move_jog_stop_neg | axis_c;
 
-constexpr uint16_t cmd_jog_step_xy = flag_jog_step | flag_x | flag_y;
-constexpr uint16_t cmd_jog_step_xyz = flag_jog_step | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_jog_step_xyzu = flag_jog_step | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_jog_start_pos_u = move_jog_start_pos | axis_u;
+constexpr uint16_t cmd_jog_stop_pos_u = move_jog_stop_pos | axis_u;
+constexpr uint16_t cmd_jog_start_neg_u = move_jog_start_neg | axis_u;
+constexpr uint16_t cmd_jog_stop_neg_u = move_jog_stop_neg | axis_u;
 
-// Operator Moves: GoTo (absolute)
-constexpr uint16_t flag_goto = flag_move | 0x0700;
+constexpr uint16_t cmd_jog_start_pos_v = move_jog_start_pos | axis_v;
+constexpr uint16_t cmd_jog_stop_pos_v = move_jog_stop_pos | axis_v;
+constexpr uint16_t cmd_jog_start_neg_v = move_jog_start_neg | axis_v;
+constexpr uint16_t cmd_jog_stop_neg_v = move_jog_stop_neg | axis_v;
 
-constexpr uint16_t cmd_goto_x = flag_goto | flag_x;
-constexpr uint16_t cmd_goto_y = flag_goto | flag_y;
-constexpr uint16_t cmd_goto_z = flag_goto | flag_z;
-constexpr uint16_t cmd_goto_u = flag_goto | flag_u;
+// For the next few movement types, we can use this flag for composing absolute or relative moves.
+constexpr uint16_t flag_abs = 0x0100;
 
-constexpr uint16_t cmd_goto_xy = flag_goto | flag_x | flag_y;
-constexpr uint16_t cmd_goto_xyz = flag_goto | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_goto_xyzu = flag_goto | flag_x | flag_y | flag_z | flag_u;
+// Operator Moves: Jog Step (relative)
+constexpr uint16_t move_jog = cls_move | 0x0600;
+constexpr uint16_t move_jog_step = move_jog; // relative jog
 
-// Programmed Travel Commands: move directly without expectation to cut. ("rapid")
-constexpr uint16_t flag_travel_abs = flag_move | 0x0800;
-constexpr uint16_t flag_travel_rel = flag_move | 0x0900;
+constexpr uint16_t cmd_jog_step_x = move_jog_step | axis_x;
+constexpr uint16_t cmd_jog_step_y = move_jog_step | axis_y;
+constexpr uint16_t cmd_jog_step_z = move_jog_step | axis_z;
+constexpr uint16_t cmd_jog_step_a = move_jog_step | axis_a;
+constexpr uint16_t cmd_jog_step_b = move_jog_step | axis_b;
+constexpr uint16_t cmd_jog_step_c = move_jog_step | axis_c;
+constexpr uint16_t cmd_jog_step_u = move_jog_step | axis_u;
+constexpr uint16_t cmd_jog_step_v = move_jog_step | axis_v;
+
+constexpr uint16_t cmd_jog_step_xy = move_jog_step | axis_x | axis_y;
+constexpr uint16_t cmd_jog_step_xyz = move_jog_step | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_jog_step_xyzu = move_jog_step | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_jog_step_abc = move_jog_step | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_jog_step_xyzabc = move_jog_step | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
+
+// Operator Moves: Jog To (absolute)
+constexpr uint16_t move_jog_to = move_jog | flag_abs;
+
+constexpr uint16_t cmd_jog_to_x = move_jog_to | axis_x;
+constexpr uint16_t cmd_jog_to_y = move_jog_to | axis_y;
+constexpr uint16_t cmd_jog_to_z = move_jog_to | axis_z;
+constexpr uint16_t cmd_jog_to_a = move_jog_to | axis_a;
+constexpr uint16_t cmd_jog_to_b = move_jog_to | axis_b;
+constexpr uint16_t cmd_jog_to_c = move_jog_to | axis_c;
+constexpr uint16_t cmd_jog_to_u = move_jog_to | axis_u;
+constexpr uint16_t cmd_jog_to_v = move_jog_to | axis_v;
+
+constexpr uint16_t cmd_jog_to_xy = move_jog_to | axis_x | axis_y;
+constexpr uint16_t cmd_jog_to_xyz = move_jog_to | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_jog_to_xyzu = move_jog_to | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_jog_to_abc = move_jog_to | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_jog_to_xyzabc = move_jog_to | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
+
+// Programmed Rapid Commands: move directly without expectation to cut.
+constexpr uint16_t move_travel = cls_move | 0x0800;
+constexpr uint16_t move_travel_rel = move_travel;
+constexpr uint16_t move_travel_abs = move_travel | flag_abs;
 
 // Travel Commands: Argument: one signed int32 (micrometers) per indicated axis.
-constexpr uint16_t cmd_travel_rel_x = flag_travel_rel | flag_x;
-constexpr uint16_t cmd_travel_rel_y = flag_travel_rel | flag_y;
-constexpr uint16_t cmd_travel_rel_z = flag_travel_rel | flag_z;
-constexpr uint16_t cmd_travel_rel_u = flag_travel_rel | flag_u;
+constexpr uint16_t cmd_travel_rel_x = move_travel_rel | axis_x;
+constexpr uint16_t cmd_travel_rel_y = move_travel_rel | axis_y;
+constexpr uint16_t cmd_travel_rel_z = move_travel_rel | axis_z;
+constexpr uint16_t cmd_travel_rel_a = move_travel_rel | axis_a;
+constexpr uint16_t cmd_travel_rel_b = move_travel_rel | axis_b;
+constexpr uint16_t cmd_travel_rel_c = move_travel_rel | axis_c;
+constexpr uint16_t cmd_travel_rel_u = move_travel_rel | axis_u;
+constexpr uint16_t cmd_travel_rel_v = move_travel_rel | axis_v;
 
-constexpr uint16_t cmd_travel_rel_xy = flag_travel_rel | flag_x | flag_y;
-constexpr uint16_t cmd_travel_rel_xyz = flag_travel_rel | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_travel_rel_xyzu = flag_travel_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_travel_rel_xy = move_travel_rel | axis_x | axis_y;
+constexpr uint16_t cmd_travel_rel_xyz = move_travel_rel | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_travel_rel_xyzu = move_travel_rel | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_travel_rel_abc = move_travel_rel | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_travel_rel_xyzabc = move_travel_rel | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
-constexpr uint16_t cmd_travel_abs_x = flag_travel_abs | flag_x;
-constexpr uint16_t cmd_travel_abs_y = flag_travel_abs | flag_y;
-constexpr uint16_t cmd_travel_abs_z = flag_travel_abs | flag_z;
-constexpr uint16_t cmd_travel_abs_u = flag_travel_abs | flag_u;
+constexpr uint16_t cmd_travel_abs_x = move_travel_abs | axis_x;
+constexpr uint16_t cmd_travel_abs_y = move_travel_abs | axis_y;
+constexpr uint16_t cmd_travel_abs_z = move_travel_abs | axis_z;
+constexpr uint16_t cmd_travel_abs_a = move_travel_abs | axis_a;
+constexpr uint16_t cmd_travel_abs_b = move_travel_abs | axis_b;
+constexpr uint16_t cmd_travel_abs_c = move_travel_abs | axis_c;
+constexpr uint16_t cmd_travel_abs_u = move_travel_abs | axis_u;
+constexpr uint16_t cmd_travel_abs_v = move_travel_abs | axis_v;
 
-constexpr uint16_t cmd_travel_abs_xy = flag_travel_abs | flag_x | flag_y;
-constexpr uint16_t cmd_travel_abs_xyz = flag_travel_abs | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_travel_abs_xyzu = flag_travel_abs | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_travel_abs_xy = move_travel_abs | axis_x | axis_y;
+constexpr uint16_t cmd_travel_abs_xyz = move_travel_abs | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_travel_abs_xyzu = move_travel_abs | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_travel_abs_abc = move_travel_abs | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_travel_abs_xyzabc = move_travel_abs | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
 // Programmed Cut Commands: move while cutting.
-constexpr uint16_t flag_cut_abs = flag_move | 0x0A00;
-constexpr uint16_t flag_cut_rel = flag_move | 0x0B00;
+constexpr uint16_t move_cut = cls_move | 0x0A00;
+constexpr uint16_t move_cut_rel = move_cut;
+constexpr uint16_t move_cut_abs = move_cut | flag_abs;
 
 // Cut Commands: Argument: one signed int32 (micrometers) per indicated axis.
-constexpr uint16_t cmd_cut_rel_x = flag_cut_rel | flag_x;
-constexpr uint16_t cmd_cut_rel_y = flag_cut_rel | flag_y;
-constexpr uint16_t cmd_cut_rel_z = flag_cut_rel | flag_z;
-constexpr uint16_t cmd_cut_rel_u = flag_cut_rel | flag_u;
+constexpr uint16_t cmd_cut_rel_x = move_cut_rel | axis_x;
+constexpr uint16_t cmd_cut_rel_y = move_cut_rel | axis_y;
+constexpr uint16_t cmd_cut_rel_z = move_cut_rel | axis_z;
+constexpr uint16_t cmd_cut_rel_a = move_cut_rel | axis_a;
+constexpr uint16_t cmd_cut_rel_b = move_cut_rel | axis_b;
+constexpr uint16_t cmd_cut_rel_c = move_cut_rel | axis_c;
+constexpr uint16_t cmd_cut_rel_u = move_cut_rel | axis_u;
+constexpr uint16_t cmd_cut_rel_v = move_cut_rel | axis_v;
 
-constexpr uint16_t cmd_cut_rel_xy = flag_cut_rel | flag_x | flag_y;
-constexpr uint16_t cmd_cut_rel_xyz = flag_cut_rel | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_cut_rel_xyzu = flag_cut_rel | flag_x | flag_y | flag_z | flag_u;
+constexpr uint16_t cmd_cut_rel_xy = move_cut_rel | axis_x | axis_y;
+constexpr uint16_t cmd_cut_rel_xyz = move_cut_rel | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_cut_rel_xyzu = move_cut_rel | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_cut_rel_abc = move_cut_rel | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_cut_rel_xyzabc = move_cut_rel | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
-constexpr uint16_t cmd_cut_abs_x = flag_cut_abs | flag_x;
-constexpr uint16_t cmd_cut_abs_y = flag_cut_abs | flag_y;
-constexpr uint16_t cmd_cut_abs_z = flag_cut_abs | flag_z;
-constexpr uint16_t cmd_cut_abs_u = flag_cut_abs | flag_u;
+constexpr uint16_t cmd_cut_abs_x = move_cut_abs | axis_x;
+constexpr uint16_t cmd_cut_abs_y = move_cut_abs | axis_y;
+constexpr uint16_t cmd_cut_abs_z = move_cut_abs | axis_z;
+constexpr uint16_t cmd_cut_abs_a = move_cut_abs | axis_a;
+constexpr uint16_t cmd_cut_abs_b = move_cut_abs | axis_b;
+constexpr uint16_t cmd_cut_abs_c = move_cut_abs | axis_c;
+constexpr uint16_t cmd_cut_abs_u = move_cut_abs | axis_u;
+constexpr uint16_t cmd_cut_abs_v = move_cut_abs | axis_v;
 
-constexpr uint16_t cmd_cut_abs_xy = flag_cut_abs | flag_x | flag_y;
-constexpr uint16_t cmd_cut_abs_xyz = flag_cut_abs | flag_x | flag_y | flag_z;
-constexpr uint16_t cmd_cut_abs_xyzu = flag_cut_abs | flag_x | flag_y | flag_z | flag_u;
-
-// Dwell
-constexpr uint16_t cmd_dwell = flag_move | 0x0D00; // int32 duration (microseconds)
-constexpr int32_t max_dwell = 60000000; // maximum dwell time (microseconds)
+constexpr uint16_t cmd_cut_abs_xy = move_cut_abs | axis_x | axis_y;
+constexpr uint16_t cmd_cut_abs_xyz = move_cut_abs | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_cut_abs_xyzu = move_cut_abs | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_cut_abs_abc = move_cut_abs | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_cut_abs_xyzabc = move_cut_abs | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
 // ----------------------------------------------------------------------------
 // 0x7000: Tool Controls ------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_tool = 0x7000; // (7 = "T", for "Tool")
+constexpr uint16_t cls_tool = 0x7000; // (7 = "T", for "Tool")
 
 // Air commands: (Air sounds like "FF")
-constexpr uint16_t cmd_air_off = flag_tool | 0x0FF0;
-constexpr uint16_t cmd_air_on = flag_tool | 0x0FF1;
+constexpr uint16_t cmd_air_off = cls_tool | 0x0FF0;
+constexpr uint16_t cmd_air_on = cls_tool | 0x0FF1;
+
+// Dwell
+constexpr uint16_t cmd_dwell = cls_tool | 0x0D31; // int32 duration (microseconds)
+constexpr int32_t max_dwell = 60000000; // maximum dwell time (microseconds)
 
 // ----------------------------------------------------------------------------
-// 0x8000: Observable State ---------------------------------------------------
+// 0x8000: State Queries ------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_state = 0x8000; // "eight" rhymes with "state"
+constexpr uint16_t cls_state_query = 0x8000; // "eight" rhymes with "state"
 
 // The Get State command will return a 32-bit integer composed of state_* flags.
-constexpr uint16_t cmd_get_state = flag_state | 0x057A;
+constexpr uint16_t cmd_get_state = cls_state_query | 0x057A;
 
 constexpr uint32_t state_idle = 0x0000;				// machine is on but not moving or executing a job
 constexpr uint32_t state_moving = 0x0001;			// machine is moving, either by job or user control
@@ -320,158 +411,273 @@ constexpr uint32_t state_file_loaded = 0x0020;		// a file is loaded and ready to
 constexpr uint32_t state_computing = 0x0040;		// machine is performing a non-trivial computation.
 
 // Position Queries
-constexpr uint16_t flag_pos = flag_state | 0x0100;
+constexpr uint16_t query_pos = cls_state_query | 0x0100;
 
-constexpr uint16_t cmd_pos_x = flag_pos | flag_x; // return int32 micrometers
-constexpr uint16_t cmd_pos_y = flag_pos | flag_y; // return int32 micrometers
-constexpr uint16_t cmd_pos_z = flag_pos | flag_z; // return int32 micrometers
-constexpr uint16_t cmd_pos_u = flag_pos | flag_u; // return int32 micrometers
+// return one uint32_t value in axis units per indicated axis.
+constexpr uint16_t cmd_pos_x = query_pos | axis_x;
+constexpr uint16_t cmd_pos_y = query_pos | axis_y;
+constexpr uint16_t cmd_pos_z = query_pos | axis_z;
+constexpr uint16_t cmd_pos_a = query_pos | axis_a;
+constexpr uint16_t cmd_pos_b = query_pos | axis_b;
+constexpr uint16_t cmd_pos_c = query_pos | axis_c;
+constexpr uint16_t cmd_pos_u = query_pos | axis_u;
+constexpr uint16_t cmd_pos_v = query_pos | axis_v;
 
-constexpr uint16_t cmd_pos_xy = flag_pos | flag_x | flag_y; // return int32 micrometers (x, y)
-constexpr uint16_t cmd_pos_xyz = flag_pos | flag_x | flag_y | flag_z; // return int32 micrometers (x, y, z)
-constexpr uint16_t cmd_pos_xyzu = flag_pos | flag_x | flag_y | flag_z | flag_u; // return int32 micrometers (x, y, z, u)
+constexpr uint16_t cmd_pos_xy = query_pos | axis_x | axis_y;
+constexpr uint16_t cmd_pos_xyz = query_pos | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_pos_xyzu = query_pos | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_pos_xyza = query_pos | axis_x | axis_y | axis_z | axis_a;
+constexpr uint16_t cmd_pos_abc = query_pos | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_pos_xyzabc = query_pos | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
 // TODO: machine lifespan queries
-constexpr uint16_t flag_total_time = flag_state | 0x0800;
-constexpr uint16_t cmd_total_on_time = flag_total_time | 0x0001; // TODO: return uint32 seconds
-constexpr uint16_t cmd_total_processing_time = flag_total_time | 0x0002; // TODO: return uint32 seconds
-constexpr uint16_t cmd_total_laser_on_time = flag_total_time | 0x0003; // TODO: Arg: 1 byte laser intex. TODO: return uint32 seconds
+constexpr uint16_t query_time = cls_state_query | 0x0800;
+constexpr uint16_t cmd_on_time			= query_time | 0x0001; // TODO: return uint32 seconds
+constexpr uint16_t cmd_processing_time	= query_time | 0x0002; // TODO: return uint32 seconds
+constexpr uint16_t cmd_laser_on_time	= query_time | 0x0003; // TODO: Arg: 1 byte laser intex. TODO: return uint32 seconds
 
-constexpr uint16_t flag_total_travel = flag_state | 0x0900;
-constexpr uint16_t cmd_total_travel_x = flag_total_travel | flag_x; // TODO: return uint32 meters
-constexpr uint16_t cmd_total_travel_y = flag_total_travel | flag_y; // TODO: return uint32 meters
-constexpr uint16_t cmd_total_travel_z = flag_total_travel | flag_z; // TODO: return uint32 meters
-constexpr uint16_t cmd_total_travel_u = flag_total_travel | flag_u; // TODO: return uint32 meters
+constexpr uint16_t query_traversal = cls_state_query | 0x0900;
+constexpr uint16_t cmd_traversal_x = query_traversal | axis_x; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_y = query_traversal | axis_y; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_z = query_traversal | axis_z; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_a = query_traversal | axis_a; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_b = query_traversal | axis_b; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_c = query_traversal | axis_c; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_u = query_traversal | axis_u; // TODO: return uint32 meters
+constexpr uint16_t cmd_traversal_v = query_traversal | axis_v; // TODO: return uint32 meters
 
 // ----------------------------------------------------------------------------
 // 0xC000: Configuration ------------------------------------------------------
 // ----------------------------------------------------------------------------
-constexpr uint16_t flag_cfg = 0xC000; // "C" for "Config"
+constexpr uint16_t cls_cfg = 0xC000; // "C" for "Config"
 
 // TODO: very few configurations are meaningfully implemented in the simulator.
 // codes, units, and flag definitions are subject to change.
 
+// Axis configuration indexes
+constexpr uint16_t axis_index_x = 0x01;
+constexpr uint16_t axis_index_y = 0x02;
+constexpr uint16_t axis_index_z = 0x03;
+constexpr uint16_t axis_index_a = 0x04;
+constexpr uint16_t axis_index_b = 0x05;
+constexpr uint16_t axis_index_c = 0x06;
+constexpr uint16_t axis_index_u = 0x07;
+constexpr uint16_t axis_index_v = 0x08;
+constexpr uint16_t axis_index_xy = 0x0A;
+constexpr uint16_t axis_index_ab = 0x0B;
+
+// Axis units
+constexpr uint8_t unit_none = 0x00;
+constexpr uint8_t unit_micrometers = 0x01;
+constexpr uint8_t unit_steps = 0x02;
+constexpr uint8_t unit_millidegrees = 0x03;
+
+// Axis Configurations
+static constexpr uint16_t axis_settings				= cls_cfg | 0x0A10;
+static constexpr uint16_t axis_unit					= cls_cfg | 0x0A20;
+static constexpr uint16_t axis_size					= cls_cfg | 0x0A30;
+static constexpr uint16_t axis_home_offset			= cls_cfg | 0x0A40;
+static constexpr uint16_t axis_max_speed			= cls_cfg | 0x0A50;
+static constexpr uint16_t axis_jumpoff_speed		= cls_cfg | 0x0A60;
+static constexpr uint16_t axis_key_jumpoff_speed	= cls_cfg | 0x0A80;
+static constexpr uint16_t axis_max_accel			= cls_cfg | 0x0A90;
+static constexpr uint16_t axis_key_accel			= cls_cfg | 0x0AA0;
+static constexpr uint16_t axis_estop_accel			= cls_cfg | 0x0AB0;
+static constexpr uint16_t axis_backlash				= cls_cfg | 0x0AC0;
+static constexpr uint16_t axis_docking_pos			= cls_cfg | 0x0AD0;
+static constexpr uint16_t axis_step_length			= cls_cfg | 0x0AE0;
+
+constexpr uint16_t cfg_x_settings			= axis_index_x | axis_settings;
+constexpr uint16_t cfg_x_unit				= axis_index_x | axis_unit;
+constexpr uint16_t cfg_x_size 				= axis_index_x | axis_size;
+constexpr uint16_t cfg_x_home_offset		= axis_index_x | axis_home_offset;
+constexpr uint16_t cfg_x_max_speed			= axis_index_x | axis_max_speed;
+constexpr uint16_t cfg_x_jumpoff_speed		= axis_index_x | axis_jumpoff_speed;
+constexpr uint16_t cfg_x_key_jumpoff_speed	= axis_index_x | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_x_max_accel			= axis_index_x | axis_max_accel;
+constexpr uint16_t cfg_x_key_accel			= axis_index_x | axis_key_accel;
+constexpr uint16_t cfg_x_estop_accel		= axis_index_x | axis_estop_accel;
+constexpr uint16_t cfg_x_backlash			= axis_index_x | axis_backlash;
+constexpr uint16_t cfg_x_docking_pos		= axis_index_x | axis_docking_pos;
+constexpr uint16_t cfg_x_step_length		= axis_index_x | axis_step_length;
+
+constexpr uint16_t cfg_y_settings			= axis_index_y | axis_settings;
+constexpr uint16_t cfg_y_unit				= axis_index_y | axis_unit;
+constexpr uint16_t cfg_y_size 				= axis_index_y | axis_size;
+constexpr uint16_t cfg_y_home_offset		= axis_index_y | axis_home_offset;
+constexpr uint16_t cfg_y_max_speed			= axis_index_y | axis_max_speed;
+constexpr uint16_t cfg_y_jumpoff_speed		= axis_index_y | axis_jumpoff_speed;
+constexpr uint16_t cfg_y_key_jumpoff_speed	= axis_index_y | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_y_max_accel			= axis_index_y | axis_max_accel;
+constexpr uint16_t cfg_y_key_accel			= axis_index_y | axis_key_accel;
+constexpr uint16_t cfg_y_estop_accel		= axis_index_y | axis_estop_accel;
+constexpr uint16_t cfg_y_backlash			= axis_index_y | axis_backlash;
+constexpr uint16_t cfg_y_docking_pos		= axis_index_y | axis_docking_pos;
+constexpr uint16_t cfg_y_step_length		= axis_index_y | axis_step_length;
+
+constexpr uint16_t cfg_z_settings			= axis_index_z | axis_settings;
+constexpr uint16_t cfg_z_unit				= axis_index_z | axis_unit;
+constexpr uint16_t cfg_z_size 				= axis_index_z | axis_size;
+constexpr uint16_t cfg_z_home_offset		= axis_index_z | axis_home_offset;
+constexpr uint16_t cfg_z_max_speed			= axis_index_z | axis_max_speed;
+constexpr uint16_t cfg_z_jumpoff_speed		= axis_index_z | axis_jumpoff_speed;
+constexpr uint16_t cfg_z_key_jumpoff_speed	= axis_index_z | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_z_max_accel			= axis_index_z | axis_max_accel;
+constexpr uint16_t cfg_z_key_accel			= axis_index_z | axis_key_accel;
+constexpr uint16_t cfg_z_estop_accel		= axis_index_z | axis_estop_accel;
+constexpr uint16_t cfg_z_backlash			= axis_index_z | axis_backlash;
+constexpr uint16_t cfg_z_docking_pos		= axis_index_z | axis_docking_pos;
+constexpr uint16_t cfg_z_step_length		= axis_index_z | axis_step_length;
+
+constexpr uint16_t cfg_a_settings			= axis_index_a | axis_settings;
+constexpr uint16_t cfg_a_unit				= axis_index_a | axis_unit;
+constexpr uint16_t cfg_a_size 				= axis_index_a | axis_size;
+constexpr uint16_t cfg_a_home_offset		= axis_index_a | axis_home_offset;
+constexpr uint16_t cfg_a_max_speed			= axis_index_a | axis_max_speed;
+constexpr uint16_t cfg_a_jumpoff_speed		= axis_index_a | axis_jumpoff_speed;
+constexpr uint16_t cfg_a_key_jumpoff_speed	= axis_index_a | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_a_max_accel			= axis_index_a | axis_max_accel;
+constexpr uint16_t cfg_a_key_accel			= axis_index_a | axis_key_accel;
+constexpr uint16_t cfg_a_estop_accel		= axis_index_a | axis_estop_accel;
+constexpr uint16_t cfg_a_backlash			= axis_index_a | axis_backlash;
+constexpr uint16_t cfg_a_docking_pos		= axis_index_a | axis_docking_pos;
+constexpr uint16_t cfg_a_step_length		= axis_index_a | axis_step_length;
+
+constexpr uint16_t cfg_b_settings			= axis_index_b | axis_settings;
+constexpr uint16_t cfg_b_unit				= axis_index_b | axis_unit;
+constexpr uint16_t cfg_b_size 				= axis_index_b | axis_size;
+constexpr uint16_t cfg_b_home_offset		= axis_index_b | axis_home_offset;
+constexpr uint16_t cfg_b_max_speed			= axis_index_b | axis_max_speed;
+constexpr uint16_t cfg_b_jumpoff_speed		= axis_index_b | axis_jumpoff_speed;
+constexpr uint16_t cfg_b_key_jumpoff_speed	= axis_index_b | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_b_max_accel			= axis_index_b | axis_max_accel;
+constexpr uint16_t cfg_b_key_accel			= axis_index_b | axis_key_accel;
+constexpr uint16_t cfg_b_estop_accel		= axis_index_b | axis_estop_accel;
+constexpr uint16_t cfg_b_backlash			= axis_index_b | axis_backlash;
+constexpr uint16_t cfg_b_docking_pos		= axis_index_b | axis_docking_pos;
+constexpr uint16_t cfg_b_step_length		= axis_index_b | axis_step_length;
+
+constexpr uint16_t cfg_c_settings			= axis_index_c | axis_settings;
+constexpr uint16_t cfg_c_unit				= axis_index_c | axis_unit;
+constexpr uint16_t cfg_c_size 				= axis_index_c | axis_size;
+constexpr uint16_t cfg_c_home_offset		= axis_index_c | axis_home_offset;
+constexpr uint16_t cfg_c_max_speed			= axis_index_c | axis_max_speed;
+constexpr uint16_t cfg_c_jumpoff_speed		= axis_index_c | axis_jumpoff_speed;
+constexpr uint16_t cfg_c_key_jumpoff_speed	= axis_index_c | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_c_max_accel			= axis_index_c | axis_max_accel;
+constexpr uint16_t cfg_c_key_accel			= axis_index_c | axis_key_accel;
+constexpr uint16_t cfg_c_estop_accel		= axis_index_c | axis_estop_accel;
+constexpr uint16_t cfg_c_backlash			= axis_index_c | axis_backlash;
+constexpr uint16_t cfg_c_docking_pos		= axis_index_c | axis_docking_pos;
+constexpr uint16_t cfg_c_step_length		= axis_index_c | axis_step_length;
+
+constexpr uint16_t cfg_u_settings			= axis_index_u | axis_settings;
+constexpr uint16_t cfg_u_unit				= axis_index_u | axis_unit;
+constexpr uint16_t cfg_u_size 				= axis_index_u | axis_size;
+constexpr uint16_t cfg_u_home_offset		= axis_index_u | axis_home_offset;
+constexpr uint16_t cfg_u_max_speed			= axis_index_u | axis_max_speed;
+constexpr uint16_t cfg_u_jumpoff_speed		= axis_index_u | axis_jumpoff_speed;
+constexpr uint16_t cfg_u_key_jumpoff_speed	= axis_index_u | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_u_max_accel			= axis_index_u | axis_max_accel;
+constexpr uint16_t cfg_u_key_accel			= axis_index_u | axis_key_accel;
+constexpr uint16_t cfg_u_estop_accel		= axis_index_u | axis_estop_accel;
+constexpr uint16_t cfg_u_backlash			= axis_index_u | axis_backlash;
+constexpr uint16_t cfg_u_docking_pos		= axis_index_u | axis_docking_pos;
+constexpr uint16_t cfg_u_step_length		= axis_index_u | axis_step_length;
+
+constexpr uint16_t cfg_v_settings			= axis_index_v | axis_settings;
+constexpr uint16_t cfg_v_unit				= axis_index_v | axis_unit;
+constexpr uint16_t cfg_v_size 				= axis_index_v | axis_size;
+constexpr uint16_t cfg_v_home_offset		= axis_index_v | axis_home_offset;
+constexpr uint16_t cfg_v_max_speed			= axis_index_v | axis_max_speed;
+constexpr uint16_t cfg_v_jumpoff_speed		= axis_index_v | axis_jumpoff_speed;
+constexpr uint16_t cfg_v_key_jumpoff_speed	= axis_index_v | axis_key_jumpoff_speed;
+constexpr uint16_t cfg_v_max_accel			= axis_index_v | axis_max_accel;
+constexpr uint16_t cfg_v_key_accel			= axis_index_v | axis_key_accel;
+constexpr uint16_t cfg_v_estop_accel		= axis_index_v | axis_estop_accel;
+constexpr uint16_t cfg_v_backlash			= axis_index_v | axis_backlash;
+constexpr uint16_t cfg_v_docking_pos		= axis_index_v | axis_docking_pos;
+constexpr uint16_t cfg_v_step_length		= axis_index_v | axis_step_length;
+
 // User Origin
-constexpr uint16_t cfg_user_origin_x = flag_cfg | 0x0060 | flag_x;
-constexpr uint16_t cfg_user_origin_y = flag_cfg | 0x0060 | flag_y;
+constexpr uint16_t cfg_user_origin_x = cls_cfg | 0x0060 | axis_index_x;
+constexpr uint16_t cfg_user_origin_y = cls_cfg | 0x0060 | axis_index_y;
 
-constexpr uint16_t cfg_head_dist = flag_cfg | 0x001E; // nanometers
+constexpr uint16_t cfg_head_dist = cls_cfg | 0x001E;
 
-constexpr uint16_t cfg_laser1_freq			= flag_cfg | 0x0111; // hz (20000)
-constexpr uint16_t cfg_laser1_min_power 	= flag_cfg | 0x0121; // percent
-constexpr uint16_t cfg_laser1_max_power 	= flag_cfg | 0x0131; // percent
-constexpr uint16_t cfg_laser1_preig_freq	= flag_cfg | 0x0141; // hz (20000)
-constexpr uint16_t cfg_laser1_preig_pct		= flag_cfg | 0x0151; // percent * 10
-// constexpr uint16_t cfg_laser1_type 		= flag_cfg | 0x0161; // TODO
-// glass / RF / RF+preignition ?  (0x8000=multi-tube, enable 1=0x2000, enable 2=0x4000, glass=0, rf No=1, rf/Wpre=2, 0x400=Special Mode)
+constexpr uint16_t cfg_laser1_freq		= cls_cfg | 0x0111; // hz (20000)
+constexpr uint16_t cfg_laser1_min_power = cls_cfg | 0x0121; // percent
+constexpr uint16_t cfg_laser1_max_power = cls_cfg | 0x0131; // percent
+constexpr uint16_t cfg_laser1_preig_freq = cls_cfg | 0x0141; // hz (20000)
+constexpr uint16_t cfg_laser1_preig_pct	= cls_cfg | 0x0151; // percent * 10
+constexpr uint16_t cfg_laser1_type		= cls_cfg | 0x0161; // TODO
 
-constexpr uint16_t cfg_laser2_freq 		= flag_cfg | 0x0112;  // hz (20000)
-constexpr uint16_t cfg_laser2_min_power	= flag_cfg | 0x0122;  // percent
-constexpr uint16_t cfg_laser2_max_power	= flag_cfg | 0x0132;  // percent
-constexpr uint16_t cfg_laser2_preig_freq = flag_cfg | 0x0142;  // hz (20000)
-constexpr uint16_t cfg_laser2_preig_pct	= flag_cfg | 0x0152;  // percent * 10
-// constexpr uint16_t cfg_laser2_type 		= flag_cfg | 0x0161; // TODO
-
-constexpr uint16_t cfg_x_step_length 		= flag_cfg | flag_x | 0x0A20; // micrometers
-constexpr uint16_t cfg_x_max_speed 			= flag_cfg | flag_x | 0x0A30; // micrometers/sec
-constexpr uint16_t cfg_x_jumpoff_speed 		= flag_cfg | flag_x | 0x0A40; // micrometers/sec^2
-constexpr uint16_t cfg_x_max_accel 			= flag_cfg | flag_x | 0x0A50; // micrometers/sec^2
-constexpr uint16_t cfg_x_breadth 			= flag_cfg | flag_x | 0x0A60; // width in nanometers
-constexpr uint16_t cfg_x_key_jumpoff_speed	= flag_cfg | flag_x | 0x0A70; // micrometers/sec
-constexpr uint16_t cfg_x_key_accel			= flag_cfg | flag_x | 0x0A80; // micrometers/sec^2
-constexpr uint16_t cfg_x_estop_accel		= flag_cfg | flag_x | 0x0A90; // micrometers/sec^2
-constexpr uint16_t cfg_x_home_offset		= flag_cfg | flag_x | 0x0AA0; // micrometers
-constexpr uint16_t cfg_x_backlash			= flag_cfg | flag_x | 0x0AB0; // micrometers
-
-constexpr uint16_t cfg_y_step_length 		= flag_cfg | flag_y | 0x0A20; // micrometers
-constexpr uint16_t cfg_y_max_speed 			= flag_cfg | flag_y | 0x0A30; // micrometers/sec
-constexpr uint16_t cfg_y_jumpoff_speed 		= flag_cfg | flag_y | 0x0A40; // micrometers/sec^2
-constexpr uint16_t cfg_y_max_accel 			= flag_cfg | flag_y | 0x0A50; // micrometers/sec^2
-constexpr uint16_t cfg_y_breadth 			= flag_cfg | flag_y | 0x0A60; // width in nanometers
-constexpr uint16_t cfg_y_key_jumpoff_speed	= flag_cfg | flag_y | 0x0A70; // micrometers/sec
-constexpr uint16_t cfg_y_key_accel			= flag_cfg | flag_y | 0x0A80; // micrometers/sec^2
-constexpr uint16_t cfg_y_estop_accel		= flag_cfg | flag_y | 0x0A90; // micrometers/sec^2
-constexpr uint16_t cfg_y_home_offset		= flag_cfg | flag_y | 0x0AA0; // micrometers
-constexpr uint16_t cfg_y_backlash			= flag_cfg | flag_y | 0x0AB0; // micrometers
-
-constexpr uint16_t cfg_z_step_length 		= flag_cfg | flag_z | 0x0A20; // micrometers
-constexpr uint16_t cfg_z_max_speed 			= flag_cfg | flag_z | 0x0A30; // micrometers/sec
-constexpr uint16_t cfg_z_jumpoff_speed 		= flag_cfg | flag_z | 0x0A40; // micrometers/sec^2
-constexpr uint16_t cfg_z_max_accel 			= flag_cfg | flag_z | 0x0A50; // micrometers/sec^2
-constexpr uint16_t cfg_z_breadth 			= flag_cfg | flag_z | 0x0A60; // width in nanometers
-constexpr uint16_t cfg_z_key_jumpoff_speed	= flag_cfg | flag_z | 0x0A70; // micrometers/sec
-constexpr uint16_t cfg_z_key_accel			= flag_cfg | flag_z | 0x0A80; // micrometers/sec^2
-constexpr uint16_t cfg_z_estop_accel		= flag_cfg | flag_z | 0x0A90; // micrometers/sec^2
-constexpr uint16_t cfg_z_home_offset		= flag_cfg | flag_z | 0x0AA0; // micrometers
-constexpr uint16_t cfg_z_backlash			= flag_cfg | flag_z | 0x0AB0; // micrometers
-
-constexpr uint16_t cfg_u_step_length 		= flag_cfg | flag_u | 0x0A20; // micrometers
-constexpr uint16_t cfg_u_max_speed 			= flag_cfg | flag_u | 0x0A30; // micrometers/sec
-constexpr uint16_t cfg_u_jumpoff_speed 		= flag_cfg | flag_u | 0x0A40; // micrometers/sec^2
-constexpr uint16_t cfg_u_max_accel 			= flag_cfg | flag_u | 0x0A50; // micrometers/sec^2
-constexpr uint16_t cfg_u_breadth 			= flag_cfg | flag_u | 0x0A60; // width in nanometers
-constexpr uint16_t cfg_u_key_jumpoff_speed	= flag_cfg | flag_u | 0x0A70; // micrometers/sec
-constexpr uint16_t cfg_u_key_accel			= flag_cfg | flag_u | 0x0A80; // micrometers/sec^2
-constexpr uint16_t cfg_u_estop_accel		= flag_cfg | flag_u | 0x0A90; // micrometers/sec^2
-constexpr uint16_t cfg_u_home_offset		= flag_cfg | flag_u | 0x0AA0; // micrometers
-constexpr uint16_t cfg_u_backlash			= flag_cfg | flag_u | 0x0AB0; // micrometers
+constexpr uint16_t cfg_laser2_freq 		= cls_cfg | 0x0112;  // hz (20000)
+constexpr uint16_t cfg_laser2_min_power	= cls_cfg | 0x0122;  // percent
+constexpr uint16_t cfg_laser2_max_power	= cls_cfg | 0x0132;  // percent
+constexpr uint16_t cfg_laser2_preig_freq = cls_cfg | 0x0142;  // hz (20000)
+constexpr uint16_t cfg_laser2_preig_pct	= cls_cfg | 0x0152;  // percent * 10
+constexpr uint16_t cfg_laser2_type 		= cls_cfg | 0x0162; // TODO
 
 // Configurables - cut:
-constexpr uint16_t cfg_idle_speed		= flag_cfg | 0x0201; // micrometers/sec
-constexpr uint16_t cfg_idle_acc			= flag_cfg | 0x0202; // micrometers/sec^2
-constexpr uint16_t cfg_idle_delay		= flag_cfg | 0x0203; // microseconds
-constexpr uint16_t cfg_start_speed		= flag_cfg | 0x0204; // micrometers/sec
-constexpr uint16_t cfg_min_acc			= flag_cfg | 0x0205; // micrometers/sec^2
-constexpr uint16_t cfg_max_acc			= flag_cfg | 0x0206; // micrometers/sec^2
-constexpr uint16_t cfg_acc_factor_pct	= flag_cfg | 0x0207; // percent
-constexpr uint16_t cfg_G0_acc_factor_pct = flag_cfg | 0x0208; // percent
-constexpr uint16_t cfg_speed_factor_pct = flag_cfg | 0x0209; // percent
+constexpr uint16_t cfg_idle_speed		= cls_cfg | 0x0201; // micrometers/sec
+constexpr uint16_t cfg_idle_acc			= cls_cfg | 0x0202; // micrometers/sec^2
+constexpr uint16_t cfg_idle_delay		= cls_cfg | 0x0203; // microseconds
+constexpr uint16_t cfg_start_speed		= cls_cfg | 0x0204; // micrometers/sec
+constexpr uint16_t cfg_min_acc			= cls_cfg | 0x0205; // micrometers/sec^2
+constexpr uint16_t cfg_max_acc			= cls_cfg | 0x0206; // micrometers/sec^2
+constexpr uint16_t cfg_acc_factor_pct	= cls_cfg | 0x0207; // percent
+constexpr uint16_t cfg_G0_acc_factor_pct = cls_cfg | 0x0208; // percent
+constexpr uint16_t cfg_speed_factor_pct = cls_cfg | 0x0209; // percent
 
 // Configurables - engrave:
-constexpr uint16_t cfg_engrave_x_start_speed = flag_cfg | 0x0E50 | flag_x; // micrometers/sec
-constexpr uint16_t cfg_engrave_y_start_speed = flag_cfg | 0x0E50 | flag_y; // micrometers/sec
+constexpr uint16_t cfg_engrave_x_start_speed = cls_cfg | 0x0E50 | axis_index_x;
+constexpr uint16_t cfg_engrave_y_start_speed = cls_cfg | 0x0E50 | axis_index_y;
 
-constexpr uint16_t cfg_engrave_x_acc		= flag_cfg | 0x0EA0 | flag_x; // micrometers/sec^2
-constexpr uint16_t cfg_engrave_y_acc		= flag_cfg | 0x0EA0 | flag_y; // micrometers/sec^2
-constexpr uint16_t cfg_line_shift_speed		= flag_cfg | 0x0E01; // micrometers/sec
-constexpr uint16_t cfg_facula_size_pct		= flag_cfg | 0x0E02; // precent*10.0
-constexpr uint16_t cfg_engrave_factor_pct	= flag_cfg | 0x0E03; // percent
+constexpr uint16_t cfg_engrave_x_acc		= cls_cfg | 0x0EA0 | axis_index_x; // micrometers/sec^2
+constexpr uint16_t cfg_engrave_y_acc		= cls_cfg | 0x0EA0 | axis_index_y; // micrometers/sec^2
+constexpr uint16_t cfg_line_shift_speed		= cls_cfg | 0x0E01; // micrometers/sec
+constexpr uint16_t cfg_facula_size_pct		= cls_cfg | 0x0E02; // precent*10.0
+constexpr uint16_t cfg_engrave_factor_pct	= cls_cfg | 0x0E03; // percent
 
 // Configurables - Homing
-constexpr uint16_t cfg_xy_home_speed = flag_cfg | 0x0AC0 | flag_x | flag_y; // micrometers/sec
-constexpr uint16_t cfg_z_home_speed = flag_cfg | 0x0AC0 | flag_z; // micrometers/sec
-constexpr uint16_t cfg_z_work_speed = flag_cfg | 0x0AD0 | flag_z; // micrometers/sec
-constexpr uint16_t cfg_u_home_speed = flag_cfg | 0x0AC0 | flag_u; // micrometers/sec
-constexpr uint16_t cfg_u_work_speed = flag_cfg | 0x0AD0 | flag_u; // micrometers/sec
+constexpr uint16_t cfg_xy_home_speed = cls_cfg | 0x0B10 | axis_index_xy;
+constexpr uint16_t cfg_z_home_speed = cls_cfg | 0x0B0 | axis_index_z;
+constexpr uint16_t cfg_z_work_speed = cls_cfg | 0x0BD0 | axis_index_z;
+constexpr uint16_t cfg_u_home_speed = cls_cfg | 0x0BC0 | axis_index_u;
+constexpr uint16_t cfg_u_work_speed = cls_cfg | 0x0BD0 | axis_index_u;
 
 // Configurables - Material
-constexpr uint16_t cfg_material_thick = flag_cfg | 0x0301; // micrometers
+constexpr uint16_t cfg_material_thick = cls_cfg | 0x0301; // micrometers
 
 // Configurables - Focus & misc
-constexpr uint16_t cfg_focus_distance	= flag_cfg | 0x0211; // micrometers
-constexpr uint16_t cfg_return_location	= flag_cfg | 0x0212; // flags (0 == origin, 0x8000 = absolute origin, 0x4000 = no return)
+constexpr uint16_t cfg_focus_distance	= cls_cfg | 0x0211; // micrometers
+constexpr uint16_t cfg_return_location	= cls_cfg | 0x0212; // flags (0 == origin, 0x8000 = absolute origin, 0x4000 = no return)
 
-constexpr uint16_t cfg_reset_delay		= flag_cfg | 0x0213; // milliseconds
-constexpr uint16_t cfg_status_on_delay	= flag_cfg | 0x0214; // milliseconds
-constexpr uint16_t cfg_status_off_delay	= flag_cfg | 0x0215; // milliseconds
-constexpr uint16_t cfg_finish_delay 	= flag_cfg | 0x0216; // milliseconds
+constexpr uint16_t cfg_reset_delay		= cls_cfg | 0x0213; // milliseconds
+constexpr uint16_t cfg_status_on_delay	= cls_cfg | 0x0214; // milliseconds
+constexpr uint16_t cfg_status_off_delay	= cls_cfg | 0x0215; // milliseconds
+constexpr uint16_t cfg_finish_delay 	= cls_cfg | 0x0216; // milliseconds
 
 // Configuration - Feeder
-constexpr uint16_t cfg_feed_pre_delay	= flag_cfg | 0x0218; // milliseconds
-constexpr uint16_t cfg_feed_post_delay	= flag_cfg | 0x0219; // milliseconds
-constexpr uint16_t cfg_feed_backlash	= flag_cfg | 0x021A; // micrometers
+constexpr uint16_t cfg_feed_pre_delay	= cls_cfg | 0x0218; // milliseconds
+constexpr uint16_t cfg_feed_post_delay	= cls_cfg | 0x0219; // milliseconds
+constexpr uint16_t cfg_feed_backlash	= cls_cfg | 0x021A; // micrometers
 
 // Configurables - Rotary
-constexpr uint16_t cfg_rotary_enable = flag_cfg | 0x0221; // rotary enable = 0 or 1
-constexpr uint16_t cfg_rotary_pulses_per_rotation = flag_cfg | 0x0222; // steps * 1000
-constexpr uint16_t cfg_rotary_diameter = flag_cfg | 0x0223; // micrometers
+constexpr uint16_t cfg_rotary_enable = cls_cfg | 0x0221; // rotary enable = 0 or 1
+constexpr uint16_t cfg_rotary_pulses_per_rotation = cls_cfg | 0x0222; // steps * 1000
+constexpr uint16_t cfg_rotary_diameter = cls_cfg | 0x0223; // micrometers
 
-constexpr uint16_t cfg_wireless_panel_fast = flag_cfg | 0x0224; // micrometers/sec
-constexpr uint16_t cfg_wireless_panel_slow = flag_cfg | 0x0225; // micrometers/sec
+constexpr uint16_t cfg_wireless_panel_fast = cls_cfg | 0x0224; // micrometers/sec
+constexpr uint16_t cfg_wireless_panel_slow = cls_cfg | 0x0225; // micrometers/sec
 
-// Configurables - Axis and Autolayout
-constexpr uint16_t cfg_autolayout = flag_cfg | 0x0401;
-constexpr uint16_t cfg_axis_auto_home = flag_cfg | 0x0402;
+// Configurables - Axis
+constexpr uint16_t cfg_axis_auto_home = cls_cfg | 0x0402;
+
+// Other boolean settings
+// Laser 1 Output Signal
+// Laser 2 Output Signal
 
 } // namespace lbp
 

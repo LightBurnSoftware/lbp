@@ -77,11 +77,11 @@ void SimView::tick(SimState state)
 	update();
 }
 
-void SimView::heatPx(int x, int y, float percent, int channel)
+void SimView::heatPx(int x, int y, float rate, int channel)
 {
 	if (x >= 0 && x < m_buffer.width() && y >= 0 && y < m_buffer.width()) {
 		QRgb px = m_buffer.pixel(x, y);
-		int heat = 0xff & qMin(255, (int) (255 * percent));
+		int heat = 0xff & qMin(255, (int) (255 * rate));
 		switch (channel) {
 		case 1:
 			px = qRed(px) | (heat << 8) | qBlue(px);
@@ -124,7 +124,7 @@ void SimView::heat(const SimState &state)
 	int y = getYPx(state.pos.y);
 	heatBall(x, y, 3, 0.5, 0); // heat red channel for position no matter what.
 	if (state.laser_1_power > 0.f) {
-		heatBall(x, y, 1, state.laser_1_power, 2); // heat blue channel for cutting power.
+		heatBall(x, y, 0, state.laser_1_power, 2); // heat blue channel for cutting power.
 	}
 }
 

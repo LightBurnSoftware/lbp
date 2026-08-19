@@ -29,6 +29,13 @@ static Vec4 calcVelocity(const Vec4 &delta, int32_t magnitude )
 	return result;
 }
 
+static inline double xydistance(const Vec4 &a, const Vec4 &b)
+{
+	return sqrt( pow(static_cast<double>(b.x - a.x), 2) + pow(static_cast<double>(b.y - a.y), 2) );
+}
+
+static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535; }
+
 MovementSim::MovementSim(Configuration &config)
 	: m_config(config)
 	, m_max_pos(300000, 180000, 120000, 60000) // hardcoded for now.
@@ -161,13 +168,13 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_jog_step_xy:
 	case lbp::cmd_jog_step_xyz:
 	case lbp::cmd_jog_step_xyzu:
-	case lbp::cmd_goto_x:
-	case lbp::cmd_goto_y:
-	case lbp::cmd_goto_z:
-	case lbp::cmd_goto_u:
-	case lbp::cmd_goto_xy:
-	case lbp::cmd_goto_xyz:
-	case lbp::cmd_goto_xyzu:
+	case lbp::cmd_jog_to_x:
+	case lbp::cmd_jog_to_y:
+	case lbp::cmd_jog_to_z:
+	case lbp::cmd_jog_to_u:
+	case lbp::cmd_jog_to_xy:
+	case lbp::cmd_jog_to_xyz:
+	case lbp::cmd_jog_to_xyzu:
 	case lbp::cmd_cut_abs_x:
 	case lbp::cmd_cut_abs_y:
 	case lbp::cmd_cut_abs_z:
@@ -238,7 +245,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_home_z:
 			target.z = 0;
 			break;
-		case lbp::cmd_goto_x:
+		case lbp::cmd_jog_to_x:
 		case lbp::cmd_cut_abs_x:
 		case lbp::cmd_travel_abs_x:
 			target.x = p.readIntArg() + m_job_origin.x;
@@ -248,7 +255,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_travel_rel_x:
 			target.x += p.readIntArg();
 			break;
-		case lbp::cmd_goto_y:
+		case lbp::cmd_jog_to_y:
 		case lbp::cmd_cut_abs_y:
 		case lbp::cmd_travel_abs_y:
 			target.y = p.readIntArg() + m_job_origin.y;
@@ -258,7 +265,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_travel_rel_y:
 			target.y += p.readIntArg();
 			break;
-		case lbp::cmd_goto_z:
+		case lbp::cmd_jog_to_z:
 		case lbp::cmd_cut_abs_z:
 		case lbp::cmd_travel_abs_z:
 			target.z = p.readIntArg();
@@ -268,7 +275,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_travel_rel_z:
 			target.z += p.readIntArg();
 			break;
-		case lbp::cmd_goto_u:
+		case lbp::cmd_jog_to_u:
 		case lbp::cmd_cut_abs_u:
 		case lbp::cmd_travel_abs_u:
 			target.u = p.readIntArg();
@@ -278,7 +285,7 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_travel_rel_u:
 			target.u += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xy:
+		case lbp::cmd_jog_to_xy:
 		case lbp::cmd_cut_abs_xy:
 		case lbp::cmd_travel_abs_xy:
 			target.x = p.readIntArg() + m_job_origin.x;
@@ -290,7 +297,7 @@ MovementSim::State MovementSim::updateTarget()
 			target.x += p.readIntArg();
 			target.y += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xyz:
+		case lbp::cmd_jog_to_xyz:
 		case lbp::cmd_cut_abs_xyz:
 		case lbp::cmd_travel_abs_xyz:
 			target.x = p.readIntArg() + m_job_origin.x;
@@ -304,7 +311,7 @@ MovementSim::State MovementSim::updateTarget()
 			target.y += p.readIntArg();
 			target.z += p.readIntArg();
 			break;
-		case lbp::cmd_goto_xyzu:
+		case lbp::cmd_jog_to_xyzu:
 		case lbp::cmd_cut_abs_xyzu:
 		case lbp::cmd_travel_abs_xyzu:
 			target.x = p.readIntArg() + m_job_origin.x;
@@ -331,47 +338,86 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_speed_u:
 			m_target_vel_u = p.readIntArg();
 			break;
-		case lbp::cmd_laser_power_min:
-			if (p.readByteArg() > 1) {
-				m_laser_2.power_min = p.readShortArg();
-			} else {
-				m_laser_1.power_min = p.readShortArg();
+		case lbp::cmd_laser_enable: {
+			gLog().push(Log::DEBUG, "Laser enable");
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.enabled = true;
 			}
-			break;
-		case lbp::cmd_laser_power_max:
-			if (p.readByteArg() > 1) {
-				m_laser_2.power_max = p.readShortArg();
-			} else {
-				m_laser_1.power_max = p.readShortArg();
+			else if (index == 1) {
+				m_laser_2.enabled = true;
 			}
-			break;
-		case lbp::cmd_laser_freq:
-			if (p.readByteArg() > 1) {
-				m_laser_2.freq = p.readIntArg();
-			} else {
-				m_laser_1.freq = p.readIntArg();
+		} break;
+		case lbp::cmd_laser_disable: {
+			gLog().push(Log::DEBUG, "Laser disable");
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.enabled = false;
 			}
-			break;
-		case lbp::cmd_laser_enable:
-		case lbp::cmd_laser_on:
+			else if (index == 1) {
+				m_laser_2.enabled = false;
+			}
+		} break;
+		case lbp::cmd_laser_on: {
 			gLog().push(Log::DEBUG, "Laser on");
-			if (p.readByteArg() > 1) {
-				m_laser_2.on = true;
-			} else {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
 				m_laser_1.on = true;
 			}
-			break;
-		case lbp::cmd_laser_disable:
-		case lbp::cmd_laser_off:
+			else if (index == 1) {
+				m_laser_2.on = true;
+			}
+		} break;
+		case lbp::cmd_laser_off: {
 			gLog().push(Log::DEBUG, "Laser off");
-			if (p.readByteArg() > 1) {
-				m_laser_2.on = false;
-			} else {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
 				m_laser_1.on = false;
 			}
-			break;
-		case lbp::cmd_raster_power:
-			break; // TODO
+			else if (index == 1) {
+				m_laser_2.on = false;
+			}
+		} break;
+		case lbp::cmd_laser_power_min: {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.power_min = normalize(p.readShortArg());
+			}
+			else if (index == 1) {
+				m_laser_2.power_min = normalize(p.readShortArg());
+			}
+		} break;
+		case lbp::cmd_laser_power_max: {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.power_max = normalize(p.readShortArg());
+				// gLog().push(Log::INFO, QString("set power max 1: ") + QString::number(m_laser_1.power_max));
+				m_laser_1.clearRaster();
+			}
+			else if (index == 1) {
+				m_laser_2.power_max = normalize(p.readShortArg());
+				// gLog().push(Log::INFO, QString("set power max 2: ") + QString::number(m_laser_1.power_max));
+				m_laser_2.clearRaster();
+			}
+		} break;
+		case lbp::cmd_laser_freq: {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.freq = p.readIntArg();
+			}
+			else if (index == 1) {
+				m_laser_2.freq = p.readIntArg();
+			}
+		} break;
+		case lbp::cmd_raster_power: {
+			uint8_t index = p.readByteArg();
+			if (index == 0) {
+				m_laser_1.setRaster(p);
+			}
+			else if (index == 1) {
+				m_laser_2.setRaster(p);
+			}
+		} break;
 		case lbp::cmd_air_off:
 			break; // TODO
 		case lbp::cmd_air_on:
@@ -418,6 +464,7 @@ MovementSim::State MovementSim::updateTarget()
 		if (target != m_pos) {
 			m_vel = calcVelocity(target - m_pos, m_target_vel_xy);
 			m_target_pos = target;
+			m_start_pos = m_pos;
 			gLog().push(Log::DEBUG, QString("New Target:   %1").arg(toQString(m_target_pos)));
 			gLog().push(Log::DEBUG, QString("New Velocity: %1").arg(toQString(m_vel)));
 			return MovementSim::State::Moving;
@@ -501,7 +548,7 @@ void MovementSim::update(int ms)
 	case MovementSim::State::Jogging:
 		m_pos = next_pos;
 		break;
-	case MovementSim::State::Moving:
+	case MovementSim::State::Moving: {
 		if (within(prev_pos.x, m_target_pos.x, next_pos.x)) {
 			next_pos.x = m_target_pos.x;
 		}
@@ -515,12 +562,17 @@ void MovementSim::update(int ms)
 			next_pos.u = m_target_pos.u;
 		}
 		m_pos = next_pos;
+		float progress = getMoveProgress();
+		m_laser_1.progressRaster(progress);
+		m_laser_2.progressRaster(progress);
 		if (m_pos == m_target_pos) {
+			m_laser_1.clearRaster();
+			m_laser_2.clearRaster();
 			next_state = updateTarget();
 		} else {
 			m_vel = calcVelocity(m_target_pos - m_pos, m_target_vel_xy);
 		}
-		break;
+	} break;
 	case MovementSim::State::Dwelling:
 		m_dwell_acc_ms += ms;
 		if (m_dwell_acc_ms > m_dwell_ms) {
@@ -574,4 +626,45 @@ uint32_t MovementSim::getFwState(uint32_t state)
 	}
 
 	return state;
+}
+
+float MovementSim::getMoveProgress() const
+{
+	double total = xydistance(m_target_pos, m_start_pos);
+	if (total < 1.0) {
+		return 1.0;
+	}
+	return static_cast<float>(xydistance(m_pos, m_start_pos) / total);
+}
+
+void LaserSettings::setRaster(lbp::CmdPayload &payload)
+{
+	if (payload.cmd() != lbp::cmd_raster_power) return;
+
+	num_rasters = (payload.size() - 3) >> 1;
+	//gLog().info(QString("set raster ") + QString::number(num_rasters));
+
+	if (!num_rasters) {
+		return;
+	}
+
+	// Assume index byte has already been read
+	for (size_t i = 0; i < num_rasters; i++) {
+		float power = normalize(payload.readShortArg());
+		raster_powers[i] = power;
+		//gLog().info(QString("----- ") + QString::number(power));
+	}
+}
+
+void LaserSettings::progressRaster(float progress)
+{
+	if (num_rasters > 0) {
+		power_max = raster_powers[(size_t) (progress * (num_rasters - 1))];
+		//gLog().info("..." + QString::number(progress) + "..." + QString::number(power_max));
+	}
+}
+
+void LaserSettings::clearRaster()
+{
+	num_rasters = 0;
 }

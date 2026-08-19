@@ -31,6 +31,18 @@ public:
 	 */
 	void push(Level level, const QString &msg);
 
+	/** Shortcut to push a debug message. */
+	void debug(const QString &msg);
+
+	/** Shortcut to push an info message. */
+	void info(const QString &msg);
+
+	/** Shortcut to push an error message. */
+	void error(const QString &msg);
+
+	/** Shortcut to push a warning message. */
+	void warning(const QString &msg);
+
 	/** @return true if the log has entries, false otherwise. */
 	bool hasEntry();
 
