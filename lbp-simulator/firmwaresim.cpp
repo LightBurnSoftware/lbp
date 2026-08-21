@@ -115,6 +115,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		gLog().push(Log::INFO, "Executing file!");
 		m_movement.stop();
 		m_filesystem.reset();
+		m_filesystem.startReading();
 		m_fw_state |= lbp::state_executing_job;
 		m_out_q.push(lbp::CmdMsg(cmd));
 		return true;
