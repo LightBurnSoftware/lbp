@@ -1,0 +1,93 @@
+{
+	"axes": [
+		{
+			"role": "x",
+			"unit": "mm",
+			"size": 300,
+			"type": "gantry",
+
+			"can_home": true,
+			"home": 0,
+			"home_speed": 10,
+
+			"max_cut_speed": 100,
+			"max_travel_speed": 100,
+			"max_accel": 10,
+			"estop_accel": 10,
+			"jumpoff_speed": 100,
+			"key_jumpoff_speed": 100
+		},
+		{
+			"role": "y",
+			"unit": "mm",
+			"size": 180,
+			"type": "gantry",
+
+			"can_home": true,
+			"home": 0,
+			"home_speed": 10,
+
+			"max_cut_speed": 100,
+			"max_travel_speed": 100,
+			"max_accel": 10,
+			"estop_accel": 10,
+			"jumpoff_speed": 100,
+			"key_jumpoff_speed": 100
+		},
+		{
+			"role": "z",
+			"unit": "mm",
+			"size": 100,
+			"type": "gantry",
+
+			"can_home": true,
+			"home": 0,
+			"home_speed": 5, 
+
+			"max_cut_speed": 10,
+			"max_travel_speed": 10,
+			"max_accel": 10,
+			"estop_accel": 10,
+			"jumpoff_speed": 100,
+			"key_jumpoff_speed": 100
+		},
+		{
+			"role": "a",
+			"unit": "degrees",
+			"size": 359,
+			"type": "rotary",
+
+			"rotary_diameter":  40,
+
+
+			"can_home": true,
+			"home": 0,
+			"home_speed": 10,
+
+			"max_cut_speed": 100,
+			"max_travel_speed": 100,
+			"max_accel": 10,
+			"estop_accel": 10,
+			"jumpoff_speed": 100,
+			"key_jumpoff_speed": 100
+		}
+	],
+	"lasers": [
+		{
+			"type": "CO2",
+			"freq": 20000,
+			"min_power": 10,
+			"max_power": 90,
+			"preignition_freq": 20000,
+			"preignition_power": 10,
+			"focus_distance": 2
+		}
+	],
+	"enable_multitube": false,
+
+	"user_origin": {
+		"x": 10,
+		"y": 10
+	}
+
+}
