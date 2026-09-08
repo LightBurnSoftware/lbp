@@ -37,7 +37,7 @@ public:
 	 * @param state The currently understood firmward state.
 	 * @return The firmware state, updated with whatever flags represent the filesystem state.
 	 */
-	uint32_t getFwState(uint32_t state);
+	uint32_t getFwState(uint32_t state) const;
 
 	/** Rewind the current filebuffer and parser */
 	void reset();

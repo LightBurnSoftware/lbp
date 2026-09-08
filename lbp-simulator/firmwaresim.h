@@ -14,6 +14,8 @@
 #include <lbp/parser.h>
 #include <lbp/queue.h>
 
+#include <QElapsedTimer>
+
 /**
  * @brief The FirmwareSim class. This is the entry-point for actual firmware simulation.
  *
@@ -54,11 +56,12 @@ public:
 	void rxCallback(const uint8_t *bytes, size_t len);
 
 private:
+	/** Update the simulation. */
+	SimState update(int ms);
+	/** send outgoing messages */
+	void tx();
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
-
-	/** Update the simulation. */
-	void update(int ms);
 
 	Transport *m_transport = nullptr; // Connection to LightBurn - sends and receives bytes.
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
@@ -67,4 +70,6 @@ private:
 	FileSystem m_filesystem; // Filesystem component - receives and manages files from LightBurn.
 	OutputQueue m_out_q; // Output message queue.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
+
+	QElapsedTimer m_profile;
 };

@@ -79,7 +79,7 @@ public:
 	 * @param fw_state The currently understood firmward state.
 	 * @return The firmware state, updated with whatever flags represent the movement simulation state.
 	 */
-	uint32_t getFwState(uint32_t fw_state);
+	uint32_t getFwState(uint32_t fw_state) const;
 
 	/** @return a structure representing the physical state of the toolhead, for display usage. */
 	SimState getSimState() const;

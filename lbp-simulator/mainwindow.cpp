@@ -59,7 +59,7 @@ MainWindow::MainWindow(QWidget *parent)
 	setCentralWidget(centralWidget);
 
 	m_sim_timer.start();
-	startTimer(5);
+	startTimer(2);
 }
 
 MainWindow::~MainWindow()
@@ -101,6 +101,13 @@ void MainWindow::timerEvent(QTimerEvent *event)
 			break;
 		}
 		wSimConsole->append(QString("%1 : %2").arg(entry.timestamp.time().toString(), entry.msg));
+	}
+	m_total_elapsed += elapsed;
+	m_ticks += 1;
+	if (m_ticks > 3000) {
+		wSimConsole->append(QString("avg tick interval %1").arg((double)m_total_elapsed / m_ticks));
+		m_ticks = 0;
+		m_total_elapsed = 0;
 	}
 }
 

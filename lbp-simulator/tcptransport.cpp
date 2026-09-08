@@ -75,6 +75,7 @@ void TcpTransport::onNewConnection()
 			pNewSocket->deleteLater();
 		} else {
 			m_socket = pNewSocket;
+			// m_socket->setSocketOption(QAbstractSocket::LowDelayOption, 1);
 			connect(m_socket, &QTcpSocket::readyRead, this, &TcpTransport::readSocket);
 			connect(m_socket, &QTcpSocket::disconnected, this, &TcpTransport::discardSocket);
 			gLog().push(Log::INFO, QString("New connection: %1").arg(pNewSocket->peerPort()));

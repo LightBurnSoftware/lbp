@@ -46,4 +46,7 @@ private:
 	Transport *m_transport = nullptr;
 	FirmwareSim m_sim;
 	QElapsedTimer m_sim_timer;
+
+	int64_t m_total_elapsed = 0;
+	int m_ticks = 0;
 };

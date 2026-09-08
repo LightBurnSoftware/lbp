@@ -599,7 +599,7 @@ bool MovementSim::canEnqueue() const
 	return m_cmd_q.freeSpace() > 0;
 }
 
-uint32_t MovementSim::getFwState(uint32_t state)
+uint32_t MovementSim::getFwState(uint32_t state) const
 {
 	if (m_state == MovementSim::State::Jogging || m_state == MovementSim::State::Moving) {
 		state |= lbp::state_moving;

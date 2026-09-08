@@ -17,36 +17,30 @@ FirmwareSim::FirmwareSim()
 
 void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 {
+	qint64 elapsed = m_profile.restart();
+	qDebug() << "rx callback :" << len << elapsed;
 	m_parser.feed(bytes, len);
-}
-
-SimState FirmwareSim::loop(int ms)
-{
 	// Process commands from transport
 	while (m_parser.parseNext()) {
 		process(m_parser.payload());
 	}
+	elapsed = m_profile.restart();
+	qDebug() << "processed in " << elapsed;
 
-	// Process commands from the job, if applicable
-	if (m_fw_state & lbp::state_executing_job) {
-		auto &fparser = m_filesystem.parser();
+	tx();
+	elapsed = m_profile.restart();
+	qDebug() << "tx in" << elapsed;
+}
 
-		if (m_movement.canEnqueue()) {
-			if (fparser.parseNext()) {
-				m_movement.process(fparser.payload(), m_out_q);
-			} else {
-				m_filesystem.feedParser();
-			}
-		}
+SimState FirmwareSim::loop(int ms)
+{
+	SimState val = update(ms);
+	tx();
+	return val;
+}
 
-		while (m_movement.canEnqueue() && fparser.parseNext()) {
-			m_movement.process(fparser.payload(), m_out_q);
-		}
-	}
-
-	// update simulation
-	update(ms);
-
+void FirmwareSim::tx()
+{
 	// send output packets
 	if (m_transport) {
 		while (!m_out_q.empty()) {
@@ -54,9 +48,6 @@ SimState FirmwareSim::loop(int ms)
 			m_transport->sendBytes(p.data(), p.size());
 		}
 	}
-
-	// collate simulation state for caller
-	return m_movement.getSimState();
 }
 
 void FirmwareSim::setTransport(Transport *conn)
@@ -129,10 +120,30 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	return false;
 }
 
-void FirmwareSim::update(int ms)
+SimState FirmwareSim::update(int ms)
 {
 	m_movement.update(ms);
 
+	// Process commands from the job, if applicable
+	if (m_fw_state & lbp::state_executing_job) {
+		auto &fparser = m_filesystem.parser();
+
+		if (m_movement.canEnqueue()) {
+			if (fparser.parseNext()) {
+				m_movement.process(fparser.payload(), m_out_q);
+			} else {
+				m_filesystem.feedParser();
+			}
+		}
+
+		while (m_movement.canEnqueue() && fparser.parseNext()) {
+			m_movement.process(fparser.payload(), m_out_q);
+		}
+	}
+
 	m_fw_state = m_filesystem.getFwState(m_fw_state);
 	m_fw_state = m_movement.getFwState(m_fw_state);
+
+	// collate simulation state for caller
+	return m_movement.getSimState();
 }

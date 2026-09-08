@@ -90,7 +90,7 @@ void FileSystem::stopReceiving()
 	}
 }
 
-uint32_t FileSystem::getFwState(uint32_t state)
+uint32_t FileSystem::getFwState(uint32_t state) const
 {
 	if (m_state == FileSystem::State::Receiving) {
 		state |= state_receiving;
