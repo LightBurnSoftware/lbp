@@ -124,6 +124,9 @@ public:
 		return 0;
 	}
 
+	/** @return THe number of bytes that can be fed to the parser. */
+	size_t freeSpace() const { return m_buffer.freeSpace(); }
+
 	/** Debug value representing the number of bytes the parser searched unsuccessfully for a valid header. */
 	size_t seeklen = 0;
 
