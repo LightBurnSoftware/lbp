@@ -3,14 +3,14 @@
 
 #pragma once
 
-#include "firmwaresim.h"
+#include "simworker.h"
 #include "simview.h"
-#include "transport.h"
 #include "transportwidget.h"
 
 #include <QMainWindow>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QThread>
 #include <QWidget>
 
 class MainWindow : public QMainWindow
@@ -20,8 +20,6 @@ class MainWindow : public QMainWindow
 public:
 	MainWindow(QWidget *parent = nullptr);
 	virtual ~MainWindow();
-
-	void onAboutToQuit();
 
 protected:
 	void timerEvent(QTimerEvent *event) override;
@@ -43,7 +41,6 @@ private:
 	QPushButton *pbClearSim = nullptr;
 
 	// members
-	Transport *m_transport = nullptr;
-	FirmwareSim m_sim;
-	QElapsedTimer m_sim_timer;
+	SimWorker *m_worker;
+	QThread m_bg_thread;
 };

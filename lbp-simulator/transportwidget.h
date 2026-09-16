@@ -25,6 +25,8 @@ public:
 
 	int baudRate() const;
 
+	Transport::Config config() const;
+
 private:
 	void onTcpToggled(bool checked);
 	void onSerialToggled(bool checked);

@@ -16,18 +16,17 @@ qt_add_executable(lbp-simulator
 
     simview.h simview.cpp
     log.h log.cpp
+	simworker.h simworker.cpp
     firmwaresim.h firmwaresim.cpp
     configuration.h configuration.cpp
     json.hpp
     movement.h movement.cpp
-
     simstate.h
     vec4.h vec4.cpp
     filesystem.h filesystem.cpp
     simutils.h
     transportwidget.h transportwidget.cpp
-    serialtransport.h
-    serialtransport.cpp
+    serialtransport.h serialtransport.cpp
 )
 
 add_subdirectory(../lbp build)

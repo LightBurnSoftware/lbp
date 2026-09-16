@@ -79,7 +79,6 @@ void TransportWidget::onSerialToggled(bool checked)
 		for (const QSerialPortInfo &info : QSerialPortInfo::availablePorts()) {
 			cmbSerialPort->addItem(info.portName());
 		}
-
 	}
 	updateView();
 }
@@ -93,6 +92,27 @@ void TransportWidget::updateView()
 	lblSerialPort->setVisible(ttype == Transport::Type::Serial);
 	cmbBaudRate->setVisible(ttype == Transport::Type::Serial);
 	lblBaudRate->setVisible(ttype == Transport::Type::Serial);
+}
+
+Transport::Config TransportWidget::config() const
+{
+	Transport::Config result;
+	result.type = type();
+
+	switch (type()) {
+	case Transport::Type::Tcp: {
+		bool ok = false;
+
+	} break;
+	case Transport::Type::Serial: {
+		result.port_name = cmbSerialPort->currentText();
+
+	} break;
+	default:
+		break;
+	}
+
+	return result;
 }
 
 QString TransportWidget::port() const
