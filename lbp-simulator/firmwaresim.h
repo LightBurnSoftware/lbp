@@ -4,7 +4,6 @@
 #pragma once
 
 #include "configuration.h"
-#include "transport.h"
 #include "filesystem.h"
 #include "movement.h"
 #include "simstate.h"
@@ -13,6 +12,8 @@
 #include <lbp/message.h>
 #include <lbp/parser.h>
 #include <lbp/queue.h>
+
+using TxCallback = std::function<void(const uint8_t*, size_t)>;
 
 /**
  * @brief The FirmwareSim class. This is the entry-point for actual firmware simulation.
@@ -44,14 +45,10 @@ public:
 	 */
 	SimState loop(int ms);
 
-	/**
-	 * @brief Stop previous transport connection and start new one.
-	 * @param conn The new connection.
-	 */
-	void setTransport(Transport *conn);
-
 	/** @brief Called when bytes are available to be read from transport. */
 	void rxCallback(const uint8_t *bytes, size_t len);
+
+	void setTxCallback(TxCallback cb) { m_tx_callback = cb; }
 
 private:
 	/** Process incoming input. */
@@ -60,11 +57,14 @@ private:
 	/** Update the simulation. */
 	void update(int ms);
 
-	Transport *m_transport = nullptr; // Connection to LightBurn - sends and receives bytes.
+	/** Send queued output messages to transport. */
+	void tx();
+
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
 	Configuration m_config; // Manages reading, writing, and storing config values.
 	MovementSim m_movement; // Movement component - simulates movement and laser actions.
 	FileSystem m_filesystem; // Filesystem component - receives and manages files from LightBurn.
 	OutputQueue m_out_q; // Output message queue.
+	TxCallback m_tx_callback; // Callback for sending output messages.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 };

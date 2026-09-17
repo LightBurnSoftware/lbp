@@ -8,8 +8,16 @@
 #include <lbp/payload.h>
 #include <lbp/spec.h>
 
+static void tx_nop(const uint8_t *bytes, size_t len)
+{
+	(void)bytes;
+	(void)len;
+
+}
+
 FirmwareSim::FirmwareSim()
 	: m_movement(m_config)
+	, m_tx_callback(&tx_nop)
 {
 	gLog().push(Log::INFO, "Started sim");
 	m_config.load();
@@ -18,15 +26,16 @@ FirmwareSim::FirmwareSim()
 void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 {
 	m_parser.feed(bytes, len);
-}
 
-SimState FirmwareSim::loop(int ms)
-{
-	// Process commands from transport
 	while (m_parser.parseNext()) {
 		process(m_parser.payload());
 	}
 
+	tx();
+}
+
+SimState FirmwareSim::loop(int ms)
+{
 	// Process commands from the job, if applicable
 	if (m_fw_state & lbp::state_executing_job) {
 		auto &fparser = m_filesystem.parser();
@@ -48,20 +57,18 @@ SimState FirmwareSim::loop(int ms)
 	update(ms);
 
 	// send output packets
-	if (m_transport) {
-		while (!m_out_q.empty()) {
-			lbp::CmdMsg p = m_out_q.pop();
-			m_transport->sendBytes(p.data(), p.size());
-		}
-	}
+	tx();
 
 	// collate simulation state for caller
 	return m_movement.getSimState();
 }
 
-void FirmwareSim::setTransport(Transport *conn)
+void FirmwareSim::tx()
 {
-	m_transport = conn;
+	while (!m_out_q.empty()) {
+		lbp::CmdMsg p = m_out_q.pop();
+		m_tx_callback(p.data(), p.size());
+	}
 }
 
 bool FirmwareSim::process(lbp::MaxPayload &payload)

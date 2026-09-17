@@ -20,11 +20,7 @@ public:
 	/** @return the selected type of transport. */
 	Transport::Type type() const;
 
-	/** @return the port used for the transport. */
-	QString port() const;
-
-	int baudRate() const;
-
+	/** @return the configuration described by the widget settings. */
 	Transport::Config config() const;
 
 private:

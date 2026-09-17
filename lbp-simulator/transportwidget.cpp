@@ -99,15 +99,14 @@ Transport::Config TransportWidget::config() const
 	Transport::Config result;
 	result.type = type();
 
-	switch (type()) {
-	case Transport::Type::Tcp: {
-		bool ok = false;
-
-	} break;
-	case Transport::Type::Serial: {
+	switch (result.type) {
+	case Transport::Type::Tcp:
+		result.port_num = txtTcpPort->text().toInt();
+	break;
+	case Transport::Type::Serial:
 		result.port_name = cmbSerialPort->currentText();
-
-	} break;
+		result.baud_rate = cmbBaudRate->currentData().toInt();
+	break;
 	default:
 		break;
 	}
@@ -115,24 +114,3 @@ Transport::Config TransportWidget::config() const
 	return result;
 }
 
-QString TransportWidget::port() const
-{
-	switch (type()) {
-	case Transport::Type::Tcp:
-		return txtTcpPort->text();
-	case Transport::Type::Serial:
-		return cmbSerialPort->currentText();
-	default:
-		return "";
-	}
-}
-
-int TransportWidget::baudRate() const
-{
-	bool ok = false;
-	int baud = cmbBaudRate->currentData().toInt(&ok);
-	if (ok) {
-		return baud;
-	}
-	return 0;
-}

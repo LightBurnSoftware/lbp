@@ -23,8 +23,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, pbStop(new QPushButton("Stop", this))
 	, pbClearSim(new QPushButton("Clear Sim View", this))
 {
-	qRegisterMetaType<Transport::Config>();
-
+	// Widget setup
 	assert(centralWidget() == nullptr);
 
 	connect(pbClearSim, &QPushButton::clicked, this, &MainWindow::onClearClicked);
@@ -56,12 +55,23 @@ MainWindow::MainWindow(QWidget *parent)
 	grid->setColumnStretch(1, 1);
 	setCentralWidget(centralWidget);
 
+	// Logic setup
+	qRegisterMetaType<Transport::Config>();
+
+	m_worker = new SimWorker;
+	m_worker->moveToThread(&m_thread);
+
+	connect(&m_thread, &QThread::started, m_worker, &SimWorker::init);
+	connect(&m_thread, &QThread::finished, m_worker, &SimWorker::deleteLater);
+	m_thread.start();
+
 	startTimer(5);
 }
 
 MainWindow::~MainWindow()
 {
-
+	m_thread.quit();
+	m_thread.wait();
 }
 
 QSize MainWindow::sizeHint() const

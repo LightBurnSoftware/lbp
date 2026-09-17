@@ -3,8 +3,9 @@
 
 #pragma once
 
-#include "simworker.h"
 #include "simview.h"
+#include "simworker.h"
+#include "transport.h"
 #include "transportwidget.h"
 
 #include <QMainWindow>
@@ -21,6 +22,9 @@ public:
 	MainWindow(QWidget *parent = nullptr);
 	virtual ~MainWindow();
 
+signals:
+	void startTransportRequested(Transport::Config config);
+
 protected:
 	void timerEvent(QTimerEvent *event) override;
 	QSize sizeHint() const override;
@@ -30,7 +34,6 @@ private:
 	void stopTransport();
 	void startTransport();
 	void onClearClicked();
-	void onTransportRx(const QByteArray &bytes);
 
 	// widgets
 	TransportWidget *wTransport = nullptr;
@@ -42,5 +45,5 @@ private:
 
 	// members
 	SimWorker *m_worker;
-	QThread m_bg_thread;
+	QThread m_thread;
 };
