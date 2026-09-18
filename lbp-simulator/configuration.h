@@ -41,7 +41,7 @@ public:
 	 * @param value The resulting value, if it exists.
 	 * @return true on success, false for unknown key.
 	 */
-	int32_t get(uint16_t key, int32_t &value) const;
+	bool get(uint16_t key, int32_t &value) const;
 
 	/**
 	 * @brief Attempt to process the given request. May enqueue an output packet.

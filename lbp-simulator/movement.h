@@ -106,8 +106,8 @@ private:
 	Vec4 m_job_origin; // origin offset for absolute moves during the current job.
 	Vec4 m_max_pos; // configured maximum dimension (assume Quadrant I).
 	Vec4 m_vel; // current velocity vector.
-	int32_t m_dwell_ms = 0; // ms to dwell, if we're in that state
-	int32_t m_dwell_acc_ms = 0; // accumulated ms spent dwelling
+	int64_t m_dwell_us = 0; // microseconds to dwell, if we're in that state
+	int64_t m_dwell_acc_us = 0; // accumulated microseconds spent dwelling
 	uint32_t m_target_vel_xy = 0; // user-specified target velocity (xy)
 	uint32_t m_target_vel_z = 0; // user-specified target velocity (z)
 	uint32_t m_target_vel_u = 0; // user-specified target velocity (u)

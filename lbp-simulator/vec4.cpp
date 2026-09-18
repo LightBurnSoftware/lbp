@@ -3,7 +3,7 @@
 
 #include "vec4.h"
 
-Vec4::Vec4(int32_t x, int32_t y, int32_t z, int32_t u)
+Vec4::Vec4(int64_t x, int64_t y, int64_t z, int64_t u)
 	: x(x)
 	, y(y)
 	, z(z)
@@ -37,7 +37,7 @@ Vec4::operator bool() const
 	return x != 0 || y != 0 || z != 0 || u != 0;
 }
 
-Vec4 operator*(const Vec4 &vec, int32_t m)
+Vec4 operator*(const Vec4 &vec, int64_t m)
 {
 	Vec4 product;
 	product.x = vec.x * m;
@@ -47,7 +47,7 @@ Vec4 operator*(const Vec4 &vec, int32_t m)
 	return product;
 }
 
-Vec4 operator/(const Vec4 &vec, int32_t d)
+Vec4 operator/(const Vec4 &vec, int64_t d)
 {
 	Vec4 product;
 	product.x = vec.x / d;
@@ -65,7 +65,7 @@ void Vec4::reset()
 	u = 0;
 }
 
-static int32_t clamp(int32_t lower, int32_t value, int32_t upper)
+static int64_t clamp(int64_t lower, int64_t value, int64_t upper)
 {
 	value = value > upper ? upper : value;
 	value = value < lower ? lower : value;

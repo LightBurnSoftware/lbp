@@ -95,7 +95,7 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	return false;
 }
 
-int32_t Configuration::get(uint16_t key, int32_t &value) const
+bool Configuration::get(uint16_t key, int32_t &value) const
 {
 	auto found = m_settings.find(key);
 	if (found == m_settings.end()) {

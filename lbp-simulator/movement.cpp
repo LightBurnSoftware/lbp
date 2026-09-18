@@ -15,16 +15,16 @@
  * @param magnitude The target velocity magnitude.
  * @return Velocity vector with proper magnitude.
  */
-static Vec4 calcVelocity(const Vec4 &delta, int32_t magnitude )
+static Vec4 calcVelocity(const Vec4 &delta, int64_t magnitude)
 {
 	Vec4 result;
 	double hyp = sqrt( pow(delta.x, 2) + pow(delta.y, 2) + pow(delta.z, 2) + pow(delta.u, 2) );
 	if (hyp > 0) {
 		double coeff = static_cast<double>(magnitude) / hyp;
-		result.x = static_cast<int32_t>(lround(delta.x * coeff));
-		result.y = static_cast<int32_t>(lround(delta.y * coeff));
-		result.z = static_cast<int32_t>(lround(delta.z * coeff));
-		result.u = static_cast<int32_t>(lround(delta.u * coeff));
+		result.x = static_cast<int64_t>(lround(delta.x * coeff));
+		result.y = static_cast<int64_t>(lround(delta.y * coeff));
+		result.z = static_cast<int64_t>(lround(delta.z * coeff));
+		result.u = static_cast<int64_t>(lround(delta.u * coeff));
 	}
 	return result;
 }
@@ -423,8 +423,8 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_air_on:
 			break; // TODO
 		case lbp::cmd_dwell:
-			m_dwell_ms = p.readIntArg();
-			m_dwell_acc_ms = 0;
+			m_dwell_us = p.readIntArg() * 1'000; // argument is ms, convert to us
+			m_dwell_acc_us = 0;
 			return MovementSim::State::Dwelling;
 		case lbp::cmd_cut_from:
 			switch (p.readByteArg()) {
@@ -432,10 +432,13 @@ MovementSim::State MovementSim::updateTarget()
 				m_job_origin.x = m_pos.x;
 				m_job_origin.y = m_pos.y;
 				break;
-			case lbp::cut_from_user_origin:
-				m_config.get(lbp::cfg_user_origin_x, m_job_origin.x);
-				m_config.get(lbp::cfg_user_origin_y, m_job_origin.y);
-				break;
+			case lbp::cut_from_user_origin: {
+				int32_t tmp = 0;
+				m_config.get(lbp::cfg_user_origin_x, tmp);
+				m_job_origin.x = static_cast<int64_t>(tmp);
+				m_config.get(lbp::cfg_user_origin_y, tmp);
+				m_job_origin.y = static_cast<int64_t>(tmp);
+			} break;
 			case lbp::cut_from_absolute:
 			default:
 				m_job_origin.reset();
@@ -525,7 +528,7 @@ void MovementSim::stopJog()
 }
 
 /** @return True if b is within a and c */
-static bool within(int32_t a, int32_t b, int32_t c)
+static bool within(int64_t a, int64_t b, int64_t c)
 {
 	if (a < c) {
 		return a <= b && b <= c;
@@ -535,9 +538,9 @@ static bool within(int32_t a, int32_t b, int32_t c)
 
 void MovementSim::step()
 {
-	int64_t elapsed = sim_step_ns;
+	int64_t elapsed = sim_step_us;
 	Vec4 prev_pos = m_pos;
-	Vec4 next_pos = clamp(m_pos + ((m_vel * elapsed) * 1e-9), m_max_pos);
+	Vec4 next_pos = clamp(m_pos + ((m_vel * elapsed) / 1'000'000), m_max_pos);
 
 	MovementSim::State next_state = m_state;
 
@@ -574,8 +577,8 @@ void MovementSim::step()
 		}
 	} break;
 	case MovementSim::State::Dwelling:
-		m_dwell_acc_ms += (sim_step_ns / 1'000'000);
-		if (m_dwell_acc_ms > m_dwell_ms) {
+		m_dwell_acc_us += sim_step_us;
+		if (m_dwell_acc_us > m_dwell_us) {
 			next_state = updateTarget();
 		}
 		break;

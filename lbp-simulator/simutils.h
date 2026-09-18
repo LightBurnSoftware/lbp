@@ -12,4 +12,5 @@ using OutputQueue = lbp::Queue<lbp::CmdMsg, 512>;
 using WireParser = lbp::Parser<4096>;
 using FileParser = lbp::Parser<4096>;
 
-constexpr int64_t sim_step_ns = 200'000;
+constexpr int64_t sim_step_us = 200;
+constexpr int64_t sim_step_ns = sim_step_us * 1'000;
