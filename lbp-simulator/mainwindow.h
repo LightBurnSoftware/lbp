@@ -14,6 +14,8 @@
 #include <QThread>
 #include <QWidget>
 
+#include <vector>
+
 class MainWindow : public QMainWindow
 {
 	Q_OBJECT
@@ -44,6 +46,7 @@ private:
 	QPushButton *pbClearSim = nullptr;
 
 	// members
-	SimWorker *m_worker;
-	QThread m_thread;
+	SimWorker *m_worker; // harness to operate the firmware simulation
+	QThread m_thread; // background worker thread for the sim harness
+	std::vector<SimState> m_points; // storage for simulated laser positions
 };

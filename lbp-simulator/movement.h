@@ -59,11 +59,8 @@ public:
 	 */
 	bool process(lbp::MaxPayload &request, OutputQueue &out_q);
 
-	/**
-	 * @brief Update the simulated position and laser state.
-	 * @param ms milliseconts that have passed since the last update.
-	 */
-	void update(int ms);
+	/** @brief Update the simulated position and laser state by a constant time step.  */
+	void step();
 
 	/** @brief stop all movement and cutting and clear the command queue. */
 	void stop();

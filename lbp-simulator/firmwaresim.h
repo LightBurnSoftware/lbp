@@ -31,19 +31,15 @@ public:
 	FirmwareSim();
 
 	/**
-	 * @brief Execute a single iteration of the simulation loop.
+	 * @brief Step the firmware by a pre-defined timestep.
 	 *
-	 * This loop will:
-	 * 1. Parse received bytes from the connection into lbp payloads.
-	 * 2: (If executing a received file) Parse received file into lbp payloads.
-	 * 3. Process these payloads.
-	 * 4. Update the simulation.
-	 * 5. Send any generated output messages via the connection.
+	 * This function will also send resulting output messages,
+	 * as well as process job messages streamed from memory
+	 * if a job is in progress.
 	 *
-	 * @param ms The number of milliseconds since the last loop.
 	 * @return A structure containing useful simulated machine state.
 	 */
-	SimState loop(int ms);
+	SimState step();
 
 	/** @brief Called when bytes are available to be read from transport. */
 	void rxCallback(const uint8_t *bytes, size_t len);
@@ -53,9 +49,6 @@ public:
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
-
-	/** Update the simulation. */
-	void update(int ms);
 
 	/** Send queued output messages to transport. */
 	void tx();

@@ -12,7 +12,6 @@ static void tx_nop(const uint8_t *bytes, size_t len)
 {
 	(void)bytes;
 	(void)len;
-
 }
 
 FirmwareSim::FirmwareSim()
@@ -34,7 +33,7 @@ void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 	tx();
 }
 
-SimState FirmwareSim::loop(int ms)
+SimState FirmwareSim::step()
 {
 	// Process commands from the job, if applicable
 	if (m_fw_state & lbp::state_executing_job) {
@@ -53,8 +52,11 @@ SimState FirmwareSim::loop(int ms)
 		}
 	}
 
-	// update simulation
-	update(ms);
+	// step movement simulation
+	m_movement.step();
+
+	m_fw_state = m_filesystem.getFwState(m_fw_state);
+	m_fw_state = m_movement.getFwState(m_fw_state);
 
 	// send output packets
 	tx();
@@ -134,12 +136,4 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		break;
 	}
 	return false;
-}
-
-void FirmwareSim::update(int ms)
-{
-	m_movement.update(ms);
-
-	m_fw_state = m_filesystem.getFwState(m_fw_state);
-	m_fw_state = m_movement.getFwState(m_fw_state);
 }

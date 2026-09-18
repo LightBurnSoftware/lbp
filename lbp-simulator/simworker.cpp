@@ -11,12 +11,13 @@
 
 SimWorker::SimWorker() : QObject(nullptr)
 {
-	m_sim.setTxCallback(std::bind(&SimWorker::onTransportTx, this, std::placeholders::_1, std::placeholders::_2));
+	// Empty
 }
 
 void SimWorker::init()
 {
-	// Empty
+	m_sim.setTxCallback(std::bind(&SimWorker::onTransportTx, this, std::placeholders::_1, std::placeholders::_2));
+	m_sim_timer.start();
 }
 
 SimWorker::~SimWorker()
@@ -26,33 +27,36 @@ SimWorker::~SimWorker()
 
 void SimWorker::timerEvent(QTimerEvent *event)
 {
-	int elapsed = m_sim_timer.restart();
-	SimState state = m_sim.loop(elapsed);
+	const qint64 curr_ns = m_sim_timer.nsecsElapsed();
+
+	m_acc_ns += curr_ns - m_last_ns;
+
+	qint64 steps = m_acc_ns / sim_step_ns;
+
+	m_acc_ns -= steps * sim_step_ns;
+
+	for (int i = 0; i < steps; i++) {
+		SimState point = m_sim.step();
+		QMutexLocker lock(&m_lock);
+		m_points.push_back(point);
+	}
+
+	m_last_ns = curr_ns;
 }
 
 void SimWorker::startTransport(Transport::Config config)
 {
-	if (m_transport) {
-		m_transport->stop();
-		disconnect(m_transport, &Transport::rxBytes, this, &SimWorker::onTransportRx);
-		m_transport->deleteLater();
-	}
+	stopTransport();
 
 	switch(config.type) {
 	case Transport::Type::Tcp:
 		if (config.port_num > 0) {
 			m_transport = new TcpTransport(config.port_num, this);
 		}
-		else {
-			m_transport = nullptr;
-		}
 		break;
 	case Transport::Type::Serial:
 		if (!config.port_name.isEmpty() && config.baud_rate > 0) {
 			m_transport = new SerialTransport(config.port_name, config.baud_rate, this);
-		}
-		else {
-			m_transport = nullptr;
 		}
 		break;
 	default:
@@ -83,4 +87,11 @@ void SimWorker::onTransportTx(const uint8_t *bytes, size_t len)
 	if (m_transport) {
 		m_transport->sendBytes(bytes, len);
 	}
+}
+
+void SimWorker::getSimPoints(std::vector<SimState> &out)
+{
+	QMutexLocker lock(&m_lock);
+	out.clear();
+	m_points.swap(out);
 }

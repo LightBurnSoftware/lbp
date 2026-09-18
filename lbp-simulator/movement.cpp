@@ -533,11 +533,11 @@ static bool within(int32_t a, int32_t b, int32_t c)
 	return c <= b && b <= a;
 }
 
-void MovementSim::update(int ms)
+void MovementSim::step()
 {
-	int64_t elapsed = ms;
+	int64_t elapsed = sim_step_ns;
 	Vec4 prev_pos = m_pos;
-	Vec4 next_pos = clamp(m_pos + ((m_vel * elapsed) / 1000), m_max_pos);
+	Vec4 next_pos = clamp(m_pos + ((m_vel * elapsed) * 1e-9), m_max_pos);
 
 	MovementSim::State next_state = m_state;
 
@@ -574,7 +574,7 @@ void MovementSim::update(int ms)
 		}
 	} break;
 	case MovementSim::State::Dwelling:
-		m_dwell_acc_ms += ms;
+		m_dwell_acc_ms += (sim_step_ns / 1'000'000);
 		if (m_dwell_acc_ms > m_dwell_ms) {
 			next_state = updateTarget();
 		}

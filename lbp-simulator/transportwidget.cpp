@@ -102,11 +102,11 @@ Transport::Config TransportWidget::config() const
 	switch (result.type) {
 	case Transport::Type::Tcp:
 		result.port_num = txtTcpPort->text().toInt();
-	break;
+		break;
 	case Transport::Type::Serial:
 		result.port_name = cmbSerialPort->currentText();
 		result.baud_rate = cmbBaudRate->currentData().toInt();
-	break;
+		break;
 	default:
 		break;
 	}
