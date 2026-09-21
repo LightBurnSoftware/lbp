@@ -22,21 +22,27 @@ class SimWorker : public QObject
 public:
 	SimWorker();
 	virtual ~SimWorker();
+
+	/**
+	 *  Get the list of simulated points since the last call.
+	 *
+	 *  @param out output container. MUST be empty.
+	 */
+	void getSimPoints(std::vector<SimState> &out);
+
+signals:
+	void startTransportRequested(Transport::Config config);
+	void stopTransportRequested();
+
 public slots:
 	/** Connect signals and kick off operations. */
 	void init();
 
 	/** Start a transport layer with the requested configuration. */
-	void startTransport(Transport::Config config);
+	void onStartTransportRequested(Transport::Config config);
 
 	/** Stop the current transport. */
-	void stopTransport();
-
-	/** Invoked by firmware sim, when bytes are ready to be sent to the transport layer. */
-	void onTransportTx(const uint8_t *bytes, size_t len);
-	
-	/** Get the list of simulated points since the last call. */
-	void getSimPoints(std::vector<SimState> &out);
+	void onStopTransportRequested();
 
 private slots:
 	/** Invoked when the transport layer has bytes ready for reading. */
@@ -46,6 +52,9 @@ protected:
 	void timerEvent(QTimerEvent *event) override;
 
 private:
+	/** Invoked by firmware sim, when bytes are ready to be sent to the transport layer. */
+	void onTransportTx(const uint8_t *bytes, size_t len);
+
 	FirmwareSim m_sim;
 	Transport *m_transport = nullptr;
 	std::vector<SimState> m_points;

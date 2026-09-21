@@ -7,6 +7,8 @@
 #include "tcptransport.h"
 #include "serialtransport.h"
 
+#include <QThread>
+
 #include <functional>
 
 SimWorker::SimWorker() : QObject(nullptr)
@@ -16,20 +18,23 @@ SimWorker::SimWorker() : QObject(nullptr)
 
 void SimWorker::init()
 {
+	connect(this, &SimWorker::startTransportRequested, this, &SimWorker::onStartTransportRequested);
+	connect(this, &SimWorker::stopTransportRequested, this, &SimWorker::onStopTransportRequested);
 	m_sim.setTxCallback(std::bind(&SimWorker::onTransportTx, this, std::placeholders::_1, std::placeholders::_2));
 	m_sim_timer.start();
+	startTimer(5);
 }
 
 SimWorker::~SimWorker()
 {
-	stopTransport();
+	onStopTransportRequested();
 }
 
 void SimWorker::timerEvent(QTimerEvent *event)
 {
 	const qint64 curr_ns = m_sim_timer.nsecsElapsed();
 
-	m_acc_ns += curr_ns - m_last_ns;
+	m_acc_ns += (curr_ns - m_last_ns);
 
 	qint64 steps = m_acc_ns / sim_step_ns;
 
@@ -44,9 +49,9 @@ void SimWorker::timerEvent(QTimerEvent *event)
 	m_last_ns = curr_ns;
 }
 
-void SimWorker::startTransport(Transport::Config config)
+void SimWorker::onStartTransportRequested(Transport::Config config)
 {
-	stopTransport();
+	onStopTransportRequested();
 
 	switch(config.type) {
 	case Transport::Type::Tcp:
@@ -68,7 +73,7 @@ void SimWorker::startTransport(Transport::Config config)
 	}
 }
 
-void SimWorker::stopTransport()
+void SimWorker::onStopTransportRequested()
 {
 	if (m_transport) {
 		m_transport->stop();
@@ -92,6 +97,5 @@ void SimWorker::onTransportTx(const uint8_t *bytes, size_t len)
 void SimWorker::getSimPoints(std::vector<SimState> &out)
 {
 	QMutexLocker lock(&m_lock);
-	out.clear();
 	m_points.swap(out);
 }

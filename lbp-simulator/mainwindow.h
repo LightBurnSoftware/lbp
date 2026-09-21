@@ -33,8 +33,8 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override;
 
 private:
-	void stopTransport();
-	void startTransport();
+	void onStopTransportClicked();
+	void onStartTransportClicked();
 	void onClearClicked();
 
 	// widgets

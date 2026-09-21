@@ -27,8 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
 	assert(centralWidget() == nullptr);
 
 	connect(pbClearSim, &QPushButton::clicked, this, &MainWindow::onClearClicked);
-	connect(pbStop, &QPushButton::clicked, this, &MainWindow::stopTransport);
-	connect(pbStart, &QPushButton::clicked, this, &MainWindow::startTransport);
+	connect(pbStop, &QPushButton::clicked, this, &MainWindow::onStopTransportClicked);
+	connect(pbStart, &QPushButton::clicked, this, &MainWindow::onStartTransportClicked);
 
 	wSimConsole->setReadOnly(true);
 	wSimConsole->document()->setMaximumBlockCount(MAX_SERVER_CONSOLE_LINES);
@@ -65,7 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(&m_thread, &QThread::finished, m_worker, &SimWorker::deleteLater);
 	m_thread.start();
 
-	startTimer(5);
+	startTimer(20);
 }
 
 MainWindow::~MainWindow()
@@ -81,6 +81,14 @@ QSize MainWindow::sizeHint() const
 
 void MainWindow::timerEvent(QTimerEvent *event)
 {
+	m_points.clear();
+	m_worker->getSimPoints(m_points);
+	//qDebug() << "accumulated" << m_points.size() << "points";
+	for (const SimState &point : m_points) {
+		wSimView->tick(point);
+	}
+
+	wSimView->update();
 	while (gLog().hasEntry()) {
 		Log::Entry entry = gLog().pop();
 		if (entry.level < Log::INFO) {
@@ -109,10 +117,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 {
 	switch (event->key()) {
 	case Qt::Key_S:
-		startTransport();
+		onStartTransportClicked();
 		break;
 	case Qt::Key_D:
-		stopTransport();
+		onStopTransportClicked();
 		break;
 	case Qt::Key_C:
 		onClearClicked();
@@ -128,14 +136,12 @@ void MainWindow::onClearClicked()
 	update();
 }
 
-void MainWindow::stopTransport()
+void MainWindow::onStopTransportClicked()
 {
-	qDebug() << "stop";
+	emit m_worker->stopTransportRequested();
 }
 
-void MainWindow::startTransport()
+void MainWindow::onStartTransportClicked()
 {
-	Transport::Config config;
-
-	qDebug() << "start";
+	emit m_worker->startTransportRequested(wTransport->config());
 }
