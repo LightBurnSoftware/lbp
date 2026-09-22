@@ -15,7 +15,9 @@ public:
 	explicit SimView(QWidget *parent = nullptr);
 	QSize sizeHint() const override;
 
-	void tick(SimState state);
+	void tick();
+	void heat(SimState state);
+	void cool(float rate);
 
 	void clear();
 
@@ -29,10 +31,9 @@ private:
 
 	int getXPx(int x) const;
 	int getYPx(int y) const;
-	void cool(float rate);
+
 	void heatPx(int x, int y, float rate, int channel = 0);
 	void heatBall(int cx, int cy, int radius, float rate, int channel = 0);
-	void heat(const SimState &state);
 
 	QImage m_buffer;
 	QElapsedTimer m_timer;

@@ -83,12 +83,11 @@ void MainWindow::timerEvent(QTimerEvent *event)
 {
 	m_points.clear();
 	m_worker->getSimPoints(m_points);
-	//qDebug() << "accumulated" << m_points.size() << "points";
 	for (const SimState &point : m_points) {
-		wSimView->tick(point);
+		wSimView->heat(point);
 	}
 
-	wSimView->update();
+	wSimView->tick();
 	while (gLog().hasEntry()) {
 		Log::Entry entry = gLog().pop();
 		if (entry.level < Log::INFO) {

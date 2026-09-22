@@ -49,11 +49,11 @@ void SimView::resizeEvent(QResizeEvent *event)
 {
 	if (m_width_um > m_height_um) {
 		sizeForWidth(event->size());
-
 	} else {
 		sizeForHeight(event->size());
 	}
 	qDebug() << m_buffer.width() << m_buffer.height() << m_x_px_offset << m_y_px_offset;
+	clear();
 }
 
 int SimView::getXPx(int x) const
@@ -68,12 +68,11 @@ int SimView::getYPx(int y) const
 	return (int) round((y_percent * m_buffer.height()));
 }
 
-void SimView::tick(SimState state)
+void SimView::tick()
 {
 	int64_t elapsed = m_timer.restart();
 	float seconds = (float) elapsed / 1000.f;
-	cool(0.01 * seconds);
-	heat(state);
+	cool(0.2 * seconds);
 	update();
 }
 
@@ -81,17 +80,17 @@ void SimView::heatPx(int x, int y, float rate, int channel)
 {
 	if (x >= 0 && x < m_buffer.width() && y >= 0 && y < m_buffer.width()) {
 		QRgb px = m_buffer.pixel(x, y);
-		int heat = 0xff & qMin(255, (int) (255 * rate));
+		int heat = qMin(255, (int) (255 * rate));
 		switch (channel) {
 		case 1:
-			px = qRed(px) | (heat << 8) | qBlue(px);
+			px = qRgb(qRed(px), heat, qBlue(px));
 			break;
 		case 2:
-			px = qRed(px) | qGreen(px) | heat;
+			px = qRgb(qRed(px), qGreen(px), heat);
 			break;
 		case 0:
 		default:
-			px = (heat << 16) | qGreen(px) | qBlue(px);
+			px = qRgb(heat, qGreen(px), qBlue(px));
 		}
 		m_buffer.setPixel(x, y, px);
 	}
@@ -106,7 +105,7 @@ void SimView::heatBall(int cx, int cy, int radius, float rate, int channel)
 			int y2 = dy * dy;
 			if ((x2 + y2) <= r2) {
 				// float scaled = rate * (1.f - (float) (x2 + y2) / r2);
-				// _heatPx(cx + dx, cy + dy, scaled);
+				// heatPx(cx + dx, cy + dy, scaled);
 				heatPx(cx + dx, cy + dy, rate, channel);
 			}
 		}
@@ -118,12 +117,17 @@ void SimView::clear()
 	m_buffer.fill(QColor(0, 0, 0));
 }
 
-void SimView::heat(const SimState &state)
+void SimView::heat(SimState state)
 {
 	int x = getXPx(state.pos.x);
 	int y = getYPx(state.pos.y);
-	heatBall(x, y, 3, 0.5, 0); // heat red channel for position no matter what.
+	heatBall(x,
+			 y,
+			 3,
+			 qMax(0.5, state.laser_1_power),
+			 0); // heat red channel for position no matter what.
 	if (state.laser_1_power > 0.f) {
+		heatBall(x, y, 0, state.laser_1_power, 1); // heat green channel for cutting power.
 		heatBall(x, y, 0, state.laser_1_power, 2); // heat blue channel for cutting power.
 	}
 }
@@ -136,10 +140,10 @@ void SimView::cool(float rate)
 			QRgb px = line[x];
 			int heat = qRed(px);
 			heat -= (1 + (int) (heat * rate));
-			if (heat < 25) {
+			if (heat < 10) {
 				heat = 0;
 			}
-			line[x] = qRgb(heat, 0, qBlue(px));
+			line[x] = qRgb(heat, qGreen(px), qBlue(px));
 		}
 	}
 }
