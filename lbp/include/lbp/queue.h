@@ -4,7 +4,6 @@
 #ifndef LBP_QUEUE_H
 #define LBP_QUEUE_H
 
-#include <cassert>
 #include <cstddef>
 #include <utility>
 
@@ -13,16 +12,13 @@ namespace lbp {
 /**
  * @brief A simple FIFO queue with templated maximum capacity which MUST be a power of two.
  * Example: An output queue of outgoing messages:
- * Queue<CmdMessage, 256> out_q;
+ * Queue<CmdMsg, 256> out_q;
  *
  * Example: A queue of scheduled movement commands:
  * Queue<CmdPayload, 64> cmd_q;
  *
- * An empty queue will still return a default-constructed item, so proper usage
- * should check before popping:
- *
- * while(!cmd_q.empty()) {
- *     CmdPayload cp = cmd_q.pop();
+ * CmdPayload cp;
+ * while(cmd_q.pop(cp)) {
  *     process(cp); // your custom processing function.
  * }
  */
@@ -34,37 +30,42 @@ public:
 	Queue() = default;
 
 	/**
-	 * @brief Push an item to the back of the queue.
-	 * @param item The item to push.
-	 * @return True if there was room for the item in the queue, false otherwise.
+	 * @brief Push a copy of an item to the back of the queue.
+	 * @param item The item to copy into the queue.
+	 * @return True if there was room for the item, false if the queue was full.
 	 */
-	bool push(T item)
+	[[nodiscard]] bool push(const T &item)
 	{
-		if (!freeSpace()) {
-			return false;
-		}
-		size_t pos = m_head & kModMask;
-
+		if (!freeSpace()) return false;
+		m_data[m_head & kModMask] = item;
 		m_head += 1;
-
-		m_data[pos] = item;
-
 		return true;
 	}
 
 	/**
-	 * @brief Remove and return the first item from the front of the queue.
-	 * @return The item at the front of the queue, or a default-constructed item if the queue was empty.
+	 * @brief Move an item into the back of the queue.
+	 * @param item The item to move into the queue.
+	 * @return True if there was room for the item, false if the queue was full.
 	 */
-	T pop() {
-		if (!size()) {
-			return T();
-		}
+	[[nodiscard]] bool push(T &&item)
+	{
+		if (!freeSpace()) return false;
+		m_data[m_head & kModMask] = std::move(item);
+		m_head += 1;
+		return true;
+	}
 
-		size_t pos = m_tail & kModMask;
-
+	/**
+	 * @brief Remove the item at the front of the queue.
+	 * @param out Reference parameter to receive the item.
+	 * @return True if an item was moved into out. False if the queue was empty, in which case out is unchanged.
+	 */
+	[[nodiscard]] bool pop(T &out)
+	{
+		if (empty()) return false;
+		out = std::move(m_data[m_tail & kModMask]);
 		m_tail += 1;
-		return std::move(m_data[pos]);
+		return true;
 	}
 
 	/** @return the number of items currently queued. */
@@ -75,6 +76,9 @@ public:
 
 	/** @return true if no items exist in the queue. */
 	bool empty() const { return m_head == m_tail; }
+
+	/** Clear the queue. */
+	void clear() { m_head = m_tail = 0; }
 
 private:
 	static constexpr size_t kModMask = Capacity - 1;

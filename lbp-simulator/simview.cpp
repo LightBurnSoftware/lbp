@@ -78,7 +78,7 @@ void SimView::tick()
 
 void SimView::heatPx(int x, int y, float rate, int channel)
 {
-	if (x >= 0 && x < m_buffer.width() && y >= 0 && y < m_buffer.width()) {
+	if (x >= 0 && x < m_buffer.width() && y >= 0 && y < m_buffer.height()) {
 		QRgb px = m_buffer.pixel(x, y);
 		int heat = qMin(255, (int) (255 * rate));
 		switch (channel) {

@@ -28,5 +28,3 @@ bool operator==(const Vec4 &a, const Vec4 &b);
 bool operator!=(const Vec4 &a, const Vec4 &b);
 Vec4 operator*(const Vec4 &vec, int64_t m);
 Vec4 operator/(const Vec4 &vec, int64_t d);
-
-Vec4 clamp(const Vec4 &vec, const Vec4 &limit);

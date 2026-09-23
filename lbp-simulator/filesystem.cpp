@@ -56,10 +56,16 @@ void FileSystem::startReceiving(lbp::MaxPayload &payload)
 		return;
 	}
 
+	uint32_t size = 0;
+	if (!payload.readArg(size)) {
+		gLog().error("Cannot start receiving - malformed packet");
+		return;
+	}
+
 	if (m_file.open(QIODevice::WriteOnly)) {
 		m_state = FileSystem::State::Receiving;
 		m_parser.clear();
-		uint32_t size = payload.readIntArg();
+
 		gLog().push(Log::INFO, QString("File size: %1").arg(size));
 	} else {
 		gLog().error("Could not open file for writing");
@@ -100,19 +106,20 @@ uint32_t FileSystem::getFwState(uint32_t state)
 	return state;
 }
 
-void FileSystem::startReading()
+bool FileSystem::startReading()
 {
 	if (m_state != FileSystem::State::Idle) {
 		gLog().error("Cannot start reading - state error");
-		return;
+		return false;
 	}
 
 	m_file.setFileName(getTmpFilename());
 	if (!m_file.open(QIODevice::ReadOnly)) {
 		gLog().error(QString("failed to open %1 for reading").arg(m_file.fileName()));
-		return;
+		return false;
 	}
 	m_state = FileSystem::State::Reading;
+	return true;
 }
 
 void FileSystem::stopReading()
@@ -125,22 +132,26 @@ void FileSystem::stopReading()
 	}
 }
 
-void FileSystem::feedParser()
+size_t FileSystem::feedParser()
 {
 	if (m_state != FileSystem::State::Reading) {
-		gLog().error("Cannot feed parser - state error");
-		return;
+		return 0;
 	}
 
 	if ((m_file.openMode() & QIODevice::ReadOnly) == 0) {
 		gLog().error("Could not feed parser, no file is open");
-		return;
+		return 0;
 	}
 
-	QByteArray b = m_file.read(m_parser.freeSpace());
-	if (b.size()) {
-		m_parser.feed((const uint8_t *) b.constData(), b.size());
+	const QByteArray b = m_file.read(m_parser.freeSpace());
+	if (b.isEmpty()) {
+		if (m_file.atEnd()) {
+			gLog().push(Log::INFO, "Reached end of job file");
+			stopReading();
+		}
+		return 0;
 	}
+	return m_parser.feed((const uint8_t *) b.constData(), b.size());
 }
 
 void FileSystem::stop()
@@ -155,4 +166,9 @@ void FileSystem::reset()
 	stopReceiving();
 	stopReading();
 	m_parser.clear();
+}
+
+bool FileSystem::isReading() const
+{
+	return m_state == State::Reading;
 }

@@ -5,7 +5,6 @@
 #define LBP_BYTEBUFFER_H
 
 #include <algorithm>
-#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -28,7 +27,7 @@ public:
 	size_t available() const { return m_head - m_tail; }
 
 	/** @return the number of bytes available to be written. */
-	size_t freeSpace() const { return Capacity - available(); }
+	size_t freeSpace() const { return Capacity - reserved(); }
 
 	/**
 	 * @brief Read data from the buffer.
@@ -36,11 +35,9 @@ public:
 	 * @param len Number of bytes to read.
 	 * @return true on success. Return false and read nothing if len > available().
 	 */
-	bool read(uint8_t *dst, size_t len)
+	[[nodiscard]] bool read(uint8_t *dst, size_t len)
 	{
-		if (len > available()) {
-			return false;
-		}
+		if (len > available()) return false;
 
 		size_t pos = m_tail & kModMask;
 		size_t first_chunk = std::min(Capacity - pos, len);
@@ -56,16 +53,18 @@ public:
 		return true;
 	}
 
-	/** @return A single byte from the buffer, 0x0 if Empty. */
-	uint8_t readByte()
+	/**
+	 * @brief Read a single byte from the buffer.
+	 * @param out Destination byte.
+	 * @return true on success. Return false if empty().
+	 */
+	[[nodiscard]] bool readByte(uint8_t &out)
 	{
-		if (empty()) {
-			return 0x0;
-		}
-
+		if (empty()) return false;
 		size_t pos = m_tail & kModMask;
+		out = m_data[pos];
 		m_tail += 1;
-		return m_data[pos];
+		return true;
 	}
 
 	/**
@@ -74,11 +73,9 @@ public:
 	 * @param len Number of bytes to write.
 	 * @return true on success. Return false write nothing if len > freeSpace().
 	 */
-	bool write(const uint8_t *src, size_t len)
+	[[nodiscard]] bool write(const uint8_t *src, size_t len)
 	{
-		if (len > freeSpace()) {
-			return false;
-		}
+		if (len > freeSpace()) return false;
 
 		size_t pos = m_head & kModMask;
 		size_t first_chunk = std::min(Capacity - pos, len);
@@ -101,28 +98,33 @@ public:
 	{
 		m_head = 0;
 		m_tail = 0;
+		m_mark = kNoMark;
 	}
 
-	/** Mark the current tail in case a rewind is requested */
-	void mark()
-	{
-		m_mark = m_tail;
-	}
+	/** Bookmark the current tail in case a rewind is requested */
+	void setBookmark() { m_mark = m_tail; }
+
+	/** Release the current bookmark. */
+	void clearBookmark() { m_mark = kNoMark; }
 
 	/** Move the tail back to the mark. */
 	void rewind()
 	{
-		m_tail = m_mark;
+		if (m_mark != kNoMark) m_tail = m_mark;
+		clearBookmark();
 	}
 
 
 private:
 	static constexpr size_t kModMask = Capacity - 1;
+	static constexpr size_t kNoMark = SIZE_MAX;
+
+	size_t reserved() const { return m_mark == kNoMark ? m_tail : m_mark; }
 
 	uint8_t m_data[Capacity]; // Actual data.
 	size_t m_head = 0;		// Write index
 	size_t m_tail = 0;		// Read index
-	size_t m_mark = 0;
+	size_t m_mark = kNoMark; // A sentinel value to indicate whether a rewind mark is present.
 };
 
 } // namespace lbp

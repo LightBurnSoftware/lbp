@@ -7,34 +7,52 @@
 #include <lbp/beio.h>
 #include <lbp/spec.h>
 
+#include <algorithm>
 #include <cmath>
 
-/**
- * @brief Calculate a velocity vector.
- * @param delta The raw delta vector.
- * @param magnitude The target velocity magnitude.
- * @return Velocity vector with proper magnitude.
- */
-static Vec4 calcVelocity(const Vec4 &delta, int64_t magnitude)
+static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535.f; }
+
+static inline int64_t clampTo(int64_t v, int64_t limit)
+{
+	if (limit > 0) {
+		return std::clamp<int64_t>(v, 0, limit);
+	}
+	return v;
+}
+
+static inline int64_t wrapTo(int64_t v, int64_t limit)
+{
+	if (limit > 0) {
+		v %= limit;
+		if (v < 0) v += limit;
+	}
+	return v;
+}
+
+struct AxisRef
+{
+	uint16_t flag;	// command bitmask: axis_x, axis_y, ...
+	uint16_t index; // config ordinal: axis_index_x, axis_index_y, ...
+	int64_t Vec4::*m;
+};
+static constexpr AxisRef kAxes[] = {
+	{lbp::axis_x, lbp::axis_index_x, &Vec4::x},
+	{lbp::axis_y, lbp::axis_index_y, &Vec4::y},
+	{lbp::axis_z, lbp::axis_index_z, &Vec4::z},
+	{lbp::axis_u, lbp::axis_index_u, &Vec4::u},
+};
+
+static constexpr uint16_t kSupportedAxes = lbp::axis_x | lbp::axis_y | lbp::axis_z | lbp::axis_u;
+
+/** @return base + offset * scale, rounded per axis. Pure function of its inputs: no drift. */
+static Vec4 advance(const Vec4 &base, const Vec4 &offset, double scale)
 {
 	Vec4 result;
-	double hyp = sqrt( pow(delta.x, 2) + pow(delta.y, 2) + pow(delta.z, 2) + pow(delta.u, 2) );
-	if (hyp > 0) {
-		double coeff = static_cast<double>(magnitude) / hyp;
-		result.x = static_cast<int64_t>(lround(delta.x * coeff));
-		result.y = static_cast<int64_t>(lround(delta.y * coeff));
-		result.z = static_cast<int64_t>(lround(delta.z * coeff));
-		result.u = static_cast<int64_t>(lround(delta.u * coeff));
+	for (const AxisRef &a : kAxes) {
+		result.*(a.m) = base.*(a.m) + llround(double(offset.*(a.m)) * scale);
 	}
 	return result;
 }
-
-static inline double xydistance(const Vec4 &a, const Vec4 &b)
-{
-	return sqrt( pow(static_cast<double>(b.x - a.x), 2) + pow(static_cast<double>(b.y - a.y), 2) );
-}
-
-static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535; }
 
 MovementSim::MovementSim(Configuration &config)
 	: m_config(config)
@@ -50,32 +68,32 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	switch (cmd) {
 	case lbp::cmd_pos_x:
 		gLog().push(Log::DEBUG, QString("X Axis Query: %1").arg(m_pos.x));
-		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.x));
+		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.x)));
 		return true;
 	case lbp::cmd_pos_y:
 		gLog().push(Log::DEBUG, QString("Y Axis Query: %1").arg(m_pos.y));
-		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.y));
+		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.y)));
 		return true;
 	case lbp::cmd_pos_z:
 		gLog().push(Log::DEBUG, QString("Z Axis Query: %1").arg(m_pos.z));
-		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.z));
+		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.z)));
 		return true;
 	case lbp::cmd_pos_u:
 		gLog().push(Log::DEBUG, QString("U Axis Query: %1").arg(m_pos.u));
-		out_q.push(lbp::CmdMsg(cmd, 4, m_pos.u));
+		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.u)));
 		return true;
 	case lbp::cmd_pos_xy: {
 		lbp::CmdMsg m(cmd, 8);
-		m.writeInt(m_pos.x);
-		m.writeInt(m_pos.y);
+		m.writeInt(toWire(m_pos.x));
+		m.writeInt(toWire(m_pos.y));
 		out_q.push(m);
 		return true;
 	}
 	case lbp::cmd_pos_xyz: {
 		lbp::CmdMsg m(cmd, 12);
-		m.writeInt(m_pos.x);
-		m.writeInt(m_pos.y);
-		m.writeInt(m_pos.z);
+		m.writeInt(toWire(m_pos.x));
+		m.writeInt(toWire(m_pos.y));
+		m.writeInt(toWire(m_pos.z));
 		out_q.push(m);
 		return true;
 	}
@@ -83,79 +101,81 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		gLog().push(Log::DEBUG, "XYZU Axis Query");
 
 		lbp::CmdMsg m(cmd, 16);
-		m.writeInt(m_pos.x);
-		m.writeInt(m_pos.y);
-		m.writeInt(m_pos.z);
-		m.writeInt(m_pos.u);
+		m.writeInt(toWire(m_pos.x));
+		m.writeInt(toWire(m_pos.y));
+		m.writeInt(toWire(m_pos.z));
+		m.writeInt(toWire(m_pos.u));
 		out_q.push(m);
 		return true;
 	}
 	case lbp::cmd_jog_start_pos_x:
-		startJog(Vec4(1, 0, 0, 0));
+		beginJog(Vec4(1, 0, 0, 0), m_target_vel_xy);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_pos_x:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_neg_x:
-		startJog(Vec4(-1, 0, 0, 0));
+		beginJog(Vec4(-1, 0, 0, 0), m_target_vel_xy);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_neg_x:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_pos_y:
-		startJog(Vec4(0, 1, 0, 0));
+		beginJog(Vec4(0, 1, 0, 0), m_target_vel_xy);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_pos_y:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_neg_y:
-		startJog(Vec4(0, -1, 0, 0));
+		beginJog(Vec4(0, -1, 0, 0), m_target_vel_xy);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_neg_y:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_pos_z:
-		startJog(Vec4(0, 0, 1, 0));
+		beginJog(Vec4(0, 0, 1, 0), m_target_vel_z);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_pos_z:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_neg_z:
-		startJog(Vec4(0, 0, -1, 0));
+		beginJog(Vec4(0, 0, -1, 0), m_target_vel_z);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_neg_z:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_pos_u:
-		startJog(Vec4(0, 0, 0, 1));
+		beginJog(Vec4(0, 0, 0, 1), m_target_vel_u);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_pos_u:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_start_neg_u:
-		startJog(Vec4(0, 0, 0, -1));
+		beginJog(Vec4(0, 0, 0, -1), m_target_vel_u);
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_jog_stop_neg_u:
-		stopJog();
+		endJog();
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_cut_from:
 	case lbp::cmd_cut_type:
+	case lbp::cmd_speed_x:
+	case lbp::cmd_speed_y:
 	case lbp::cmd_home_xy:
 	case lbp::cmd_home_z:
 	case lbp::cmd_speed_xy:
@@ -222,7 +242,9 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	case lbp::cmd_job_header_end:
 	case lbp::cmd_frame_begin:
 	case lbp::cmd_frame_end:
-		m_cmd_q.push(toCmd(request));
+		if (!m_cmd_q.push(toCmd(request))) {
+			gLog().error("Move command queue full");
+		}
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	default:
@@ -231,136 +253,120 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	return false;
 }
 
-MovementSim::State MovementSim::updateTarget()
+static inline bool isMoveCmd(uint16_t cmd)
 {
-	while (!m_cmd_q.empty()) {
-		Vec4 target = m_pos;
-		lbp::Payload p = m_cmd_q.pop();
+	return (cmd & 0xF000) == lbp::cls_move;
+}
 
-		switch(p.cmd()) {
-		case lbp::cmd_home_xy:
-			target.x = 0;
-			target.y = 0;
-			break;
-		case lbp::cmd_home_z:
-			target.z = 0;
-			break;
-		case lbp::cmd_jog_to_x:
-		case lbp::cmd_cut_abs_x:
-		case lbp::cmd_travel_abs_x:
-			target.x = p.readIntArg() + m_job_origin.x;
-			break;
-		case lbp::cmd_jog_step_x:
-		case lbp::cmd_cut_rel_x:
-		case lbp::cmd_travel_rel_x:
-			target.x += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_y:
-		case lbp::cmd_cut_abs_y:
-		case lbp::cmd_travel_abs_y:
-			target.y = p.readIntArg() + m_job_origin.y;
-			break;
-		case lbp::cmd_jog_step_y:
-		case lbp::cmd_cut_rel_y:
-		case lbp::cmd_travel_rel_y:
-			target.y += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_z:
-		case lbp::cmd_cut_abs_z:
-		case lbp::cmd_travel_abs_z:
-			target.z = p.readIntArg();
-			break;
-		case lbp::cmd_jog_step_z:
-		case lbp::cmd_cut_rel_z:
-		case lbp::cmd_travel_rel_z:
-			target.z += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_u:
-		case lbp::cmd_cut_abs_u:
-		case lbp::cmd_travel_abs_u:
-			target.u = p.readIntArg();
-			break;
-		case lbp::cmd_jog_step_u:
-		case lbp::cmd_cut_rel_u:
-		case lbp::cmd_travel_rel_u:
-			target.u += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_xy:
-		case lbp::cmd_cut_abs_xy:
-		case lbp::cmd_travel_abs_xy:
-			target.x = p.readIntArg() + m_job_origin.x;
-			target.y = p.readIntArg() + m_job_origin.y;
-			break;
-		case lbp::cmd_jog_step_xy:
-		case lbp::cmd_cut_rel_xy:
-		case lbp::cmd_travel_rel_xy:
-			target.x += p.readIntArg();
-			target.y += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_xyz:
-		case lbp::cmd_cut_abs_xyz:
-		case lbp::cmd_travel_abs_xyz:
-			target.x = p.readIntArg() + m_job_origin.x;
-			target.y = p.readIntArg() + m_job_origin.y;
-			target.z = p.readIntArg();
-			break;
-		case lbp::cmd_jog_step_xyz:
-		case lbp::cmd_cut_rel_xyz:
-		case lbp::cmd_travel_rel_xyz:
-			target.x += p.readIntArg();
-			target.y += p.readIntArg();
-			target.z += p.readIntArg();
-			break;
-		case lbp::cmd_jog_to_xyzu:
-		case lbp::cmd_cut_abs_xyzu:
-		case lbp::cmd_travel_abs_xyzu:
-			target.x = p.readIntArg() + m_job_origin.x;
-			target.y = p.readIntArg() + m_job_origin.y;
-			target.z = p.readIntArg();
-			target.u = p.readIntArg();
-			break;
-		case lbp::cmd_jog_step_xyzu:
-		case lbp::cmd_cut_rel_xyzu:
-		case lbp::cmd_travel_rel_xyzu:
-			target.x += p.readIntArg();
-			target.y += p.readIntArg();
-			target.z += p.readIntArg();
-			target.u += p.readIntArg();
-			break;
+static bool isRelativeMove(uint16_t cmd)
+{
+	return isMoveCmd(cmd) && (cmd & lbp::flag_abs) == 0;
+}
+
+static bool isAbsoluteMove(uint16_t cmd)
+{
+	return isMoveCmd(cmd) && (cmd & lbp::flag_abs) == lbp::flag_abs;
+}
+
+bool MovementSim::decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta)
+{
+	const uint16_t cmd = p.cmd();
+	const bool home = ((cmd & 0xFF00) == lbp::move_home);
+	const bool abs = isAbsoluteMove(cmd);
+
+	if (cmd & ~(lbp::mask_axis | 0xFF00)) {
+		return false; // defensive
+	}
+	if (cmd & lbp::mask_axis & ~kSupportedAxes) {
+		return false; // a/b/c/v: can't decode
+	}
+	for (int i = 0; i < 4; ++i) {
+		if (!(cmd & kAxes[i].flag)) {
+			continue;
+		}
+
+		if (home) {
+			delta.*(kAxes[i].m) = homeDelta(i);
+			continue;
+		}
+		int32_t arg = 0;
+		if (!p.readArg(arg)) {
+			return false;
+		}
+		delta.*(kAxes[i].m) = abs ? absoluteDelta(i, arg) : relativeDelta(i, arg);
+	}
+	return true;
+}
+
+MovementSim::State MovementSim::takeNextCommand()
+{
+	refreshRotary();
+	lbp::CmdPayload p;
+	while (m_cmd_q.pop(p)) {
+		const uint16_t cmd = p.cmd();
+		if (isMoveCmd(cmd)) {
+			Vec4 delta;
+			if (!decodeMoveDelta(p, delta)) {
+				badPayload(p);
+				continue; // malformed: discard, try the next
+			}
+			if (!beginMove(delta)) {
+				continue; // nothing to move: consumed, try the next
+			}
+			return State::Moving;
+		}
+
+		switch (p.cmd()) {
 		case lbp::cmd_speed_x:
 		case lbp::cmd_speed_y:
 		case lbp::cmd_speed_xy:
-			m_target_vel_xy = p.readIntArg();
+			if (!p.readArg(m_target_vel_xy)) {
+				badPayload(p);
+			}
 			break;
 		case lbp::cmd_speed_z:
-			m_target_vel_z = p.readIntArg();
+			if (!p.readArg(m_target_vel_z)) {
+				badPayload(p);
+			}
 			break;
 		case lbp::cmd_speed_u:
-			m_target_vel_u = p.readIntArg();
+			if (!p.readArg(m_target_vel_u)) {
+				badPayload(p);
+			}
 			break;
 		case lbp::cmd_laser_enable: {
 			gLog().push(Log::DEBUG, "Laser enable");
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			if (!p.readArg(index)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
 				m_laser_1.enabled = true;
-			}
-			else if (index == 1) {
+			} else if (index == 1) {
 				m_laser_2.enabled = true;
 			}
 		} break;
 		case lbp::cmd_laser_disable: {
 			gLog().push(Log::DEBUG, "Laser disable");
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			if (!p.readArg(index)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
 				m_laser_1.enabled = false;
-			}
-			else if (index == 1) {
+			} else if (index == 1) {
 				m_laser_2.enabled = false;
 			}
 		} break;
 		case lbp::cmd_laser_on: {
 			gLog().push(Log::DEBUG, "Laser on");
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			if (!p.readArg(index)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
 				m_laser_1.on = true;
 			}
@@ -370,7 +376,11 @@ MovementSim::State MovementSim::updateTarget()
 		} break;
 		case lbp::cmd_laser_off: {
 			gLog().push(Log::DEBUG, "Laser off");
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			if (!p.readArg(index)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
 				m_laser_1.on = false;
 			}
@@ -379,38 +389,56 @@ MovementSim::State MovementSim::updateTarget()
 			}
 		} break;
 		case lbp::cmd_laser_power_min: {
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			int16_t power = 0;
+			if (!p.readArgs(index, power)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
-				m_laser_1.power_min = normalize(p.readShortArg());
+				m_laser_1.power_min = normalize(power);
 			}
 			else if (index == 1) {
-				m_laser_2.power_min = normalize(p.readShortArg());
+				m_laser_2.power_min = normalize(power);
 			}
 		} break;
 		case lbp::cmd_laser_power_max: {
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			int16_t power = 0;
+			if (!p.readArgs(index, power)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
-				m_laser_1.power_max = normalize(p.readShortArg());
+				m_laser_1.power_max = normalize(power);
 				// gLog().push(Log::INFO, QString("set power max 1: ") + QString::number(m_laser_1.power_max));
 				m_laser_1.clearRaster();
-			}
-			else if (index == 1) {
-				m_laser_2.power_max = normalize(p.readShortArg());
+			} else if (index == 1) {
+				m_laser_2.power_max = normalize(power);
 				// gLog().push(Log::INFO, QString("set power max 2: ") + QString::number(m_laser_1.power_max));
 				m_laser_2.clearRaster();
 			}
 		} break;
 		case lbp::cmd_laser_freq: {
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			int32_t freq = 0;
+			if (!p.readArgs(index, freq)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
-				m_laser_1.freq = p.readIntArg();
+				m_laser_1.freq = freq;
 			}
 			else if (index == 1) {
-				m_laser_2.freq = p.readIntArg();
+				m_laser_2.freq = freq;
 			}
 		} break;
 		case lbp::cmd_raster_power: {
-			uint8_t index = p.readByteArg();
+			uint8_t index = 0;
+			if (!p.readArg(index)) {
+				badPayload(p);
+				continue;
+			}
 			if (index == 0) {
 				m_laser_1.setRaster(p);
 			}
@@ -422,12 +450,23 @@ MovementSim::State MovementSim::updateTarget()
 			break; // TODO
 		case lbp::cmd_air_on:
 			break; // TODO
-		case lbp::cmd_dwell:
-			m_dwell_us = p.readIntArg() * 1'000; // argument is ms, convert to us
-			m_dwell_acc_us = 0;
-			return MovementSim::State::Dwelling;
-		case lbp::cmd_cut_from:
-			switch (p.readByteArg()) {
+		case lbp::cmd_dwell: {
+			uint32_t us = 0;
+			if (!p.readArg(us)) {
+				badPayload(p);
+				continue;
+			}
+			us = std::min(us, uint32_t(lbp::max_dwell));
+			m_dwell_remaining_s = double(us) / 1'000'000.0;
+			return State::Dwelling;
+		}
+		case lbp::cmd_cut_from: {
+			uint8_t code = 0;
+			if (!p.readArg(code)) {
+				badPayload(p);
+				continue;
+			}
+			switch (code) {
 			case lbp::cut_from_current_position:
 				m_job_origin.x = m_pos.x;
 				m_job_origin.y = m_pos.y;
@@ -444,6 +483,9 @@ MovementSim::State MovementSim::updateTarget()
 				m_job_origin.reset();
 				break;
 			}
+		} break;
+		case lbp::cmd_cut_type:
+			// TODO
 			break;
 		case lbp::cmd_job_header_begin:
 		case lbp::cmd_job_header_end:
@@ -451,26 +493,22 @@ MovementSim::State MovementSim::updateTarget()
 		case lbp::cmd_job_body_end:
 			break; // TODO
 		case lbp::cmd_frame_begin:
+			m_in_frame = true;
+			break;
 		case lbp::cmd_frame_end:
+			m_in_frame = false;
+			break;
 		case lbp::cmd_job_begin:
-			m_job_cmd = p.cmd();
+			m_in_job = true;
 			break;
 		case lbp::cmd_job_end:
-			m_job_cmd = p.cmd();
+			m_in_job = false;
+			m_job_ended = true;
 			m_job_origin.reset();
 			break;
 		default:
-			gLog().push(Log::ERROR, QString("unexpected queued move command %1").arg(p.cmd()));
+			gLog().push(Log::ERROR, QString("unexpected queued move command %1").arg(QString::number(p.cmd(), 16)));
 			break;
-		}
-		target = clamp(target, m_max_pos);
-		if (target != m_pos) {
-			m_vel = calcVelocity(target - m_pos, m_target_vel_xy);
-			m_target_pos = target;
-			m_start_pos = m_pos;
-			gLog().push(Log::DEBUG, QString("New Target:   %1").arg(toQString(m_target_pos)));
-			gLog().push(Log::DEBUG, QString("New Velocity: %1").arg(toQString(m_vel)));
-			return MovementSim::State::Moving;
 		}
 	}
 	return MovementSim::State::Idle;
@@ -478,15 +516,14 @@ MovementSim::State MovementSim::updateTarget()
 
 void MovementSim::stop()
 {
-	m_vel.reset();
-	m_target_pos = m_pos;
 	m_state = MovementSim::State::Idle;
-	while (!m_cmd_q.empty()) {
-		m_cmd_q.pop();
-	}
-	m_job_cmd = 0;
+	m_cmd_q.clear();
+	m_in_frame = false;
+	m_in_job = false;
+	m_job_ended = false;
 	m_laser_1.on = false;
 	m_laser_2.on = false;
+	m_dwell_remaining_s = 0.0;
 }
 
 void MovementSim::pause()
@@ -511,81 +548,97 @@ void MovementSim::resume()
 	}
 }
 
-void MovementSim::startJog(Vec4 dir)
+void MovementSim::beginJog(const Vec4 &d, int32_t target_vel)
 {
-	if (m_state != MovementSim::State::Idle) {
+	refreshRotary();
+	double norm = 0.0;
+	double speed = double(target_vel);
+	for (const AxisRef &a : kAxes) {
+		const double v = double(d.*(a.m));
+		norm += v * v;
+	}
+	norm = std::sqrt(norm);
+	if (norm <= 0.0 || speed <= 0.0) {
 		return;
 	}
-	m_vel = dir * m_target_vel_xy;
-	m_state = MovementSim::State::Jogging;
+
+	for (int i = 0; i < 4; ++i) {
+		m_jog.dir[i] = double(d.*(kAxes[i].m)) / norm;
+	}
+	m_jog.start = m_pos;
+	m_jog.traveled = 0.0;
+	m_jog.speed = speed;
+	m_state = State::Jogging;
 }
 
-void MovementSim::stopJog()
+void MovementSim::endJog()
 {
 	if (m_state == MovementSim::State::Jogging) {
-		stop();
+		m_state = MovementSim::State::Idle;
 	}
-}
-
-/** @return True if b is within a and c */
-static bool within(int64_t a, int64_t b, int64_t c)
-{
-	if (a < c) {
-		return a <= b && b <= c;
-	}
-	return c <= b && b <= a;
 }
 
 void MovementSim::step()
 {
-	int64_t elapsed = sim_step_us;
-	Vec4 prev_pos = m_pos;
-	Vec4 next_pos = clamp(m_pos + ((m_vel * elapsed) / 1'000'000), m_max_pos);
+	double budget_s = double(sim_step_us) / 1'000'000.0;
 
-	MovementSim::State next_state = m_state;
+	while (budget_s > 0.0) {
+		switch (m_state) {
+		case State::Idle:
+			m_state = takeNextCommand();          // renamed updateTarget
+			if (m_state == State::Idle) return;   // nothing to do; don't spin
+			continue;                             // re-enter with the new state, same budget
 
-	switch (m_state) {
-	case MovementSim::State::Idle:
-		next_state = updateTarget();
-		break;
-	case MovementSim::State::Jogging:
-		m_pos = next_pos;
-		break;
-	case MovementSim::State::Moving: {
-		if (within(prev_pos.x, m_target_pos.x, next_pos.x)) {
-			next_pos.x = m_target_pos.x;
+		case State::Moving: {
+			const double remaining = m_move.length - m_move.traveled;
+			const double step_dist = m_move.speed * budget_s;
+
+			if (step_dist < remaining) {
+				m_move.traveled += step_dist;
+				budget_s = 0.0;
+			} else {
+				m_move.traveled = m_move.length;
+				budget_s -= remaining / m_move.speed;   // carry the remainder forward
+			}
+
+			m_pos = applyLimits(advance(m_move.start, m_move.delta, m_move.progress()));
+
+			const float progress = float(m_move.progress());
+			m_laser_1.progressRaster(progress);
+			m_laser_2.progressRaster(progress);
+
+			if (m_move.done()) {
+				m_laser_1.clearRaster();
+				m_laser_2.clearRaster();
+				m_state = State::Idle;
+			}
+		} break;
+
+		case State::Jogging: {
+			m_jog.traveled += m_jog.speed * budget_s;
+			Vec4 p;
+			for (int i = 0; i < 4; ++i) {
+				p.*(kAxes[i].m) = m_jog.start.*(kAxes[i].m)
+								  + llround(m_jog.dir[i] * m_jog.traveled);
+			}
+			m_pos = applyLimits(p);
+			budget_s = 0.0;
+		} break;
+
+		case State::Dwelling:
+			if (m_dwell_remaining_s > budget_s) {
+				m_dwell_remaining_s -= budget_s;   // dwell outlasts this tick
+				budget_s = 0.0;
+			} else {
+				budget_s -= m_dwell_remaining_s;   // dwell ends mid-tick; carry the rest
+				m_dwell_remaining_s = 0.0;
+				m_state = State::Idle;             // loop re-enters, takes the next command
+			}
+			break;
+		case State::Paused:
+			return;
 		}
-		if (within(prev_pos.y, m_target_pos.y, next_pos.y)) {
-			next_pos.y = m_target_pos.y;
-		}
-		if (within(prev_pos.z, m_target_pos.z, next_pos.z)) {
-			next_pos.z = m_target_pos.z;
-		}
-		if (within(prev_pos.u, m_target_pos.u, next_pos.u)) {
-			next_pos.u = m_target_pos.u;
-		}
-		m_pos = next_pos;
-		float progress = getMoveProgress();
-		m_laser_1.progressRaster(progress);
-		m_laser_2.progressRaster(progress);
-		if (m_pos == m_target_pos) {
-			m_laser_1.clearRaster();
-			m_laser_2.clearRaster();
-			next_state = updateTarget();
-		} else {
-			m_vel = calcVelocity(m_target_pos - m_pos, m_target_vel_xy);
-		}
-	} break;
-	case MovementSim::State::Dwelling:
-		m_dwell_acc_us += sim_step_us;
-		if (m_dwell_acc_us > m_dwell_us) {
-			next_state = updateTarget();
-		}
-		break;
-	case MovementSim::State::Paused:
-		break;
 	}
-	m_state = next_state;
 }
 
 SimState MovementSim::getSimState() const
@@ -610,13 +663,7 @@ uint32_t MovementSim::getFwState(uint32_t state)
 		state &= ~lbp::state_moving;
 	}
 
-	if (m_job_cmd == lbp::cmd_job_begin) {
-		state |= lbp::state_executing_job;
-	} else {
-		state &= ~lbp::state_executing_job;
-	}
-
-	if (m_job_cmd == lbp::cmd_frame_begin) {
+	if (m_in_frame) {
 		state |= lbp::state_executing_frame;
 	} else {
 		state &= ~lbp::state_executing_frame;
@@ -631,18 +678,13 @@ uint32_t MovementSim::getFwState(uint32_t state)
 	return state;
 }
 
-float MovementSim::getMoveProgress() const
-{
-	double total = xydistance(m_target_pos, m_start_pos);
-	if (total < 1.0) {
-		return 1.0;
-	}
-	return static_cast<float>(xydistance(m_pos, m_start_pos) / total);
-}
-
 void LaserSettings::setRaster(lbp::CmdPayload &payload)
 {
 	if (payload.cmd() != lbp::cmd_raster_power) return;
+	if (payload.size() < 3) {
+		num_rasters = 0;
+		return;
+	}
 
 	num_rasters = (payload.size() - 3) >> 1;
 	//gLog().info(QString("set raster ") + QString::number(num_rasters));
@@ -652,10 +694,11 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 	}
 
 	// Assume index byte has already been read
+	int16_t power;
 	for (size_t i = 0; i < num_rasters; i++) {
-		float power = normalize(payload.readShortArg());
-		raster_powers[i] = power;
-		//gLog().info(QString("----- ") + QString::number(power));
+		if (payload.readArg(power)) {
+			raster_powers[i] = normalize(power);
+		}
 	}
 }
 
@@ -670,4 +713,120 @@ void LaserSettings::progressRaster(float progress)
 void LaserSettings::clearRaster()
 {
 	num_rasters = 0;
+}
+
+void MovementSim::refreshRotary()
+{
+	m_rotary_axis = -1;
+	int32_t enabled = 0;
+	if (!m_config.get(lbp::cfg_rotary_enable, enabled) || !enabled) return;
+
+	int32_t axis = -1;
+	if (!m_config.get(lbp::cfg_rotary_axis, axis)) return;
+	for (int i = 0; i < 4; ++i) {
+		if (axis == kAxes[i].index) {
+			m_rotary_axis = i;
+			return;
+		}
+	}
+}
+
+int64_t MovementSim::relativeDelta(int idx, int64_t arg) const
+{
+	if (idx == m_rotary_axis) return arg; // no clamping for rotary deltas
+	const int64_t curr = m_pos.*(kAxes[idx].m);
+	const int64_t limit = m_max_pos.*(kAxes[idx].m);
+	return clampTo(curr + arg, limit) - curr;
+}
+
+int64_t MovementSim::absoluteDelta(int idx, int64_t arg) const
+{
+	const int64_t curr   = m_pos.*(kAxes[idx].m);
+	const int64_t limit  = m_max_pos.*(kAxes[idx].m);
+	const int64_t target = arg + m_job_origin.*(kAxes[idx].m);
+	const int64_t capped = clampTo(target, limit);
+	if (capped != target) {
+		gLog().push(Log::WARNING, QString("absolute target %1 on axis %2 clamped to %3")
+			.arg(target).arg(idx).arg(capped));
+	}
+	return capped - curr;
+}
+
+int64_t MovementSim::homeDelta(int idx) const
+{
+	if (idx == m_rotary_axis) {
+		return 0; // rotary has no machine zero to seek
+	}
+	return -(m_pos.*(kAxes[idx].m));
+}
+
+Vec4 MovementSim::applyLimits(const Vec4 &vec) const
+{
+    Vec4 result;
+    for (int i = 0; i < 4; ++i) {
+        const int64_t v = vec.*(kAxes[i].m);
+        const int64_t limit = m_max_pos.*(kAxes[i].m);
+        result.*(kAxes[i].m) = (i == m_rotary_axis) ? wrapTo(v, limit) : clampTo(v, limit);
+    }
+	return result;
+}
+
+bool MovementSim::beginMove(const Vec4 &delta)
+{
+	double length = 0.0, speed = 0.0;
+	if (!pacingFor(delta, length, speed)) return false;
+
+	m_move.start    = m_pos;
+	m_move.delta    = delta;
+	m_move.length   = length;
+	m_move.speed    = speed;
+	m_move.traveled = 0.0;
+	return true;
+}
+
+/**
+ * @brief Choose the path metric and rate for a move.
+ *
+ * Feed rate applies to the XY path when there is any XY motion; Z and U are
+ * carried along and arrive with it. A move with no XY component is paced by
+ * whichever remaining group is moving, at that group's commanded rate.
+ *
+ * @param length Out: path distance the rate applies to, in um.
+ * @param speed  Out: path rate, in um/s.
+ * @return False if the move has no motion or no rate is set, in which case
+ *         length and speed are unchanged.
+ */
+bool MovementSim::pacingFor(const Vec4 &delta, double &length, double &speed) const
+{
+	const double xy = std::hypot(double(delta.x), double(delta.y));
+	if (xy > 0.0) {
+		length = xy;
+		speed  = double(m_target_vel_xy);
+	} else if (delta.z != 0) {
+		length = std::abs(double(delta.z));
+		speed  = double(m_target_vel_z);
+	} else if (delta.u != 0) {
+		length = std::abs(double(delta.u));
+		speed  = double(m_target_vel_u);
+	} else {
+		return false;   // no motion
+	}
+
+	if (speed <= 0.0) {
+		gLog().push(Log::WARNING, "move requested with no feed rate set");
+		return false;
+	}
+	return true;
+}
+
+bool MovementSim::takeJobEnded()
+{
+	const bool f = m_job_ended;
+	m_job_ended = false;
+	return f;
+}
+
+bool MovementSim::isIdle() const
+{
+	return m_state == State::Idle && m_cmd_q.empty();
 }

@@ -61,6 +61,8 @@ MainWindow::MainWindow(QWidget *parent)
 	m_worker = new SimWorker;
 	m_worker->moveToThread(&m_thread);
 
+	connect(this, &MainWindow::startTransportRequested, m_worker, &SimWorker::onStartTransportRequested);
+	connect(this, &MainWindow::stopTransportRequested, m_worker, &SimWorker::onStopTransportRequested);
 	connect(&m_thread, &QThread::started, m_worker, &SimWorker::init);
 	connect(&m_thread, &QThread::finished, m_worker, &SimWorker::deleteLater);
 	m_thread.start();
@@ -137,10 +139,10 @@ void MainWindow::onClearClicked()
 
 void MainWindow::onStopTransportClicked()
 {
-	emit m_worker->stopTransportRequested();
+	emit stopTransportRequested();
 }
 
 void MainWindow::onStartTransportClicked()
 {
-	emit m_worker->startTransportRequested(wTransport->config());
+	emit startTransportRequested(wTransport->config());
 }

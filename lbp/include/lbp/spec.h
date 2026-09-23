@@ -10,8 +10,11 @@
 
 namespace lbp {
 
+//header of every message
+constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+
 //sizes of message components
-constexpr uint8_t size_start = 4; // 4 bytes for start header
+constexpr uint8_t size_start = sizeof(cmd_start); // 4 bytes for start header
 constexpr uint8_t size_len = 2; // 2 bytes to store payload size
 constexpr uint8_t size_crc = 2; // 2 bytes to store crc16 at end of message
 constexpr uint8_t size_cmd = 2; // 2 bytes for the lbp command code.
@@ -30,8 +33,8 @@ constexpr int size_file_msg = 512; // total size of a file message.
 constexpr int size_file_payload = size_file_msg - size_header_footer; // size of a file payload.
 constexpr int size_file_chunk = size_file_msg - size_header_footer - size_cmd; // length of the actual file segment sent in a cmd_file_chunk message.
 
-//header of every message
-constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+static_assert(size_min_payload >= size_cmd, "Minimum payload is a command.");
+
 
 // LBP command codes are broken into 16 headings.
 // The most significant nibble (four bits) represents the broad command category.
@@ -61,7 +64,6 @@ constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon"
 // 0xD000 - Reserved: Vender-specific Configuration
 // 0xE000 - Reserved: Extended Future Capabilities
 // 0xF000 - Unused
-//
 
 // NOTE: Only values that begin with the prefix `cmd_` or `cfg_` are valid commands. All other values
 // defined in this header are either partial values used to construct commands codes,
@@ -603,6 +605,17 @@ constexpr uint16_t cfg_v_step_length		= axis_index_v | axis_step_length;
 constexpr uint16_t cfg_user_origin_x = cls_cfg | 0x0060 | axis_index_x;
 constexpr uint16_t cfg_user_origin_y = cls_cfg | 0x0060 | axis_index_y;
 
+// Configuration - Feeder
+constexpr uint16_t cfg_feed_pre_delay	= cls_cfg | 0x0218; // milliseconds
+constexpr uint16_t cfg_feed_post_delay	= cls_cfg | 0x0219; // milliseconds
+constexpr uint16_t cfg_feed_backlash	= cls_cfg | 0x021A; // micrometers
+
+// Configurables - Rotary
+constexpr uint16_t cfg_rotary_axis = cls_cfg | 0x020A; // argument: axis index
+constexpr uint16_t cfg_rotary_enable = cls_cfg | 0x0201; // rotary enable = 0 or 1
+constexpr uint16_t cfg_rotary_pulses_per_rotation = cls_cfg | 0x0202; // steps * 1000
+constexpr uint16_t cfg_rotary_diameter = cls_cfg | 0x0203; // micrometers
+
 constexpr uint16_t cfg_head_dist = cls_cfg | 0x001E;
 
 constexpr uint16_t cfg_laser1_freq		= cls_cfg | 0x0111; // hz (20000)
@@ -620,15 +633,15 @@ constexpr uint16_t cfg_laser2_preig_pct	= cls_cfg | 0x0152;  // percent * 10
 constexpr uint16_t cfg_laser2_type 		= cls_cfg | 0x0162; // TODO
 
 // Configurables - cut:
-constexpr uint16_t cfg_idle_speed		= cls_cfg | 0x0201; // micrometers/sec
-constexpr uint16_t cfg_idle_acc			= cls_cfg | 0x0202; // micrometers/sec^2
-constexpr uint16_t cfg_idle_delay		= cls_cfg | 0x0203; // microseconds
-constexpr uint16_t cfg_start_speed		= cls_cfg | 0x0204; // micrometers/sec
-constexpr uint16_t cfg_min_acc			= cls_cfg | 0x0205; // micrometers/sec^2
-constexpr uint16_t cfg_max_acc			= cls_cfg | 0x0206; // micrometers/sec^2
-constexpr uint16_t cfg_acc_factor_pct	= cls_cfg | 0x0207; // percent
-constexpr uint16_t cfg_G0_acc_factor_pct = cls_cfg | 0x0208; // percent
-constexpr uint16_t cfg_speed_factor_pct = cls_cfg | 0x0209; // percent
+constexpr uint16_t cfg_idle_speed		= cls_cfg | 0x0501; // micrometers/sec
+constexpr uint16_t cfg_idle_acc			= cls_cfg | 0x0502; // micrometers/sec^2
+constexpr uint16_t cfg_idle_delay		= cls_cfg | 0x0503; // microseconds
+constexpr uint16_t cfg_start_speed		= cls_cfg | 0x0504; // micrometers/sec
+constexpr uint16_t cfg_min_acc			= cls_cfg | 0x0505; // micrometers/sec^2
+constexpr uint16_t cfg_max_acc			= cls_cfg | 0x0506; // micrometers/sec^2
+constexpr uint16_t cfg_acc_factor_pct	= cls_cfg | 0x0507; // percent
+constexpr uint16_t cfg_G0_acc_factor_pct = cls_cfg | 0x0508; // percent
+constexpr uint16_t cfg_speed_factor_pct = cls_cfg | 0x0509; // percent
 
 // Configurables - engrave:
 constexpr uint16_t cfg_engrave_x_start_speed = cls_cfg | 0x0E50 | axis_index_x;
@@ -641,8 +654,8 @@ constexpr uint16_t cfg_facula_size_pct		= cls_cfg | 0x0E02; // precent*10.0
 constexpr uint16_t cfg_engrave_factor_pct	= cls_cfg | 0x0E03; // percent
 
 // Configurables - Homing
-constexpr uint16_t cfg_xy_home_speed = cls_cfg | 0x0B10 | axis_index_xy;
-constexpr uint16_t cfg_z_home_speed = cls_cfg | 0x0B0 | axis_index_z;
+constexpr uint16_t cfg_xy_home_speed = cls_cfg | 0x0BC0 | axis_index_xy;
+constexpr uint16_t cfg_z_home_speed = cls_cfg | 0x0BC0 | axis_index_z;
 constexpr uint16_t cfg_z_work_speed = cls_cfg | 0x0BD0 | axis_index_z;
 constexpr uint16_t cfg_u_home_speed = cls_cfg | 0x0BC0 | axis_index_u;
 constexpr uint16_t cfg_u_work_speed = cls_cfg | 0x0BD0 | axis_index_u;
@@ -658,16 +671,6 @@ constexpr uint16_t cfg_reset_delay		= cls_cfg | 0x0213; // milliseconds
 constexpr uint16_t cfg_status_on_delay	= cls_cfg | 0x0214; // milliseconds
 constexpr uint16_t cfg_status_off_delay	= cls_cfg | 0x0215; // milliseconds
 constexpr uint16_t cfg_finish_delay 	= cls_cfg | 0x0216; // milliseconds
-
-// Configuration - Feeder
-constexpr uint16_t cfg_feed_pre_delay	= cls_cfg | 0x0218; // milliseconds
-constexpr uint16_t cfg_feed_post_delay	= cls_cfg | 0x0219; // milliseconds
-constexpr uint16_t cfg_feed_backlash	= cls_cfg | 0x021A; // micrometers
-
-// Configurables - Rotary
-constexpr uint16_t cfg_rotary_enable = cls_cfg | 0x0221; // rotary enable = 0 or 1
-constexpr uint16_t cfg_rotary_pulses_per_rotation = cls_cfg | 0x0222; // steps * 1000
-constexpr uint16_t cfg_rotary_diameter = cls_cfg | 0x0223; // micrometers
 
 constexpr uint16_t cfg_wireless_panel_fast = cls_cfg | 0x0224; // micrometers/sec
 constexpr uint16_t cfg_wireless_panel_slow = cls_cfg | 0x0225; // micrometers/sec

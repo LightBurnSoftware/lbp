@@ -26,6 +26,7 @@ public:
 
 signals:
 	void startTransportRequested(Transport::Config config);
+	void stopTransportRequested();
 
 protected:
 	void timerEvent(QTimerEvent *event) override;

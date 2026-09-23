@@ -46,12 +46,23 @@ public:
 
 	void setTxCallback(TxCallback cb) { m_tx_callback = cb; }
 
+	/** Stop all movement, file operations, and queued commands. */
+	void stop();
+
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
 
 	/** Send queued output messages to transport. */
 	void tx();
+
+	/** Keep the movement queue fed from the job file while a job is executing. */
+	void pumpJob();
+	void beginJob();
+	void endJob();
+	void checkJobComplete();
+
+	void updateFwState();
 
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
 	Configuration m_config; // Manages reading, writing, and storing config values.

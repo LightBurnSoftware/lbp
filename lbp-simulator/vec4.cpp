@@ -64,20 +64,3 @@ void Vec4::reset()
 	z = 0;
 	u = 0;
 }
-
-static int64_t clamp(int64_t lower, int64_t value, int64_t upper)
-{
-	value = value > upper ? upper : value;
-	value = value < lower ? lower : value;
-	return value;
-}
-
-Vec4 clamp(const Vec4 &vec, const Vec4 &limit)
-{
-	Vec4 result;
-	result.x = clamp(0, vec.x, limit.x);
-	result.y = clamp(0, vec.y, limit.y);
-	result.z = clamp(0, vec.z, limit.z);
-	result.u = clamp(0, vec.u, limit.u);
-	return result;
-}

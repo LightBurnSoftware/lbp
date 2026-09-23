@@ -30,10 +30,6 @@ public:
 	 */
 	void getSimPoints(std::vector<SimState> &out);
 
-signals:
-	void startTransportRequested(Transport::Config config);
-	void stopTransportRequested();
-
 public slots:
 	/** Connect signals and kick off operations. */
 	void init();

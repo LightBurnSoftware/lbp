@@ -42,14 +42,19 @@ public:
 	/** Rewind the current filebuffer and parser */
 	void reset();
 
-	/** Feed the parser with data from the filebuffer. */
-	void feedParser();
+	/**
+	 * @brief Feed the parser with data from the filebuffer.
+	 * @return the number of bytes fed from the filebuffer into the parser.
+	 */
+	size_t feedParser();
 
 	/** @return The parser that is loaded with file data. */
 	FileParser &parser();
 
-	void startReading();
+	/** @return True if a file was successfully opened and reading begun. */
+	bool startReading();
 	void stopReading();
+	bool isReading() const;
 
 private:
 	enum class State { Idle, Receiving, Reading };

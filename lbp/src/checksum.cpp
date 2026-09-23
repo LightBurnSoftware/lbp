@@ -1,6 +1,8 @@
 #include <lbp/checksum.h>
 
-uint16_t crc16(const uint8_t *data_p, uint16_t len)
+namespace lbp {
+
+uint16_t crc16(const uint8_t *data_p, size_t len)
 {
 	static constexpr uint16_t POLY = 0x8408;
 	uint8_t i;
@@ -26,3 +28,4 @@ uint16_t crc16(const uint8_t *data_p, uint16_t len)
 
 	return (crc);
 }
+} // namespace lbp
