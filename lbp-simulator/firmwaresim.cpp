@@ -24,16 +24,21 @@ FirmwareSim::FirmwareSim()
 
 void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 {
-	const size_t fed = m_parser.feed(bytes, len);
+	size_t offset = 0;
+	while (offset < len) {
+		const size_t fed = m_parser.feed(bytes + offset, len - offset);
+		offset += fed;
 
-	if (fed < len) {
-		gLog().warning(QString("rx: could only feed %1 of %2 to parser").arg(fed).arg(len));
+		// Drain what we just fed, freeing space for the next pass.
+		while (m_parser.parseNext()) {
+			process(m_parser.payload());
+		}
+
+		if (fed == 0) {
+			gLog().error("rx: parser cannot consume, dropping remaining bytes");
+			break;
+		}
 	}
-
-	while (m_parser.parseNext()) {
-		process(m_parser.payload());
-	}
-
 	tx();
 }
 
@@ -64,9 +69,13 @@ void FirmwareSim::pumpJob()
 
 	while (m_movement.canEnqueue()) {
 		if (fparser.parseNext()) {
-			m_movement.process(fparser.payload(), m_out_q);
+			m_movement.process(fparser.payload(), m_out_q, CmdSource::Wire);
 		} else if (m_filesystem.feedParser() == 0) {
-			break;   // file exhausted
+			gLog().warning(QString("pumpJob stalled: reading=%1 idle=%2 parserFree=%3")
+							   .arg(m_filesystem.isReading())
+							   .arg(m_movement.isIdle())
+							   .arg(fparser.freeSpace()));
+			break;
 		}
 	}
 }
@@ -81,13 +90,6 @@ void FirmwareSim::updateFwState()
 	}
 }
 
-/**
- * @brief Decide whether the running job has finished, and end it if so.
- *
- * Normal completion is cmd_job_end retiring from the movement queue: because
- * that queue is FIFO, everything the job issued has executed by then. The
- * fallback covers a truncated or malformed file with no terminator.
- */
 void FirmwareSim::checkJobComplete()
 {
 	if (m_movement.takeJobEnded()) {
@@ -139,7 +141,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	if (m_config.process(payload, m_out_q)) {
 		return true;
 	}
-	if (m_movement.process(payload, m_out_q)) {
+	if (m_movement.process(payload, m_out_q, CmdSource::Wire)) {
 		return true;
 	}
 

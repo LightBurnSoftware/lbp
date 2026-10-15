@@ -11,6 +11,8 @@
 
 #include <functional>
 
+#include "log.h"
+
 SimWorker::SimWorker() : QObject(nullptr)
 {
 	// Empty
@@ -30,11 +32,18 @@ SimWorker::~SimWorker()
 
 void SimWorker::timerEvent(QTimerEvent *event)
 {
+	static constexpr qint64 kMaxStepsPerTick = 64;
+
 	const qint64 curr_ns = m_sim_timer.nsecsElapsed();
 
 	m_acc_ns += (curr_ns - m_last_ns);
 
 	qint64 steps = m_acc_ns / sim_step_ns;
+
+	if (steps > kMaxStepsPerTick) {
+		gLog().warning(QString("sim behind: %1 steps").arg(steps - kMaxStepsPerTick));
+		steps = kMaxStepsPerTick;
+	}
 
 	m_acc_ns -= steps * sim_step_ns;
 

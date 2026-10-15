@@ -27,7 +27,7 @@ public:
 	size_t available() const { return m_head - m_tail; }
 
 	/** @return the number of bytes available to be written. */
-	size_t freeSpace() const { return Capacity - reserved(); }
+	size_t freeSpace() const { return Capacity - (m_head - reserved()); }
 
 	/**
 	 * @brief Read data from the buffer.

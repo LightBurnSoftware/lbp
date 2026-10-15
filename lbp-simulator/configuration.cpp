@@ -104,7 +104,7 @@ bool Configuration::get(uint16_t key, int32_t &value) const
 	return true;
 }
 
-static constexpr uint16_t cgf_codes[157] = {
+static constexpr uint16_t cgf_codes[] = {
 	cfg_x_settings,
 	cfg_x_unit,
 	cfg_x_size,

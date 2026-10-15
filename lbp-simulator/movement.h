@@ -76,9 +76,10 @@ public:
 	 *
 	 * @param request The request to process.
 	 * @param out_q Storage for resulting output packets.
+	 * @param source identies the source of the command to be processed.
 	 * @return True if the  was able to process the request, false otherwise.
 	 */
-	bool process(lbp::MaxPayload &request, OutputQueue &out_q);
+	bool process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source);
 
 	/** @brief Update the simulated position and laser state by a constant time step.  */
 	void step();

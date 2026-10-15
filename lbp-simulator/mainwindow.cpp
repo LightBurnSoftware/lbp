@@ -92,7 +92,7 @@ void MainWindow::timerEvent(QTimerEvent *event)
 	wSimView->tick();
 	while (gLog().hasEntry()) {
 		Log::Entry entry = gLog().pop();
-		if (entry.level < Log::INFO) {
+		if (entry.level < Log::DEBUG) {
 			continue;
 		}
 		switch (entry.level) {

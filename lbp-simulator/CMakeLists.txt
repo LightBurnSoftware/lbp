@@ -13,6 +13,7 @@ qt_add_executable(lbp-simulator
 
     transport.h
     tcptransport.h tcptransport.cpp
+    serialtransport.h serialtransport.cpp
 
     simview.h simview.cpp
     log.h log.cpp
@@ -24,10 +25,8 @@ qt_add_executable(lbp-simulator
     simstate.h
     vec4.h vec4.cpp
     filesystem.h filesystem.cpp
-    simutils.h
+    simutils.h simutils.cpp
     transportwidget.h transportwidget.cpp
-    serialtransport.h serialtransport.cpp
-    simutils.cpp
 )
 
 add_subdirectory(../lbp build)

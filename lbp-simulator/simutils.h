@@ -7,6 +7,9 @@
 #include <lbp/parser.h>
 #include <lbp/queue.h>
 
+/** Identifies if a command comes from a job file or transport. */
+enum class CmdSource { File, Wire };
+
 using CmdQueue = lbp::Queue<lbp::CmdPayload, 512>;
 using WireParser = lbp::Parser<4096>;
 using FileParser = lbp::Parser<4096>;

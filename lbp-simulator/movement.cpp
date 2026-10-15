@@ -35,6 +35,7 @@ struct AxisRef
 	uint16_t index; // config ordinal: axis_index_x, axis_index_y, ...
 	int64_t Vec4::*m;
 };
+
 static constexpr AxisRef kAxes[] = {
 	{lbp::axis_x, lbp::axis_index_x, &Vec4::x},
 	{lbp::axis_y, lbp::axis_index_y, &Vec4::y},
@@ -61,7 +62,7 @@ MovementSim::MovementSim(Configuration &config)
 	// Empty
 }
 
-bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
+bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source)
 {
 	const uint16_t cmd = request.cmd();
 
@@ -245,7 +246,9 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		if (!m_cmd_q.push(toCmd(request))) {
 			gLog().error("Move command queue full");
 		}
-		out_q.push(lbp::CmdMsg(cmd));
+		if (source == CmdSource::Wire) {
+			out_q.push(lbp::CmdMsg(cmd));
+		}
 		return true;
 	default:
 		break;
@@ -304,6 +307,7 @@ MovementSim::State MovementSim::takeNextCommand()
 	lbp::CmdPayload p;
 	while (m_cmd_q.pop(p)) {
 		const uint16_t cmd = p.cmd();
+		gLog().debug(QString("Popped a command: %1 of %2").arg(cmd).arg(m_cmd_q.size()));
 		if (isMoveCmd(cmd)) {
 			Vec4 delta;
 			if (!decodeMoveDelta(p, delta)) {
