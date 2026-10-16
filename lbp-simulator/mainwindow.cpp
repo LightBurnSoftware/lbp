@@ -14,6 +14,8 @@
 #define MAX_SERVER_CONSOLE_LINES 512
 #define MAX_SIM_CONSOLE_LINES 512
 
+static constexpr Log::Level kLogFilter = Log::INFO;
+
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
 	, wTransport(new TransportWidget(this))
@@ -92,7 +94,7 @@ void MainWindow::timerEvent(QTimerEvent *event)
 	wSimView->tick();
 	while (gLog().hasEntry()) {
 		Log::Entry entry = gLog().pop();
-		if (entry.level < Log::DEBUG) {
+		if (entry.level < kLogFilter) {
 			continue;
 		}
 		switch (entry.level) {

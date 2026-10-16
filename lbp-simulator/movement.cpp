@@ -307,7 +307,7 @@ MovementSim::State MovementSim::takeNextCommand()
 	lbp::CmdPayload p;
 	while (m_cmd_q.pop(p)) {
 		const uint16_t cmd = p.cmd();
-		gLog().debug(QString("Popped a command: %1 of %2").arg(cmd).arg(m_cmd_q.size()));
+		gLog().debug(QString("Dequeued a command: %1 of %2").arg(cmd).arg(m_cmd_q.size()));
 		if (isMoveCmd(cmd)) {
 			Vec4 delta;
 			if (!decodeMoveDelta(p, delta)) {

@@ -98,6 +98,7 @@ public:
 					} else {
 						// Reject messages with invalid checksum.
 						checksum_rejections += 1;
+						m_header = 0;
 						m_buffer.rewind();
 					}
 				} else {

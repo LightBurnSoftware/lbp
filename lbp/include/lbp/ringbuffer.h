@@ -15,6 +15,8 @@ namespace lbp {
  * @brief A simple Ring Buffer designed to be used by a single producer and a single consumer on the same thread.
  *
  * Templated by total capacity, which MUST be a power of two.
+ * The queue is designed to be consumed by a message parser, and thus has the ability to
+ * "rewind" in the case of a misaligned message.
  */
 template <size_t Capacity>
 class RingBuffer
