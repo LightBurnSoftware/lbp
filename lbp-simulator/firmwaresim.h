@@ -31,15 +31,19 @@ public:
 	FirmwareSim();
 
 	/**
-	 * @brief Step the firmware by a pre-defined timestep.
+	 * @brief Advance the firmware by one iteration of dt_ns simulated time.
 	 *
-	 * This function will also send resulting output messages,
-	 * as well as process job messages streamed from memory
-	 * if a job is in progress.
+	 * Feeds job messages streamed from memory (if a job is in progress),
+	 * advances the movement simulation, and sends resulting output messages.
 	 *
+	 * Any dt is exact for motion, but the job queue is only refilled once per
+	 * call, so callers should keep dt small to avoid the
+	 * movement queue running dry mid-step.
+	 *
+	 * @param dt_ns Simulated time to advance, in nanoseconds.
 	 * @return A structure containing useful simulated machine state.
 	 */
-	SimState step();
+	SimState step(int64_t dt_ns);
 
 	/** @brief Called when bytes are available to be read from transport. */
 	void rxCallback(const uint8_t *bytes, size_t len);

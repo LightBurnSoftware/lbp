@@ -582,9 +582,9 @@ void MovementSim::endJog()
 	}
 }
 
-void MovementSim::step()
+void MovementSim::step(double dt_s)
 {
-	double budget_s = double(sim_step_us) / 1'000'000.0;
+	double budget_s = dt_s;
 
 	while (budget_s > 0.0) {
 		switch (m_state) {
@@ -709,7 +709,9 @@ void LaserSettings::setRaster(lbp::CmdPayload &payload)
 void LaserSettings::progressRaster(float progress)
 {
 	if (num_rasters > 0) {
-		power_max = raster_powers[(size_t) (progress * (num_rasters - 1))];
+		// Each of the N rasters covers an equal 1/N share of the move.
+		const size_t i = std::min(num_rasters - 1, (size_t) (progress * num_rasters));
+		power_max = raster_powers[i];
 		//gLog().info("..." + QString::number(progress) + "..." + QString::number(power_max));
 	}
 }

@@ -14,8 +14,10 @@ using CmdQueue = lbp::Queue<lbp::CmdPayload, 512>;
 using WireParser = lbp::Parser<4096>;
 using FileParser = lbp::Parser<4096>;
 
+/** Firmware simulation step resolution. Impacts maximum resolution of visualization.*/
 constexpr int64_t sim_step_us = 500;
 constexpr int64_t sim_step_ns = sim_step_us * 1'000;
+constexpr int64_t sim_max_tick_ns = 50'000'000; // elapsed time beyond this in one tick is dropped (sleep, App Nap, debugger)
 
 void badPayload(const lbp::CmdPayload &p);
 

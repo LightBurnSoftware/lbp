@@ -81,8 +81,8 @@ public:
 	 */
 	bool process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source);
 
-	/** @brief Update the simulated position and laser state by a constant time step.  */
-	void step();
+	/** @brief Advance position and laser state by dt_s seconds. Exact for any dt (moves are interpolated). */
+	void step(double dt_s);
 
 	/** @brief stop all movement and cutting and clear the command queue. */
 	void stop();

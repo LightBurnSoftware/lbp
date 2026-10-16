@@ -42,10 +42,10 @@ void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 	tx();
 }
 
-SimState FirmwareSim::step()
+SimState FirmwareSim::step(int64_t dt_ns)
 {
 	pumpJob(); // no-op unless a job is executing.
-	m_movement.step(); // step movement simulation.
+	m_movement.step(double(dt_ns) / 1e9); // step movement simulation.
 	updateFwState();
 	tx(); // send output packets.
 	return m_movement.getSimState();
@@ -71,10 +71,6 @@ void FirmwareSim::pumpJob()
 		if (fparser.parseNext()) {
 			m_movement.process(fparser.payload(), m_out_q, CmdSource::Wire);
 		} else if (m_filesystem.feedParser() == 0) {
-			gLog().warning(QString("pumpJob stalled: reading=%1 idle=%2 parserFree=%3")
-							   .arg(m_filesystem.isReading())
-							   .arg(m_movement.isIdle())
-							   .arg(fparser.freeSpace()));
 			break;
 		}
 	}

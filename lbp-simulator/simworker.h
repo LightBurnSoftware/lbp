@@ -57,5 +57,4 @@ private:
 	QMutex m_lock;
 	QElapsedTimer m_sim_timer;
 	qint64 m_last_ns = 0;
-	qint64 m_acc_ns = 0;
 };
