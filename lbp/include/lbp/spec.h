@@ -611,10 +611,10 @@ constexpr uint16_t cfg_feed_post_delay	= cls_cfg | 0x0219; // milliseconds
 constexpr uint16_t cfg_feed_backlash	= cls_cfg | 0x021A; // micrometers
 
 // Configurables - Rotary
-constexpr uint16_t cfg_rotary_axis = cls_cfg | 0x020A; // argument: axis index
-constexpr uint16_t cfg_rotary_enable = cls_cfg | 0x0201; // rotary enable = 0 or 1
-constexpr uint16_t cfg_rotary_pulses_per_rotation = cls_cfg | 0x0202; // steps * 1000
-constexpr uint16_t cfg_rotary_diameter = cls_cfg | 0x0203; // micrometers
+constexpr uint16_t cfg_rotary_axis = cls_cfg | 0x022A;				  // argument: axis index
+constexpr uint16_t cfg_rotary_enable = cls_cfg | 0x0221;			  // rotary enable = 0 or 1
+constexpr uint16_t cfg_rotary_pulses_per_rotation = cls_cfg | 0x0222; // steps * 1000
+constexpr uint16_t cfg_rotary_diameter = cls_cfg | 0x0223;			  // micrometers
 
 constexpr uint16_t cfg_head_dist = cls_cfg | 0x001E;
 
