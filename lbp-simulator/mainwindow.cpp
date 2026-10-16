@@ -4,8 +4,6 @@
 #include "mainwindow.h"
 
 #include "log.h"
-#include "serialtransport.h"
-#include "tcptransport.h"
 
 #include <QDebug>
 #include <QHBoxLayout>
@@ -16,6 +14,8 @@
 #define MAX_SERVER_CONSOLE_LINES 512
 #define MAX_SIM_CONSOLE_LINES 512
 
+static constexpr Log::Level kLogFilter = Log::INFO;
+
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
 	, wTransport(new TransportWidget(this))
@@ -24,14 +24,13 @@ MainWindow::MainWindow(QWidget *parent)
 	, pbStart(new QPushButton("Start", this))
 	, pbStop(new QPushButton("Stop", this))
 	, pbClearSim(new QPushButton("Clear Sim View", this))
-	, m_sim()
-	, m_sim_timer()
 {
+	// Widget setup
 	assert(centralWidget() == nullptr);
 
 	connect(pbClearSim, &QPushButton::clicked, this, &MainWindow::onClearClicked);
-	connect(pbStop, &QPushButton::clicked, this, &MainWindow::stopTransport);
-	connect(pbStart, &QPushButton::clicked, this, &MainWindow::startTransport);
+	connect(pbStop, &QPushButton::clicked, this, &MainWindow::onStopTransportClicked);
+	connect(pbStart, &QPushButton::clicked, this, &MainWindow::onStartTransportClicked);
 
 	wSimConsole->setReadOnly(true);
 	wSimConsole->document()->setMaximumBlockCount(MAX_SERVER_CONSOLE_LINES);
@@ -58,15 +57,25 @@ MainWindow::MainWindow(QWidget *parent)
 	grid->setColumnStretch(1, 1);
 	setCentralWidget(centralWidget);
 
-	m_sim_timer.start();
-	startTimer(5);
+	// Logic setup
+	qRegisterMetaType<Transport::Config>();
+
+	m_worker = new SimWorker;
+	m_worker->moveToThread(&m_thread);
+
+	connect(this, &MainWindow::startTransportRequested, m_worker, &SimWorker::onStartTransportRequested);
+	connect(this, &MainWindow::stopTransportRequested, m_worker, &SimWorker::onStopTransportRequested);
+	connect(&m_thread, &QThread::started, m_worker, &SimWorker::init);
+	connect(&m_thread, &QThread::finished, m_worker, &SimWorker::deleteLater);
+	m_thread.start();
+
+	startTimer(20);
 }
 
 MainWindow::~MainWindow()
 {
-	if (m_transport) {
-		m_transport->stop();
-	}
+	m_thread.quit();
+	m_thread.wait();
 }
 
 QSize MainWindow::sizeHint() const
@@ -76,13 +85,16 @@ QSize MainWindow::sizeHint() const
 
 void MainWindow::timerEvent(QTimerEvent *event)
 {
-	int elapsed = m_sim_timer.restart();
-	SimState state = m_sim.loop(elapsed);
-	wSimView->tick(state);
+	m_points.clear();
+	m_worker->getSimPoints(m_points);
+	for (const SimState &point : m_points) {
+		wSimView->heat(point);
+	}
 
+	wSimView->tick();
 	while (gLog().hasEntry()) {
 		Log::Entry entry = gLog().pop();
-		if (entry.level < Log::INFO) {
+		if (entry.level < kLogFilter) {
 			continue;
 		}
 		switch (entry.level) {
@@ -108,10 +120,10 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 {
 	switch (event->key()) {
 	case Qt::Key_S:
-		startTransport();
+		onStartTransportClicked();
 		break;
 	case Qt::Key_D:
-		stopTransport();
+		onStopTransportClicked();
 		break;
 	case Qt::Key_C:
 		onClearClicked();
@@ -127,64 +139,12 @@ void MainWindow::onClearClicked()
 	update();
 }
 
-void MainWindow::stopTransport()
+void MainWindow::onStopTransportClicked()
 {
-	qDebug() << "stop";
-	m_sim.setTransport(nullptr);
-	if (m_transport) {
-		m_transport->stop();
-		m_transport->deleteLater();
-		m_transport = nullptr;
-	}
+	emit stopTransportRequested();
 }
 
-void MainWindow::startTransport()
+void MainWindow::onStartTransportClicked()
 {
-	if (m_transport) {
-		m_transport->stop();
-		disconnect(m_transport, &Transport::rxBytes, this, &MainWindow::onTransportRx);
-		m_transport->deleteLater();
-	}
-	switch(wTransport->type()) {
-	case Transport::Type::Tcp: {
-		bool ok = false;
-		int port = wTransport->port().toInt(&ok);
-		if (ok) {
-			m_transport = new TcpTransport(port, this);
-		}
-		else {
-			m_transport = nullptr;
-		}
-	} break;
-	case Transport::Type::Serial: {
-		QString port = wTransport->port();
-		int baud = wTransport->baudRate();
-		if (!port.isEmpty() && baud > 0) {
-			m_transport = new SerialTransport(port, baud, this);
-		}
-		else {
-			m_transport = nullptr;
-		}
-	} break;
-	default:
-		m_transport = nullptr;
-	}
-	if (m_transport) {
-		connect(m_transport, &Transport::rxBytes, this, &MainWindow::onTransportRx);
-		m_transport->start();
-	}
-	m_sim.setTransport(m_transport);
-	qDebug() << "start";
-}
-
-void MainWindow::onTransportRx(const QByteArray &bytes)
-{
-	m_sim.rxCallback((const uint8_t *) bytes.constData(), bytes.size());
-}
-
-void MainWindow::onAboutToQuit()
-{
-	if (m_transport) {
-		m_transport->stop();
-	}
+	emit startTransportRequested(wTransport->config());
 }

@@ -6,6 +6,7 @@
 #include <queue>
 #include <QDateTime>
 #include <QString>
+#include <QMutex>
 
 #include "vec4.h"
 
@@ -20,9 +21,6 @@ public:
 		QString msg;
 		QDateTime timestamp;
 	};
-
-	/** Constructor */
-	Log();
 
 	/**
 	 * @brief push a new entry onto the log
@@ -51,6 +49,7 @@ public:
 
 private:
 	std::queue<Entry> m_q;
+	QMutex m_lock;
 };
 
 /** global log instance. */

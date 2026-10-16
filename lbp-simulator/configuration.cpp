@@ -82,12 +82,11 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	}
 	if (request.size() == 2) {
 		// it's a query
-		gLog().push(Log::INFO, QString("Config Get %1: %2").arg(cmd).arg(m_settings[cmd]));
+		gLog().info(QString("Config Get %1: %2").arg(cmd).arg(m_settings[cmd]));
 		out_q.push(lbp::CmdMsg(cmd, 4, m_settings[cmd]));
 		return true;
 	}
-	if (request.size() == 6) {
-		m_scratch[cmd] = request.readIntArg();
+	if (request.size() == 6 && request.readArg(m_scratch[cmd])) {
 		gLog().push(Log::INFO, QString("Config Set %1: %2").arg(cmd).arg(m_scratch[cmd]));
 		out_q.push(lbp::CmdMsg(cmd));
 		return true;
@@ -95,7 +94,7 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	return false;
 }
 
-int32_t Configuration::get(uint16_t key, int32_t &value) const
+bool Configuration::get(uint16_t key, int32_t &value) const
 {
 	auto found = m_settings.find(key);
 	if (found == m_settings.end()) {
@@ -105,7 +104,7 @@ int32_t Configuration::get(uint16_t key, int32_t &value) const
 	return true;
 }
 
-static constexpr uint16_t cgf_codes[156] = {
+static constexpr uint16_t cgf_codes[] = {
 	cfg_x_settings,
 	cfg_x_unit,
 	cfg_x_size,
@@ -257,6 +256,7 @@ static constexpr uint16_t cgf_codes[156] = {
 	cfg_feed_post_delay,
 	cfg_feed_backlash,
 	cfg_rotary_enable,
+	cfg_rotary_axis,
 	cfg_rotary_pulses_per_rotation,
 	cfg_rotary_diameter,
 	cfg_wireless_panel_fast,
@@ -754,6 +754,9 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_rotary_enable:
 		name = "cfg_rotary_enable";
 		return true;
+	case cfg_rotary_axis:
+		name = "cfg_rotary_axis";
+		return true;
 	case cfg_rotary_pulses_per_rotation:
 		name = "cfg_rotary_pulses_per_rotation";
 		return true;
@@ -929,6 +932,7 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_feed_post_delay:
 	case cfg_feed_backlash:
 	case cfg_rotary_enable:
+	case cfg_rotary_axis:
 	case cfg_rotary_pulses_per_rotation:
 	case cfg_rotary_diameter:
 	case cfg_wireless_panel_fast:

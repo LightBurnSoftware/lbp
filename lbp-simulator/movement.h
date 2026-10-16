@@ -18,7 +18,7 @@ struct LaserSettings {
 	float power_min = 0.f;
 	float power_max = 0.f;
 	size_t num_rasters = 0;
-	float raster_powers[lbp::size_max_cmd_args >> 1];
+	float raster_powers[lbp::size_max_cmd_args >> 1] = {};
 	bool on = false;
 	bool enabled = false;
 
@@ -27,7 +27,28 @@ struct LaserSettings {
 	/** Update the current max power to the respective raster power based on progress ratio [0.0, 1.0]. */
 	void progressRaster(float progress);
 	void clearRaster();
-	bool isRaster() const;
+};
+
+/** Data describing a move in progress. */
+struct Move {
+	Vec4   start;            // wrapped position when the move began
+	Vec4   delta;            // signed displacement; may exceed a rotary axis limit
+	double length = 0.0;     // path distance used to pace the move (um)
+	double traveled = 0.0;   // distance covered so far (um)
+	double speed = 0.0;      // path speed (um/s)
+
+	/** @return progress along the path, [0.0, 1.0]. */
+	double progress() const { return length > 0.0 ? std::min(1.0, traveled / length) : 1.0; }
+	bool done() const { return traveled >= length; }
+	void reset() { *this = Move(); }
+};
+
+/** Data describing a jog in progress. A jog has no endpoint; it runs until stopped. */
+struct Jog {
+	Vec4   start;
+	double dir[4] = {0, 0, 0, 0};  // unit direction, indexed like kAxes
+	double traveled = 0.0;
+	double speed = 0.0;
 };
 
 /**
@@ -55,15 +76,13 @@ public:
 	 *
 	 * @param request The request to process.
 	 * @param out_q Storage for resulting output packets.
+	 * @param source identies the source of the command to be processed.
 	 * @return True if the  was able to process the request, false otherwise.
 	 */
-	bool process(lbp::MaxPayload &request, OutputQueue &out_q);
+	bool process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source);
 
-	/**
-	 * @brief Update the simulated position and laser state.
-	 * @param ms milliseconts that have passed since the last update.
-	 */
-	void update(int ms);
+	/** @brief Advance position and laser state by dt_s seconds. Exact for any dt (moves are interpolated). */
+	void step(double dt_s);
 
 	/** @brief stop all movement and cutting and clear the command queue. */
 	void stop();
@@ -87,6 +106,12 @@ public:
 	/** @return true if the internal command queue can enqueue another command, false otherwise. */
 	bool canEnqueue() const;
 
+	/** @return true if cmd_job_end has been executed since the last call. */
+	bool takeJobEnded();
+
+	/** @return true if nothing is executing and no commands are pending. */
+	bool isIdle() const;
+
 private:
 	enum class State { Idle, Jogging, Moving, Dwelling, Paused };
 	struct PausedState {
@@ -95,28 +120,45 @@ private:
 		State state = State::Idle;
 	};
 
-	State updateTarget();
-	void startJog(Vec4 dir);
-	void stopJog();
+	State takeNextCommand();
 
-	float getMoveProgress() const;
+	/** Refresh our knowledge of the configured rotary axis. Called when a move begins. */
+	void refreshRotary();
+	/** Calculate the axis delta for a relative move. */
+	int64_t relativeDelta(int idx, int64_t arg) const;
+	/** Calculate the axis delta for an absolute move. */
+	int64_t absoluteDelta(int idx, int64_t arg) const;
+	/** Calculate the axis delta for an a move to machine 0 */
+	int64_t homeDelta(int idx) const;
 
-	Configuration &m_config; // reference to configuration component, for certain lookups.
+	bool decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta);
+
+	/** Choose the path metric and rate for a move. */
+	bool pacingFor(const Vec4 &delta, double &length, double &speed) const;
+	bool beginMove(const Vec4 &delta);
+	void beginJog(const Vec4 &dir, int32_t target_vel);
+	void endJog();
+
+	/** Apply each axis's travel limit: linear axes clip, rotary axes wrap. */
+	Vec4 applyLimits(const Vec4 &vec) const;
+
+	Configuration &m_config;	 // reference to configuration component, for certain lookups.
 	State m_state = State::Idle; // "movement state" - controls internal state machine.
-	Vec4 m_pos; // current position vector.
-	Vec4 m_start_pos; // start position of the current movement vector.
-	Vec4 m_target_pos; // user-specified target position.
-	Vec4 m_job_origin; // origin offset for absolute moves during the current job.
-	Vec4 m_max_pos; // configured maximum dimension (assume Quadrant I).
-	Vec4 m_vel; // current velocity vector.
-	int32_t m_dwell_ms = 0; // ms to dwell, if we're in that state
-	int32_t m_dwell_acc_ms = 0; // accumulated ms spent dwelling
+	Move m_move;				 // the Move currently executing
+	Jog m_jog;					 // the Jog currently executing
+	int m_rotary_axis = -1; // rotary axis index, or -1 for none, refreshed when a move or jog begins.
+	Vec4 m_pos;				// current laser position
+	Vec4 m_job_origin;		// origin offset for absolute moves during the current job.
+	Vec4 m_max_pos;			// configured maximum dimension (assume Quadrant I).
+	double m_dwell_remaining_s = 0.0;  // remaining seconds to dwell if in dwelling state.
 	uint32_t m_target_vel_xy = 0; // user-specified target velocity (xy)
-	uint32_t m_target_vel_z = 0; // user-specified target velocity (z)
-	uint32_t m_target_vel_u = 0; // user-specified target velocity (u)
-	LaserSettings m_laser_1; // current settings for laser 1
-	LaserSettings m_laser_2; // current settings for laser 2
-	PausedState m_paused; // state to resume after pause.
-	CmdQueue m_cmd_q; // queue for scheduled movement commands.
-	uint16_t m_job_cmd; // cache a "begin job" or "begin frame" command for state derivations.
+	uint32_t m_target_vel_z = 0;  // user-specified target velocity (z)
+	uint32_t m_target_vel_u = 0;  // user-specified target velocity (u)
+	LaserSettings m_laser_1;	  // current settings for laser 1
+	LaserSettings m_laser_2;	  // current settings for laser 2
+	PausedState m_paused;		  // state to resume after pause.
+	CmdQueue m_cmd_q;			  // queue for scheduled movement commands.
+	bool m_in_job = false;		  // state boolean - are we currently executing a job?
+	bool m_in_frame = false;	  // state boolean - are we currently framing?
+	bool m_job_ended = false;	// latching flag to indicate a job has completed.
 };

@@ -79,7 +79,6 @@ void TransportWidget::onSerialToggled(bool checked)
 		for (const QSerialPortInfo &info : QSerialPortInfo::availablePorts()) {
 			cmbSerialPort->addItem(info.portName());
 		}
-
 	}
 	updateView();
 }
@@ -95,24 +94,23 @@ void TransportWidget::updateView()
 	lblBaudRate->setVisible(ttype == Transport::Type::Serial);
 }
 
-QString TransportWidget::port() const
+Transport::Config TransportWidget::config() const
 {
-	switch (type()) {
+	Transport::Config result;
+	result.type = type();
+
+	switch (result.type) {
 	case Transport::Type::Tcp:
-		return txtTcpPort->text();
+		result.port_num = txtTcpPort->text().toInt();
+		break;
 	case Transport::Type::Serial:
-		return cmbSerialPort->currentText();
+		result.port_name = cmbSerialPort->currentText();
+		result.baud_rate = cmbBaudRate->currentData().toInt();
+		break;
 	default:
-		return "";
+		break;
 	}
+
+	return result;
 }
 
-int TransportWidget::baudRate() const
-{
-	bool ok = false;
-	int baud = cmbBaudRate->currentData().toInt(&ok);
-	if (ok) {
-		return baud;
-	}
-	return 0;
-}

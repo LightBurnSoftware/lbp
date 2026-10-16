@@ -3,25 +3,23 @@
 
 #include "log.h"
 
+#include <QMutexLocker>
+
 Log &gLog()
 {
 	static Log instance;
 	return instance;
 }
 
-Log::Log()
-	: m_q()
-{
-	// Empty
-}
-
 void Log::push(Level level, const QString &msg)
 {
+	QMutexLocker lock(&m_lock);
 	m_q.push({level, msg, QDateTime::currentDateTimeUtc()});
 }
 
 const Log::Entry Log::pop()
 {
+	QMutexLocker lock(&m_lock);	
 	Entry entry = std::move(m_q.front());
 	m_q.pop();
 	return entry;
@@ -29,6 +27,7 @@ const Log::Entry Log::pop()
 
 bool Log::hasEntry()
 {
+	QMutexLocker lock(&m_lock);	
 	return !m_q.empty();
 }
 

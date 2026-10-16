@@ -4,6 +4,9 @@
 #ifndef LBP_PARSER_H
 #define LBP_PARSER_H
 
+#include <algorithm>
+#include <cassert>
+
 #include <lbp/checksum.h>
 #include <lbp/beio.h>
 #include <lbp/payload.h>
@@ -20,10 +23,11 @@ namespace lbp {
  *
  * Parser<4096> parser;
  *
- * parser.feed(incoming_data, len);
+ * const size_t fed = parser.feed(incoming_data, len);
+ * // fed may be < len if the buffer is full; keep the remainder and retry.
  *
  * while (parser.parseNext()) {
- *	 MaxPayload &p = parser.getPayload();
+ *	 MaxPayload &p = parser.payload();
  *	 process(p);
  * }
  */
@@ -31,6 +35,8 @@ template <size_t Capacity>
 class Parser
 {
 public:
+	static_assert(Capacity >= size_file_msg, "Parser capacity must hold a maximum-size message");
+
 	static constexpr size_t kCapacity = Capacity;
 
 	Parser() = default;
@@ -38,7 +44,7 @@ public:
 	Parser& operator=(const Parser&) = delete;
 
 	/**
-	 * @brief parse the next payload from the internal buffer.
+	 * @brief Parse the next payload from the internal buffer.
 	 * @return True if a payload was completely parsed, false otherwise.
 	 */
 	bool parseNext()
@@ -46,20 +52,26 @@ public:
 		while (!m_buffer.empty()) {
 			switch (m_state) {
 			case State::HeaderSync:
-				seeklen += 1;
-				m_header = (m_header << 8) | m_buffer.readByte();
-				if (m_header == cmd_start) {
-					m_buffer.mark(); // If a bad packet is detected, rewind to just after this header.
-					m_state = State::Size;
-					seeklen = 0;
+				if (m_buffer.readByte(m_byte)) {
+					seeklen += 1;
+					m_header = (m_header << 8) | m_byte;
+					if (m_header == cmd_start) {
+						m_buffer.setBookmark(); // If a bad packet is detected, rewind to just after this header.
+						m_state = State::Size;
+						seeklen = 0;
+					}
+				}
+				else {
+					return false;
 				}
 				break;
 			case State::Size:
 				if (m_buffer.read(m_shortbuffer, 2)) {
-					int16_t len = readBE16(m_shortbuffer);
+					uint16_t len = readBE16(m_shortbuffer);
 					if (len < size_min_payload || len > size_file_payload) {
 						// Reject messages of invalid size.
-						numbad += 1;
+						size_rejections += 1;
+						m_header = 0;
 						m_buffer.rewind();
 						m_state = State::HeaderSync;
 					} else {
@@ -81,10 +93,12 @@ public:
 				if (m_buffer.read(m_shortbuffer, 2)) {
 					m_state = State::HeaderSync;
 					if (readBE16(m_shortbuffer) == crc16(m_payload.data(), m_payload.size())) {
+						m_buffer.clearBookmark();
 						return true;
 					} else {
 						// Reject messages with invalid checksum.
-						numbad += 1;
+						checksum_rejections += 1;
+						m_header = 0;
 						m_buffer.rewind();
 					}
 				} else {
@@ -105,7 +119,8 @@ public:
 		m_buffer.clear();
 		m_header = 0;
 		m_state = State::HeaderSync;
-		numbad = 0;
+		checksum_rejections = 0;
+		size_rejections = 0;
 		seeklen = 0;
 	}
 
@@ -115,20 +130,25 @@ public:
 	 * @param len Number of bytes to attempt to write. May write less if there isn't enough room.
 	 * @return The number of bytes successfully fed to the internal buffer.
 	 */
-	size_t feed(const uint8_t *src, size_t len)
+	[[nodiscard]] size_t feed(const uint8_t *src, size_t len)
 	{
 		len = std::min(len, m_buffer.freeSpace());
-		if (m_buffer.write(src, len)) {
-			return len;
-		}
-		return 0;
+		[[maybe_unused]] const bool ok = m_buffer.write(src, len);
+		assert(ok && "write cannot fail: len was clamped to freeSpace()");
+		return len;
 	}
+
+	/** @return The number of bytes that can be fed to the parser. */
+	size_t freeSpace() const { return m_buffer.freeSpace(); }
 
 	/** Debug value representing the number of bytes the parser searched unsuccessfully for a valid header. */
 	size_t seeklen = 0;
 
 	/** Debug value representing the number of packets that have been rejected with an invalid checksum. */
-	size_t numbad = 0;
+	size_t checksum_rejections = 0;
+
+	/** Debug value representing the number of packets that have been rejected with a bad length (possible misframe. */
+	size_t size_rejections = 0;
 
 private:
 	enum class State {
@@ -142,7 +162,8 @@ private:
 	RingBuffer<Capacity> m_buffer;		// Stores bytes to be parsed.
 	MaxPayload m_payload;				// Stores current payload tha we're working on.
 	uint32_t m_header = 0;			 	// Storage for the header we're searching for.
-	uint8_t m_shortbuffer[2];		  	// Buffer for several two-byte chunks of data.
+	uint8_t m_shortbuffer[2] = {};	  	// Buffer for several two-byte chunks of data.
+	uint8_t m_byte = 0;					// Buffer for reading one byte at a time.
 };
 
 } // namespace lbp

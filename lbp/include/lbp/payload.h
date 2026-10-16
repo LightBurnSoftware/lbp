@@ -37,9 +37,9 @@ public:
 	/** Copy Constructor */
 	Payload(const Payload &other)
 		: m_size(other.m_size)
-		, m_cursor(size_cmd)
+		, m_cursor(other.m_cursor)
 	{
-		memcpy(m_data, other.m_data, m_size);
+		std::memcpy(m_data, other.m_data, m_size);
 	}
 
 	/** Move Constructor */
@@ -53,7 +53,7 @@ public:
 	}
 
 	/** Copy Assignment */
-	Payload &operator=(Payload &other) noexcept
+	Payload &operator=(const Payload &other) noexcept
 	{
 		if (&other != this) {
 			m_size = other.m_size;
@@ -66,7 +66,7 @@ public:
 	/** Move Assignment */
 	Payload &operator=(Payload &&other) noexcept
 	{
-		if (*other != this) {
+		if (&other != this) {
 			m_size = other.m_size;
 			m_cursor = other.m_cursor;
 			std::memcpy(m_data, other.m_data, other.m_size);
@@ -106,78 +106,120 @@ public:
 	/** @brief reset Reset the size and read cursor. */
 	void reset(uint16_t size)
 	{
-		m_size = size;
+		m_size = size <= Capacity ? size : Capacity;
 		m_cursor = size_cmd;
 	}
 
 	/** @return the number of bytes yet to be read with read* commands */
-	uint16_t available() const
+	size_t available() const
 	{
-		return m_size - m_cursor;
+		return m_cursor >= m_size ? 0 : size_t(m_size - m_cursor);
 	}
 
 	/**
-	 * @brief Read the next 8-bit byte from the args section of the payload. Advances arg read cursor by 1.
-	 * @return The next Byte from the args section of the payload. -1 if there are no more bytes to read.
-	 */
-	uint8_t readByteArg()
-	{
-		if (available() < 1) {
-			return -1;
-		}
-		uint8_t val = m_data[m_cursor];
-		m_cursor += 1;
-		return val;
-	}
-
-	/**
-	 * @brief Read the next 16-bit short from the args section of the payload. Advances arg read cursor by 2.
-	 * @return The next short from the args section of the payload. -1 if there were not two bytes to read.
-	 */
-	int16_t readShortArg()
-	{
-		if (available() < 2) {
-			return -1;
-		}
-		int16_t val = readBE16(m_data + m_cursor);
-		m_cursor += 2;
-		return val;
-	}
-
-	/**
-	 * @brief Read the next 32-bit int from the args section of the payload. Advances arg read cursor by 4.
-	 * @return The next int from the args section of the payload. -1 if there were not four bytes to read.
-	 */
-	int32_t readIntArg()
-	{
-		if (available() < 4) {
-			return -1;
-		}
-		int32_t val = readBE32(m_data + m_cursor);
-		m_cursor += 4;
-		return val;
-	}
-
-	/**
-	 * @brief Read the next bytes from the arg section of the payload. Advances arg read cursor by len.
+	 * @brief Read the next len bytes from the arg section of the payload. Advances arg read cursor by len.
 	 * @param dst The destination buffer.
 	 * @param len The number of bytes to read.
 	 * @return True if len bytes could be read, false if there were not that many bytes remaining to read.
 	 */
-	bool readDataArg(uint8_t *dst, uint16_t len)
+	[[nodiscard]] bool readData(uint8_t *dst, uint16_t len)
 	{
-		if (available() < len) {
-			return false;
-		}
+		if (available() < len) return false;
 		std::memcpy(dst, m_data + m_cursor, len);
 		m_cursor += len;
 		return true;
 	}
 
+	/**
+	 * @brief Read the next byte from the args section and advance the read cursor accordingly.
+	 * @param out Reference parameter for the output value.
+	 * @return True if the value was successfully read and the read cursor was advanced.
+	 *         False if the payload was too small for the requested value, in which case the read cursor is unchanged.
+	 */
+	[[nodiscard]] bool readArg(uint8_t &out)
+	{
+		if (available() < 1) return false;
+		out = m_data[m_cursor];
+		m_cursor += 1;
+		return true;
+	}
+
+	/**
+	 * @brief Read the next two bytes from the args section as an unsigned 16-bit integer and advance the read cursor accordingly.
+	 * @param out Reference parameter for the output value.
+	 * @return True if the value was successfully read and the read cursor was advanced.
+	 *         False if the payload was too small for the requested value, in which case the read cursor is unchanged.
+	 */
+	[[nodiscard]] bool readArg(uint16_t &out)
+	{
+		if (available() < 2) return false;
+		out = readBE16(m_data + m_cursor);
+		m_cursor += 2;
+		return true;
+	}
+
+	/**
+	 * @brief Read the next two bytes from the args section as a signed 16-bit integer and advance the read cursor accordingly.
+	 * @param out Reference parameter for the output value.
+	 * @return True if the value was successfully read and the read cursor was advanced.
+	 *         False if the payload was too small for the requested value, in which case the read cursor is unchanged.
+	 */
+	[[nodiscard]] bool readArg(int16_t &out)
+	{
+		if (available() < 2) return false;
+		out = static_cast<int16_t>(readBE16(m_data + m_cursor));
+		m_cursor += 2;
+		return true;
+	}
+
+	/**
+	 * @brief Read the next four bytes from the args section as an unsigned 32-bit integer and advance the read cursor accordingly.
+	 * @param out Reference parameter for the output value.
+	 * @return True if the value was successfully read and the read cursor was advanced.
+	 *         False if the payload was too small for the requested value, in which case the read cursor is unchanged.
+	 */
+	[[nodiscard]] bool readArg(uint32_t &out)
+	{
+		if (available() < 4) return false;
+		out = readBE32(m_data + m_cursor);
+		m_cursor += 4;
+		return true;
+	}
+
+	/**
+	 * @brief Read the next four bytes from the args section as a signed 32-bit integer and advance the read cursor accordingly.
+	 * @param out Reference parameter for the output value.
+	 * @return True if the value was successfully read and the read cursor was advanced.
+	 *         False if the payload was too small for the requested value, in which case the read cursor is unchanged.
+	 */
+	[[nodiscard]] bool readArg(int32_t &out)
+	{
+		if (available() < 4) return false;
+		out = static_cast<int32_t>(readBE32(m_data + m_cursor));
+		m_cursor += 4;
+		return true;
+	}
+
+	/**
+	 * @brief Read several arguments in sequence from the arg section of the payload.
+	 * @tparam Args Types of the values to read. Must be uint8_t, int16_t, uint16_t, uint32_t, or int32_t.
+	 * @param args lvalue references to receive the values, in payload order.
+	 * @return True if every value was successfully read. False if the payload was too small for the
+	 *         requested value, in which case the read cursor is unchanged.
+	 */
+	template <typename ... Args>
+	[[nodiscard]] bool readArgs(Args &... args)
+	{
+		const uint16_t saved = m_cursor;
+		if ((readArg(args) && ...)) return true; // C++17 "folding" syntax
+		m_cursor = saved; // if read fails, rewind cursor.
+		return false;
+	}
+
 private:
-	uint8_t m_data[Capacity];	// Stack-allocated data buffer.
-	uint16_t m_size = 0;		// The size, in bytes, of m_data. <= Capacity.
-	uint16_t m_cursor = size_cmd; // Read cursor for the read* functions.
+	uint8_t m_data[Capacity] = {};	// Stack-allocated data buffer.
+	uint16_t m_size = 0;			// The size, in bytes, of m_data. <= Capacity.
+	uint16_t m_cursor = size_cmd;	// Read cursor for the read* functions.
 };
 
 /** Most payloads will be small "command" payloads. They might be stored in command queues. */

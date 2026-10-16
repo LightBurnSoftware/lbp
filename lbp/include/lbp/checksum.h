@@ -1,8 +1,10 @@
 #ifndef LBP_CHECKSUM_H
 #define LBP_CHECKSUM_H
 
+#include <cstddef>
 #include <cstdint>
 
+namespace lbp {
 /**
  * from https://stjarnhimlen.se/snippets/crc-16.c
  *                                      16   12   5
@@ -12,6 +14,8 @@
  * bit is always assumed to be set, thus we only use 16 bits to
  * represent the 17 bit value.
  */
-uint16_t crc16(const uint8_t *data_p, uint16_t len);
+uint16_t crc16(const uint8_t *data_p, size_t len);
+
+} // namespace lbp
 
 #endif // LBP_CHECKSUM_H

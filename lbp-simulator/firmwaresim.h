@@ -4,7 +4,6 @@
 #pragma once
 
 #include "configuration.h"
-#include "transport.h"
 #include "filesystem.h"
 #include "movement.h"
 #include "simstate.h"
@@ -13,6 +12,8 @@
 #include <lbp/message.h>
 #include <lbp/parser.h>
 #include <lbp/queue.h>
+
+using TxCallback = std::function<void(const uint8_t*, size_t)>;
 
 /**
  * @brief The FirmwareSim class. This is the entry-point for actual firmware simulation.
@@ -30,41 +31,48 @@ public:
 	FirmwareSim();
 
 	/**
-	 * @brief Execute a single iteration of the simulation loop.
+	 * @brief Advance the firmware by one iteration of dt_ns simulated time.
 	 *
-	 * This loop will:
-	 * 1. Parse received bytes from the connection into lbp payloads.
-	 * 2: (If executing a received file) Parse received file into lbp payloads.
-	 * 3. Process these payloads.
-	 * 4. Update the simulation.
-	 * 5. Send any generated output messages via the connection.
+	 * Feeds job messages streamed from memory (if a job is in progress),
+	 * advances the movement simulation, and sends resulting output messages.
 	 *
-	 * @param ms The number of milliseconds since the last loop.
+	 * Any dt is exact for motion, but the job queue is only refilled once per
+	 * call, so callers should keep dt small to avoid the
+	 * movement queue running dry mid-step.
+	 *
+	 * @param dt_ns Simulated time to advance, in nanoseconds.
 	 * @return A structure containing useful simulated machine state.
 	 */
-	SimState loop(int ms);
-
-	/**
-	 * @brief Stop previous transport connection and start new one.
-	 * @param conn The new connection.
-	 */
-	void setTransport(Transport *conn);
+	SimState step(int64_t dt_ns);
 
 	/** @brief Called when bytes are available to be read from transport. */
 	void rxCallback(const uint8_t *bytes, size_t len);
+
+	void setTxCallback(TxCallback cb) { m_tx_callback = cb; }
+
+	/** Stop all movement, file operations, and queued commands. */
+	void stop();
 
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
 
-	/** Update the simulation. */
-	void update(int ms);
+	/** Send queued output messages to transport. */
+	void tx();
 
-	Transport *m_transport = nullptr; // Connection to LightBurn - sends and receives bytes.
+	/** Keep the movement queue fed from the job file while a job is executing. */
+	void pumpJob();
+	void beginJob();
+	void endJob();
+	void checkJobComplete();
+
+	void updateFwState();
+
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
 	Configuration m_config; // Manages reading, writing, and storing config values.
 	MovementSim m_movement; // Movement component - simulates movement and laser actions.
 	FileSystem m_filesystem; // Filesystem component - receives and manages files from LightBurn.
 	OutputQueue m_out_q; // Output message queue.
+	TxCallback m_tx_callback; // Callback for sending output messages.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 };

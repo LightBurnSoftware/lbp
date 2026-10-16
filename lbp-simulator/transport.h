@@ -9,7 +9,16 @@ class Transport : public QObject
 {
 	Q_OBJECT
 public:
-    enum class Type { None, Tcp, Serial };
+	enum class Type { None, Tcp, Serial };
+	Q_ENUM(Type);
+
+	struct Config
+	{
+		Type type = Type::None;
+		QString port_name;
+		int baud_rate = 0;
+		int port_num = 0;
+	};
 
 	/** Constructor */
 	Transport(QObject *parent = nullptr) : QObject(parent) {}
@@ -37,3 +46,5 @@ signals:
 	/** @brief triggered when the transport has bytes ready to be read. */
 	void rxBytes(const QByteArray &bytes);
 };
+
+Q_DECLARE_METATYPE(Transport::Config)

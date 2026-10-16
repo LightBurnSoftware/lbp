@@ -8,8 +8,15 @@
 #include <lbp/payload.h>
 #include <lbp/spec.h>
 
+static void tx_nop(const uint8_t *bytes, size_t len)
+{
+	(void)bytes;
+	(void)len;
+}
+
 FirmwareSim::FirmwareSim()
 	: m_movement(m_config)
+	, m_tx_callback(&tx_nop)
 {
 	gLog().push(Log::INFO, "Started sim");
 	m_config.load();
@@ -17,51 +24,108 @@ FirmwareSim::FirmwareSim()
 
 void FirmwareSim::rxCallback(const uint8_t *bytes, size_t len)
 {
-	m_parser.feed(bytes, len);
+	size_t offset = 0;
+	while (offset < len) {
+		const size_t fed = m_parser.feed(bytes + offset, len - offset);
+		offset += fed;
+
+		// Drain what we just fed, freeing space for the next pass.
+		while (m_parser.parseNext()) {
+			process(m_parser.payload());
+		}
+
+		if (fed == 0) {
+			gLog().error("rx: parser cannot consume, dropping remaining bytes");
+			break;
+		}
+	}
+	tx();
 }
 
-SimState FirmwareSim::loop(int ms)
+SimState FirmwareSim::step(int64_t dt_ns)
 {
-	// Process commands from transport
-	while (m_parser.parseNext()) {
-		process(m_parser.payload());
-	}
-
-	// Process commands from the job, if applicable
-	if (m_fw_state & lbp::state_executing_job) {
-		auto &fparser = m_filesystem.parser();
-
-		if (m_movement.canEnqueue()) {
-			if (fparser.parseNext()) {
-				m_movement.process(fparser.payload(), m_out_q);
-			} else {
-				m_filesystem.feedParser();
-			}
-		}
-
-		while (m_movement.canEnqueue() && fparser.parseNext()) {
-			m_movement.process(fparser.payload(), m_out_q);
-		}
-	}
-
-	// update simulation
-	update(ms);
-
-	// send output packets
-	if (m_transport) {
-		while (!m_out_q.empty()) {
-			lbp::CmdMsg p = m_out_q.pop();
-			m_transport->sendBytes(p.data(), p.size());
-		}
-	}
-
-	// collate simulation state for caller
+	pumpJob(); // no-op unless a job is executing.
+	m_movement.step(double(dt_ns) / 1e9); // step movement simulation.
+	updateFwState();
+	tx(); // send output packets.
 	return m_movement.getSimState();
 }
 
-void FirmwareSim::setTransport(Transport *conn)
+void FirmwareSim::tx()
 {
-	m_transport = conn;
+	lbp::CmdMsg m;
+	while (m_out_q.pop(m)) {
+		m_tx_callback(m.data(), m.size());
+	}
+}
+
+void FirmwareSim::pumpJob()
+{
+	if (!(m_fw_state & lbp::state_executing_job)) {
+		return;
+	}
+
+	auto &fparser = m_filesystem.parser();
+
+	while (m_movement.canEnqueue()) {
+		if (fparser.parseNext()) {
+			m_movement.process(fparser.payload(), m_out_q, CmdSource::Wire);
+		} else if (m_filesystem.feedParser() == 0) {
+			break;
+		}
+	}
+}
+
+void FirmwareSim::updateFwState()
+{
+	m_fw_state = m_filesystem.getFwState(m_fw_state);
+	m_fw_state = m_movement.getFwState(m_fw_state);
+
+	if (m_fw_state & lbp::state_executing_job) {
+		checkJobComplete();
+	}
+}
+
+void FirmwareSim::checkJobComplete()
+{
+	if (m_movement.takeJobEnded()) {
+		endJob();
+		return;
+	}
+
+	// No terminator: Maybe the job file was malformed.
+	// wait until the file is exhausted AND the movement queue
+	// has drained, so we never report completion while the head is still moving.
+	if (!m_filesystem.isReading() && m_movement.isIdle()) {
+		gLog().warning("job file ended without cmd_job_end");
+		endJob();
+	}
+}
+
+void FirmwareSim::endJob()
+{
+	m_fw_state &= ~lbp::state_executing_job;
+	m_filesystem.stop();
+	// TODO: perhaps a different command for notification?
+	m_out_q.push(lbp::CmdMsg(lbp::cmd_job_end));
+	gLog().push(Log::INFO, "Job complete");
+}
+
+void FirmwareSim::beginJob()
+{
+	m_movement.stop();
+	m_filesystem.reset();
+	if (m_filesystem.startReading()) {
+		m_fw_state |= lbp::state_executing_job;
+	}
+}
+
+void FirmwareSim::stop()
+{
+	m_movement.stop();
+	m_filesystem.stop();
+	m_fw_state &= ~lbp::state_executing_job;
+	m_fw_state &= ~lbp::state_executing_frame;
 }
 
 bool FirmwareSim::process(lbp::MaxPayload &payload)
@@ -73,7 +137,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	if (m_config.process(payload, m_out_q)) {
 		return true;
 	}
-	if (m_movement.process(payload, m_out_q)) {
+	if (m_movement.process(payload, m_out_q, CmdSource::Wire)) {
 		return true;
 	}
 
@@ -92,10 +156,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		return true;
 	case lbp::cmd_stop:
 		gLog().push(Log::INFO, "Stop command received.");
-		m_movement.stop();
-		m_filesystem.stop();
-		m_fw_state &= ~lbp::state_executing_job;
-		m_fw_state &= ~lbp::state_executing_frame;
+		stop();
 		m_out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	case lbp::cmd_pause:
@@ -113,9 +174,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		return true;
 	case lbp::cmd_execute: {
 		gLog().push(Log::INFO, "Executing file!");
-		m_movement.stop();
-		m_filesystem.reset();
-		m_fw_state |= lbp::state_executing_job;
+		beginJob();
 		m_out_q.push(lbp::CmdMsg(cmd));
 		return true;
 	}
@@ -126,12 +185,4 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		break;
 	}
 	return false;
-}
-
-void FirmwareSim::update(int ms)
-{
-	m_movement.update(ms);
-
-	m_fw_state = m_filesystem.getFwState(m_fw_state);
-	m_fw_state = m_movement.getFwState(m_fw_state);
 }

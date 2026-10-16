@@ -3,15 +3,18 @@
 
 #pragma once
 
-#include "firmwaresim.h"
 #include "simview.h"
+#include "simworker.h"
 #include "transport.h"
 #include "transportwidget.h"
 
 #include <QMainWindow>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QThread>
 #include <QWidget>
+
+#include <vector>
 
 class MainWindow : public QMainWindow
 {
@@ -21,7 +24,9 @@ public:
 	MainWindow(QWidget *parent = nullptr);
 	virtual ~MainWindow();
 
-	void onAboutToQuit();
+signals:
+	void startTransportRequested(Transport::Config config);
+	void stopTransportRequested();
 
 protected:
 	void timerEvent(QTimerEvent *event) override;
@@ -29,10 +34,9 @@ protected:
 	void keyPressEvent(QKeyEvent *event) override;
 
 private:
-	void stopTransport();
-	void startTransport();
+	void onStopTransportClicked();
+	void onStartTransportClicked();
 	void onClearClicked();
-	void onTransportRx(const QByteArray &bytes);
 
 	// widgets
 	TransportWidget *wTransport = nullptr;
@@ -43,7 +47,7 @@ private:
 	QPushButton *pbClearSim = nullptr;
 
 	// members
-	Transport *m_transport = nullptr;
-	FirmwareSim m_sim;
-	QElapsedTimer m_sim_timer;
+	SimWorker *m_worker; // harness to operate the firmware simulation
+	QThread m_thread; // background worker thread for the sim harness
+	std::vector<SimState> m_points; // storage for simulated laser positions
 };
