@@ -55,9 +55,9 @@ public:
 				if (m_buffer.readByte(m_byte)) {
 					seeklen += 1;
 					m_header = (m_header << 8) | m_byte;
-					if (m_header == cmd_start) {
+					if (m_header == magic_start) {
 						m_buffer.setBookmark(); // If a bad packet is detected, rewind to just after this header.
-						m_state = State::Size;
+						m_state = State::TxId;
 						seeklen = 0;
 					}
 				}
@@ -65,9 +65,16 @@ public:
 					return false;
 				}
 				break;
+			case State::TxId:
+				if (m_buffer.read(m_txid_buffer, size_txid)) {
+					m_state = State::Size;
+				} else {
+					return false;
+				}
+				break;
 			case State::Size:
-				if (m_buffer.read(m_shortbuffer, 2)) {
-					uint16_t len = readBE16(m_shortbuffer);
+				if (m_buffer.read(m_len_buffer, size_len)) {
+					uint16_t len = readBE16(m_len_buffer);
 					if (len < size_min_payload || len > size_file_payload) {
 						// Reject messages of invalid size.
 						size_rejections += 1;
@@ -76,6 +83,7 @@ public:
 						m_state = State::HeaderSync;
 					} else {
 						m_payload.reset(len);
+						m_payload.setTxid(readBE16(m_txid_buffer));
 						m_state = State::Data;
 					}
 				} else {
@@ -90,9 +98,13 @@ public:
 				}
 				break;
 			case State::Checksum:
-				if (m_buffer.read(m_shortbuffer, 2)) {
+				if (m_buffer.read(m_crc_buffer, 2)) {
 					m_state = State::HeaderSync;
-					if (readBE16(m_shortbuffer) == crc16(m_payload.data(), m_payload.size())) {
+					uint16_t crc = crc16_begin();
+					crc = crc16_update(crc, m_txid_buffer, size_txid);
+					crc = crc16_update(crc, m_len_buffer, size_len);
+					crc = crc16_update(crc, m_payload.data(), m_payload.size());
+					if (readBE16(m_crc_buffer) == crc16_end(crc)) {
 						m_buffer.clearBookmark();
 						return true;
 					} else {
@@ -153,6 +165,7 @@ public:
 private:
 	enum class State {
 		HeaderSync,
+		TxId,
 		Size,
 		Data,
 		Checksum
@@ -162,7 +175,9 @@ private:
 	RingBuffer<Capacity> m_buffer;		// Stores bytes to be parsed.
 	MaxPayload m_payload;				// Stores current payload tha we're working on.
 	uint32_t m_header = 0;			 	// Storage for the header we're searching for.
-	uint8_t m_shortbuffer[2] = {};	  	// Buffer for several two-byte chunks of data.
+	uint8_t m_crc_buffer[2] = {};	  	// Scratch for read value of the checksum.
+	uint8_t m_txid_buffer[size_txid] = {}; // Raw txid bytes, kept for the checksum computation.
+	uint8_t m_len_buffer[size_len] = {};	// Raw size bytes, kept for the checksum computation.
 	uint8_t m_byte = 0;					// Buffer for reading one byte at a time.
 };
 

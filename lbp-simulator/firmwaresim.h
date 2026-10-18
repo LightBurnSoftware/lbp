@@ -75,4 +75,5 @@ private:
 	OutputQueue m_out_q; // Output message queue.
 	TxCallback m_tx_callback; // Callback for sending output messages.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
+	uint16_t m_last_txid = lbp::txid_none; // Most recent transaction id processed, for retry detection.
 };

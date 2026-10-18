@@ -69,29 +69,29 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	switch (cmd) {
 	case lbp::cmd_pos_x:
 		gLog().push(Log::DEBUG, QString("X Axis Query: %1").arg(m_pos.x));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.x)));
+		out_q.respond(request, toWire(m_pos.x));
 		return true;
 	case lbp::cmd_pos_y:
 		gLog().push(Log::DEBUG, QString("Y Axis Query: %1").arg(m_pos.y));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.y)));
+		out_q.respond(request, toWire(m_pos.y));
 		return true;
 	case lbp::cmd_pos_z:
 		gLog().push(Log::DEBUG, QString("Z Axis Query: %1").arg(m_pos.z));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.z)));
+		out_q.respond(request, toWire(m_pos.z));
 		return true;
 	case lbp::cmd_pos_u:
 		gLog().push(Log::DEBUG, QString("U Axis Query: %1").arg(m_pos.u));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.u)));
+		out_q.respond(request, toWire(m_pos.u));
 		return true;
 	case lbp::cmd_pos_xy: {
-		lbp::CmdMsg m(cmd, 8);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 8);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		out_q.push(m);
 		return true;
 	}
 	case lbp::cmd_pos_xyz: {
-		lbp::CmdMsg m(cmd, 12);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 12);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		m.writeInt(toWire(m_pos.z));
@@ -101,7 +101,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_pos_xyzu: {
 		gLog().push(Log::DEBUG, "XYZU Axis Query");
 
-		lbp::CmdMsg m(cmd, 16);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 16);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		m.writeInt(toWire(m_pos.z));
@@ -111,67 +111,67 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	}
 	case lbp::cmd_jog_start_pos_x:
 		beginJog(Vec4(1, 0, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_x:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_x:
 		beginJog(Vec4(-1, 0, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_x:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_y:
 		beginJog(Vec4(0, 1, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_y:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_y:
 		beginJog(Vec4(0, -1, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_y:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_z:
 		beginJog(Vec4(0, 0, 1, 0), m_target_vel_z);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_z:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_z:
 		beginJog(Vec4(0, 0, -1, 0), m_target_vel_z);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_z:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_u:
 		beginJog(Vec4(0, 0, 0, 1), m_target_vel_u);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_u:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_u:
 		beginJog(Vec4(0, 0, 0, -1), m_target_vel_u);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_u:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_cut_from:
 	case lbp::cmd_cut_type:
@@ -247,7 +247,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 			gLog().error("Move command queue full");
 		}
 		if (source == CmdSource::Wire) {
-			out_q.push(lbp::CmdMsg(cmd));
+			out_q.respond(request);
 		}
 		return true;
 	default:

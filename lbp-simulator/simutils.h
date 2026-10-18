@@ -32,6 +32,12 @@ class OutputQueue
 {
 public:
 	void push(lbp::CmdMsg msg);
+	/** Queue a response to request: same command and transaction id, no arguments. */
+	void respond(const lbp::MaxPayload &request);
+	/** Queue a response to request with a single int32 argument. */
+	void respond(const lbp::MaxPayload &request, int32_t value);
+	/** @return true if the most recent response with a transaction id answered txid; copies it to out. */
+	bool lastResponse(uint16_t txid, lbp::CmdMsg &out) const;
 	bool pop(lbp::CmdMsg &out) { return m_q.pop(out); }
 	bool empty() const { return m_q.empty(); }
 	/** @return true if any message has been dropped since the last call. */
@@ -39,6 +45,7 @@ public:
 
 private:
 	lbp::Queue<lbp::CmdMsg, 512> m_q;
+	lbp::CmdMsg m_last_response; // Re-sent when a request is retried.
 	bool m_overflowed = false;
 };
 

@@ -13,6 +13,7 @@ CmdPayload toCmd(const MaxPayload &mp)
     CmdPayload c;
     c.reset(static_cast<uint16_t>(std::min<size_t>(mp.size(), CmdPayload::kCapacity)));
     std::memcpy(c.data(), mp.data(), c.size());
+    c.setTxid(mp.txid());
     return c;
 }
 } // namespace lbp

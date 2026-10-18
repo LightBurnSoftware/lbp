@@ -48,6 +48,13 @@ namespace lbp {
  * Additionally, two convenience constructors are provided:
  * One with just a command code (arguably the most commonly sent message),
  * and another for commands with a single argument.
+ *
+ * Transaction IDs default to txid_none. Senders that track requests stamp one with setTxid(),
+ * which may be called at any time (e.g. just before sending) and keeps the checksum valid.
+ * Responses should be built with responseTo(), which copies the request's transaction id:
+ *
+ * auto reply = CmdMsg::responseTo(request, 4);
+ * reply.writeInt(state);
  */
 template <std::size_t Capacity>
 class Message
@@ -70,7 +77,8 @@ public:
 	{
 		assert((size_min_msg + size_t(arg_size)) <= Capacity && "Total message size cannot exceed capacity");
 		// Cannot fail, the constructor and static limits on Capacity guarantee room to write.
-		writeInt(cmd_start);
+		writeInt(magic_start);
+		writeShort(txid_none);
 		writeShort(payloadSize());
 		writeShort(cmd);
 	}
@@ -104,6 +112,19 @@ public:
 		} else if (arg_size == 4) {
 			writeInt(static_cast<uint32_t>(arg));
 		}
+	}
+
+	/**
+	 * @brief Construct a response to a received request: same command code and transaction id.
+	 * @param request The payload of the request being answered.
+	 * @param arg_size Size of the response arguments (in bytes).
+	 */
+	template <size_t PayloadCapacity>
+	static Message responseTo(const Payload<PayloadCapacity> &request, uint16_t arg_size = 0)
+	{
+		Message m(request.cmd(), arg_size);
+		m.setTxid(request.txid());
+		return m;
 	}
 
 	/** Copy Constructor */
@@ -152,7 +173,22 @@ public:
 	uint16_t size() const { return m_size; }
 
 	/** @return the command code included in this message. */
-	uint16_t cmd() const { return readBE16(m_data + size_start + size_len); }
+	uint16_t cmd() const { return readBE16(m_data + size_payload_offset); }
+
+	/** @return the transaction id included in this message. */
+	uint16_t txid() const { return m_size >= size_min_msg ? readBE16(m_data + size_txid_offset) : txid_none; }
+
+	/**
+	 * @brief Set the transaction id. If the message is already complete, the checksum is recomputed.
+	 * @return False if the message was never properly constructed.
+	 */
+	bool setTxid(uint16_t txid)
+	{
+		if (m_size < size_min_msg) return false;
+		writeBE16(txid, m_data + size_txid_offset);
+		if (full()) setChecksum();
+		return true;
+	}
 
 	/** @return the checksum from the end of this message. */
 	uint16_t checksum() const { return m_size >= size_min_msg ? readBE16(m_data + (m_size - size_crc)) : 0; }
@@ -268,7 +304,7 @@ private:
 	void setChecksum()
 	{
 		uint16_t crc_offset = m_size - size_crc;
-		uint16_t checksum = crc16(payloadData(), payloadSize());
+		uint16_t checksum = crc16(m_data + size_crc_offset, crc_offset - size_crc_offset);
 		m_data[crc_offset + 0] = (uint8_t) (checksum >> 8);
 		m_data[crc_offset + 1] = (uint8_t) (checksum >> 0);
 	}

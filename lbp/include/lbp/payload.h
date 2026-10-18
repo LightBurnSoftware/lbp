@@ -38,6 +38,7 @@ public:
 	Payload(const Payload &other)
 		: m_size(other.m_size)
 		, m_cursor(other.m_cursor)
+		, m_txid(other.m_txid)
 	{
 		std::memcpy(m_data, other.m_data, m_size);
 	}
@@ -46,6 +47,7 @@ public:
 	Payload(Payload &&other) noexcept
 		: m_size(other.m_size)
 		, m_cursor(other.m_cursor)
+		, m_txid(other.m_txid)
 	{
 		std::memcpy(m_data, other.m_data, other.m_size);
 		other.m_size = 0;
@@ -58,6 +60,7 @@ public:
 		if (&other != this) {
 			m_size = other.m_size;
 			m_cursor = other.m_cursor;
+			m_txid = other.m_txid;
 			std::memcpy(m_data, other.m_data, other.m_size);
 		}
 		return *this;
@@ -69,6 +72,7 @@ public:
 		if (&other != this) {
 			m_size = other.m_size;
 			m_cursor = other.m_cursor;
+			m_txid = other.m_txid;
 			std::memcpy(m_data, other.m_data, other.m_size);
 			other.m_size = 0;
 			other.m_cursor = size_cmd;
@@ -90,6 +94,12 @@ public:
 		}
 		return ((uint16_t) m_data[0] << 8) | m_data[1];
 	}
+
+	/** @return The transaction id of the message this payload arrived in. */
+	uint16_t txid() const { return m_txid; }
+
+	/** @brief Set the transaction id. Normally done only by the Parser. */
+	void setTxid(uint16_t txid) { m_txid = txid; }
 
 	/** @return A const pointer to the payload data. */
 	const uint8_t *data() const { return m_data; }
@@ -220,6 +230,7 @@ private:
 	uint8_t m_data[Capacity] = {};	// Stack-allocated data buffer.
 	uint16_t m_size = 0;			// The size, in bytes, of m_data. <= Capacity.
 	uint16_t m_cursor = size_cmd;	// Read cursor for the read* functions.
+	uint16_t m_txid = txid_none;	// Transaction id from the message header (not part of m_data).
 };
 
 /** Most payloads will be small "command" payloads. They might be stored in command queues. */

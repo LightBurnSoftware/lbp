@@ -25,16 +25,16 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 		gLog().push(Log::INFO, "BOF~~~~~~");
 		reset();
 		startReceiving(request);
-		out_q.push(CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case cmd_file_end:
 		gLog().push(Log::INFO, "EOF~~~~~~");
 		stopReceiving();
-		out_q.push(CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case cmd_file_chunk:
 		receive(request);
-		out_q.push(CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	default:
 		break;

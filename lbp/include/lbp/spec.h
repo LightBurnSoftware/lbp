@@ -11,19 +11,32 @@
 namespace lbp {
 
 //header of every message
-constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+constexpr uint32_t magic_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+
+// Message layout: [start 4][txid 2][size 2][payload: cmd 2, args n][crc 2]
+// size counts the payload only. crc covers txid, size, and payload.
 
 //sizes of message components
-constexpr uint8_t size_start = sizeof(cmd_start); // 4 bytes for start header
+constexpr uint8_t size_start = sizeof(magic_start); // 4 bytes for start header
+constexpr uint8_t size_txid = 2; // 2 bytes for the transaction id
 constexpr uint8_t size_len = 2; // 2 bytes to store payload size
 constexpr uint8_t size_crc = 2; // 2 bytes to store crc16 at end of message
 constexpr uint8_t size_cmd = 2; // 2 bytes for the lbp command code.
+constexpr uint8_t size_header = size_start + size_txid + size_len; // everything before the payload.
 constexpr uint8_t size_min_payload = size_cmd; // smallest is just a 16 bit command
 constexpr uint8_t size_cfg_payload = size_cmd + 4; // all cfg payloads are just the command plus a 4-byte value.
-constexpr uint8_t size_header_footer = size_start + size_len + size_crc; // size of everything *except* the payload.
+constexpr uint8_t size_header_footer = size_header + size_crc; // size of everything *except* the payload.
 constexpr uint8_t size_min_msg = size_header_footer + size_min_payload; // size of the smallest permitted message.
-constexpr uint8_t size_payload_offset = size_start + size_len; // index of the first byte of the payload
+constexpr uint8_t size_txid_offset = size_start; // index of the transaction id
+constexpr uint8_t size_len_offset = size_txid_offset + size_txid; // index of the payload size
+constexpr uint8_t size_payload_offset = size_header; // index of the first byte of the payload
 constexpr uint8_t size_arg_offset = size_payload_offset + size_min_payload; // index of the first byte of payload "arguments"
+constexpr uint8_t size_crc_offset = size_txid_offset; // index of the first byte covered by the checksum
+
+constexpr uint16_t txid_none = 0; // transaction id for messages that aren't part of a request/response pair.
+
+// Protocol version exchanged in cmd_handshake: upper byte major, lower byte minor. See lbp/version.h.
+constexpr uint16_t protocol_version = 0x0009; // 0.9
 
 // sizes of common msgs and payloads (defined to facilitate static allocations).
 constexpr int size_max_cmd_args = 32; // no commands require more than eight 4-byte integers.

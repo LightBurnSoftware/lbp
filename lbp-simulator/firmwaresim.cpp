@@ -7,6 +7,7 @@
 #include <lbp/message.h>
 #include <lbp/payload.h>
 #include <lbp/spec.h>
+#include <lbp/version.h>
 
 static void tx_nop(const uint8_t *bytes, size_t len)
 {
@@ -69,7 +70,7 @@ void FirmwareSim::pumpJob()
 
 	while (m_movement.canEnqueue()) {
 		if (fparser.parseNext()) {
-			m_movement.process(fparser.payload(), m_out_q, CmdSource::Wire);
+			m_movement.process(fparser.payload(), m_out_q, CmdSource::File);
 		} else if (m_filesystem.feedParser() == 0) {
 			break;
 		}
@@ -130,6 +131,21 @@ void FirmwareSim::stop()
 
 bool FirmwareSim::process(lbp::MaxPayload &payload)
 {
+	const uint16_t txid = payload.txid();
+
+	// A repeated transaction id is a retry: answer again without repeating side effects.
+	if (txid != lbp::txid_none && txid == m_last_txid) {
+		lbp::CmdMsg prev;
+		if (m_out_q.lastResponse(txid, prev)) {
+			gLog().push(Log::INFO, QString("Duplicate txid %1, resending response").arg(txid));
+			m_out_q.push(prev);
+			return true;
+		}
+	}
+	if (txid != lbp::txid_none) {
+		m_last_txid = txid;
+	}
+
 	// Try to handle this request with one of the components.
 	if (m_filesystem.process(payload, m_out_q)) {
 		return true;
@@ -148,40 +164,50 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	case lbp::cmd_commit_cfg:
 		m_config.commit();
 		gLog().push(Log::INFO, "Config Commit");
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		return true;
-	case lbp::cmd_handshake:
-		gLog().push(Log::DEBUG, "Handshake detected. Shaking Back :)");
-		m_out_q.push(lbp::CmdMsg(cmd));
+	case lbp::cmd_handshake: {
+		uint16_t host_version = 0;
+		if (payload.readArg(host_version)) {
+			gLog().push(Log::DEBUG, QString("Handshake from host v%1.%2. Shaking back :)")
+										.arg(lbp::versionMajor(host_version))
+										.arg(lbp::versionMinor(host_version)));
+		} else {
+			gLog().push(Log::WARNING, "Handshake without a version. Shaking back anyway.");
+		}
+		lbp::CmdMsg reply = lbp::CmdMsg::responseTo(payload, 2);
+		reply.writeShort(lbp::protocol_version);
+		m_out_q.push(reply);
 		return true;
+	}
 	case lbp::cmd_stop:
 		gLog().push(Log::INFO, "Stop command received.");
 		stop();
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		return true;
 	case lbp::cmd_pause:
 		gLog().push(Log::INFO, "Pause command received.");
 		m_movement.pause();
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		return true;
 	case lbp::cmd_continue:
 		gLog().push(Log::INFO, "Resume command received.");
 		m_movement.resume();
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		return true;
 	case lbp::cmd_get_state:
-		m_out_q.push(lbp::CmdMsg(cmd, 4, m_fw_state));
+		m_out_q.respond(payload, static_cast<int32_t>(m_fw_state));
 		return true;
 	case lbp::cmd_execute: {
 		gLog().push(Log::INFO, "Executing file!");
 		beginJob();
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		return true;
 	}
 	default:
 		gLog().push(Log::WARNING,
 					QString("Encountered unimplemented cmd %1. Sending default response.").arg(cmd));
-		m_out_q.push(lbp::CmdMsg(cmd));
+		m_out_q.respond(payload);
 		break;
 	}
 	return false;

@@ -12,11 +12,35 @@ void badPayload(const lbp::CmdPayload &p)
 
 void OutputQueue::push(lbp::CmdMsg msg)
 {
+	if (msg.txid() != lbp::txid_none) {
+		m_last_response = msg;
+	}
 	if (!m_q.push(msg)) {
 		gLog().error(QString("output queue full, dropped response %1")
 						 .arg(msg.cmd(), 0, 16));
 		m_overflowed = true;
 	}
+}
+
+void OutputQueue::respond(const lbp::MaxPayload &request)
+{
+	push(lbp::CmdMsg::responseTo(request));
+}
+
+void OutputQueue::respond(const lbp::MaxPayload &request, int32_t value)
+{
+	lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 4);
+	m.writeInt(static_cast<uint32_t>(value));
+	push(m);
+}
+
+bool OutputQueue::lastResponse(uint16_t txid, lbp::CmdMsg &out) const
+{
+	if (txid == lbp::txid_none || m_last_response.txid() != txid) {
+		return false;
+	}
+	out = m_last_response;
+	return true;
 }
 
 bool OutputQueue::takeOverflow()
