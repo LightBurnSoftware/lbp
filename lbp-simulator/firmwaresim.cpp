@@ -205,9 +205,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		return true;
 	}
 	default:
-		gLog().push(Log::WARNING,
-					QString("Encountered unimplemented cmd %1. Sending default response.").arg(cmd));
-		m_out_q.respond(payload);
+		m_out_q.nack(payload, lbp::err_unknown_cmd);
 		break;
 	}
 	return false;

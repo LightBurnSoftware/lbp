@@ -55,6 +55,10 @@ namespace lbp {
  *
  * auto reply = CmdMsg::responseTo(request, 4);
  * reply.writeInt(state);
+ *
+ * Rejections should be built with nackTo():
+ *
+ * auto reply = CmdMsg::nackTo(request, err_invalid_arg, 1);
  */
 template <std::size_t Capacity>
 class Message
@@ -124,6 +128,24 @@ public:
 	{
 		Message m(request.cmd(), arg_size);
 		m.setTxid(request.txid());
+		return m;
+	}
+
+	/**
+	 * @brief Construct a rejection of a received request: cmd_nack with the request's transaction id.
+	 * @param request The payload of the request being rejected.
+	 * @param code An err_* code from spec.h.
+	 * @param detail Code-specific detail, or 0.
+	 */
+	template <size_t PayloadCapacity>
+	static Message nackTo(const Payload<PayloadCapacity> &request, uint16_t code, uint32_t detail = 0)
+	{
+		static_assert(Capacity >= size_min_msg + size_nack_args, "Message capacity must hold a nack");
+		Message m(cmd_nack, size_nack_args);
+		m.setTxid(request.txid());
+		m.writeShort(request.cmd());
+		m.writeShort(code);
+		m.writeInt(detail);
 		return m;
 	}
 

@@ -12,7 +12,8 @@ void badPayload(const lbp::CmdPayload &p)
 
 void OutputQueue::push(lbp::CmdMsg msg)
 {
-	if (msg.txid() != lbp::txid_none) {
+	// A nacked request had no side effects, so a retry is re-evaluated rather than answered from cache.
+	if (msg.txid() != lbp::txid_none && msg.cmd() != lbp::cmd_nack) {
 		m_last_response = msg;
 	}
 	if (!m_q.push(msg)) {
@@ -32,6 +33,15 @@ void OutputQueue::respond(const lbp::MaxPayload &request, int32_t value)
 	lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 4);
 	m.writeInt(static_cast<uint32_t>(value));
 	push(m);
+}
+
+void OutputQueue::nack(const lbp::MaxPayload &request, uint16_t code, uint32_t detail)
+{
+	gLog().push(Log::WARNING, QString("NACK cmd %1: error %2, detail %3")
+								  .arg(request.cmd(), 4, 16, QChar('0'))
+								  .arg(code, 4, 16, QChar('0'))
+								  .arg(detail));
+	push(lbp::CmdMsg::nackTo(request, code, detail));
 }
 
 bool OutputQueue::lastResponse(uint16_t txid, lbp::CmdMsg &out) const

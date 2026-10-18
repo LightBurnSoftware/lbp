@@ -21,21 +21,39 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 	const uint16_t cmd = request.cmd();
 
 	switch (cmd) {
-	case cmd_file_begin:
+	case cmd_file_begin: {
 		gLog().push(Log::INFO, "BOF~~~~~~");
+		if (isReading()) {
+			out_q.nack(request, err_invalid_state, state_executing_job);
+			return true;
+		}
 		reset();
-		startReceiving(request);
-		out_q.respond(request);
+		const uint16_t err = startReceiving(request);
+		if (err) {
+			out_q.nack(request, err, err == err_bad_length ? 4 : 0);
+		} else {
+			out_q.respond(request);
+		}
 		return true;
+	}
 	case cmd_file_end:
 		gLog().push(Log::INFO, "EOF~~~~~~");
+		if (m_state != State::Receiving) {
+			out_q.nack(request, err_transfer);
+			return true;
+		}
 		stopReceiving();
 		out_q.respond(request);
 		return true;
-	case cmd_file_chunk:
-		receive(request);
-		out_q.respond(request);
+	case cmd_file_chunk: {
+		const uint16_t err = receive(request);
+		if (err) {
+			out_q.nack(request, err);
+		} else {
+			out_q.respond(request);
+		}
 		return true;
+	}
 	default:
 		break;
 	}
@@ -47,19 +65,19 @@ FileParser &FileSystem::parser()
 	return m_parser;
 }
 
-void FileSystem::startReceiving(lbp::MaxPayload &payload)
+uint16_t FileSystem::startReceiving(lbp::MaxPayload &payload)
 {
 	m_file.setFileName(getTmpFilename());
 
 	if (m_state != FileSystem::State::Idle) {
 		gLog().error("Cannot start receiving - state error");
-		return;
+		return err_invalid_state;
 	}
 
 	uint32_t size = 0;
-	if (!payload.readArg(size)) {
+	if (payload.size() != size_cmd + 4 || !payload.readArg(size)) {
 		gLog().error("Cannot start receiving - malformed packet");
-		return;
+		return err_bad_length;
 	}
 
 	if (m_file.open(QIODevice::WriteOnly)) {
@@ -67,25 +85,31 @@ void FileSystem::startReceiving(lbp::MaxPayload &payload)
 		m_parser.clear();
 
 		gLog().push(Log::INFO, QString("File size: %1").arg(size));
-	} else {
-		gLog().error("Could not open file for writing");
-		m_state = FileSystem::State::Idle;
+		return 0;
 	}
+	gLog().error("Could not open file for writing");
+	m_state = FileSystem::State::Idle;
+	return err_internal;
 }
 
-void FileSystem::receive(const lbp::MaxPayload &payload)
+uint16_t FileSystem::receive(const lbp::MaxPayload &payload)
 {
 	if (m_state != FileSystem::State::Receiving) {
 		gLog().error("Cannot receive - state error");
-		return;
+		return err_transfer;
 	}
 	if (!m_file.isOpen()) {
 		gLog().error("Cannot receive - file not open");
-		return;
+		return err_internal;
 	}
 
-	gLog().push(Log::INFO, QString("Receiving %1").arg(payload.size() - 2));
-	m_file.write((const char *) payload.args(), payload.size() - 2);
+	const qint64 len = payload.size() - size_cmd;
+	gLog().push(Log::INFO, QString("Receiving %1").arg(len));
+	if (m_file.write((const char *) payload.args(), len) != len) {
+		gLog().error("Cannot receive - write failed");
+		return err_storage_full;
+	}
+	return 0;
 }
 
 void FileSystem::stopReceiving()

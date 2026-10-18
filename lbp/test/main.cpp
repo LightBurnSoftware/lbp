@@ -118,6 +118,32 @@ int main()
 		assert(lbp::crc16(a, 0) == lbp::crc16_end(lbp::crc16_begin()));
 	}
 
+	// nackTo: cmd_nack carrying the request's txid, rejected cmd, code, and detail.
+	{
+		lbp::CmdMsg req(lbp::cmd_jog_to_xy, 8);
+		assert(req.writeInt(1) && req.writeInt(2));
+		assert(req.setTxid(0x1234));
+		assert(parser.feed(req.data(), req.size()) == req.size());
+		assert(parser.parseNext());
+
+		auto nack = lbp::CmdMsg::nackTo(parser.payload(), lbp::err_out_of_bounds, lbp::axis_x);
+		assert(nack.complete());
+		assert(nack.cmd() == lbp::cmd_nack);
+		assert(nack.txid() == 0x1234);
+
+		assert(parser.feed(nack.data(), nack.size()) == nack.size());
+		assert(parser.parseNext());
+		lbp::MaxPayload &p = parser.payload();
+		assert(p.txid() == 0x1234);
+		uint16_t rejected = 0, code = 0;
+		uint32_t detail = 0;
+		assert(p.readArgs(rejected, code, detail));
+		assert(rejected == lbp::cmd_jog_to_xy);
+		assert(code == lbp::err_out_of_bounds);
+		assert((code & lbp::mask_err_category) == lbp::err_cat_request);
+		assert(detail == lbp::axis_x);
+	}
+
 	// Version compatibility
 	static_assert(lbp::versionsCompatible(lbp::makeVersion(0, 9), lbp::makeVersion(0, 9)));
 	static_assert(!lbp::versionsCompatible(lbp::makeVersion(0, 9), lbp::makeVersion(0, 8)));

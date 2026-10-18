@@ -22,11 +22,13 @@ constexpr int64_t sim_max_tick_ns = 50'000'000; // elapsed time beyond this in o
 void badPayload(const lbp::CmdPayload &p);
 
 /**
- * @brief Output queue with drop detection.
+ * @brief Output queue with drop detection and other useful bookkeeping.
  *
  * Sending can fail if the consumer isn't draining. There's no useful recovery
  * at the call site, so failures are logged and latched here; the flag is
  * reported in fw_state and cleared when read.
+ * 
+ * Also contains convenience and helper functions for creating and pushing properly formed response messages.
  */
 class OutputQueue
 {
@@ -36,7 +38,9 @@ public:
 	void respond(const lbp::MaxPayload &request);
 	/** Queue a response to request with a single int32 argument. */
 	void respond(const lbp::MaxPayload &request, int32_t value);
-	/** @return true if the most recent response with a transaction id answered txid; copies it to out. */
+	/** Queue a cmd_nack rejecting request. */
+	void nack(const lbp::MaxPayload &request, uint16_t code, uint32_t detail = 0);
+	/** @return true if the most recent non-nack response with a transaction id answered txid; copies it to out. */
 	bool lastResponse(uint16_t txid, lbp::CmdMsg &out) const;
 	bool pop(lbp::CmdMsg &out) { return m_q.pop(out); }
 	bool empty() const { return m_q.empty(); }

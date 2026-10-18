@@ -10,6 +10,62 @@
 #include <algorithm>
 #include <cmath>
 
+/**
+ * @brief Check the argument size of a command this component queues.
+ * @param expected Out: the expected argument size, for the nack detail.
+ * @return True if args is a valid argument size for cmd.
+ */
+static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
+{
+	const uint16_t high = cmd & 0xFF00;
+	if ((cmd & lbp::mask_class) == lbp::cls_move) {
+		if (high == lbp::move_home) {
+			expected = 0;
+		} else {
+			int axes = 0;
+			for (uint16_t bits = cmd & lbp::mask_axis; bits; bits &= bits - 1) {
+				axes += 1;
+			}
+			expected = 4 * axes;
+		}
+		return args == expected;
+	}
+	if (high == lbp::setting_speed) {
+		expected = 4;
+		return args == expected;
+	}
+	switch (cmd) {
+	case lbp::cmd_laser_power_min:
+	case lbp::cmd_laser_power_max:
+		expected = 3;
+		break;
+	case lbp::cmd_laser_freq:
+		expected = 5;
+		break;
+	case lbp::cmd_laser_enable:
+	case lbp::cmd_laser_disable:
+	case lbp::cmd_laser_on:
+	case lbp::cmd_laser_off:
+	case lbp::cmd_cut_from:
+		expected = 1;
+		break;
+	case lbp::cmd_cut_type:
+		expected = 2;
+		break;
+	case lbp::cmd_dwell:
+		expected = 4;
+		break;
+	case lbp::cmd_raster_power:
+		// laser index + up to 15 uint16 powers
+		expected = 1;
+		return args >= 1 && args <= 31 && (args % 2) == 1;
+	default:
+		expected = 0;
+		break;
+	}
+	return args == expected;
+}
+
 static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535.f; }
 
 static inline int64_t clampTo(int64_t v, int64_t limit)
@@ -242,14 +298,28 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_job_header_begin:
 	case lbp::cmd_job_header_end:
 	case lbp::cmd_frame_begin:
-	case lbp::cmd_frame_end:
+	case lbp::cmd_frame_end: {
+		uint32_t expected = 0;
+		if (!argSizeValid(cmd, request.size() - lbp::size_cmd, expected)) {
+			if (source == CmdSource::Wire) {
+				out_q.nack(request, lbp::err_bad_length, expected);
+			} else {
+				gLog().error(QString("Job command %1 has bad argument size").arg(cmd, 4, 16, QChar('0')));
+			}
+			return true;
+		}
 		if (!m_cmd_q.push(toCmd(request))) {
 			gLog().error("Move command queue full");
+			if (source == CmdSource::Wire) {
+				out_q.nack(request, lbp::err_queue_full);
+			}
+			return true;
 		}
 		if (source == CmdSource::Wire) {
 			out_q.respond(request);
 		}
 		return true;
+	}
 	default:
 		break;
 	}

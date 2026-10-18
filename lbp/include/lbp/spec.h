@@ -123,6 +123,49 @@ constexpr uint16_t cmd_frame_end = 0x0FAE; // Marks the end of frame commands.
 
 constexpr uint16_t cmd_commit_cfg = 0x0CCC; // commit changes sent with cfg_ commands.
 
+// Sent by the firmware instead of the normal response when it rejects a request.
+// Carries the rejected request's transaction id. Args: uint16 rejected cmd, uint16 err_* code, uint32 detail.
+constexpr uint16_t cmd_nack = 0x0BAD;
+constexpr uint8_t size_nack_args = 2 + 2 + 4;
+
+// ----------------------------------------------------------------------------
+// Error codes for cmd_nack ---------------------------------------------------
+// ----------------------------------------------------------------------------
+// The upper byte is the category, which tells LightBurn how to react even to codes it doesn't know.
+// Detail is code-specific (noted below), 0 if unused.
+constexpr uint16_t mask_err_category = 0xFF00;
+
+// 0x01xx: the request is wrong. Retrying it unchanged will not help.
+constexpr uint16_t err_cat_request = 0x0100;
+constexpr uint16_t err_unknown_cmd		= err_cat_request | 0x01; // command not recognized or not implemented.
+constexpr uint16_t err_bad_length		= err_cat_request | 0x02; // argument size wrong for this command. detail: expected size.
+constexpr uint16_t err_invalid_arg		= err_cat_request | 0x03; // argument value invalid or out of range. detail: index of the bad argument.
+constexpr uint16_t err_unsupported		= err_cat_request | 0x04; // valid command, but this device can't do it (e.g. no Z axis).
+constexpr uint16_t err_out_of_bounds	= err_cat_request | 0x05; // target outside machine limits. detail: axis_* flags.
+
+// 0x02xx: the machine's current state prevents it. May succeed once the state changes.
+constexpr uint16_t err_cat_state = 0x0200;
+constexpr uint16_t err_busy				= err_cat_state | 0x01; // can't accept this right now; retry shortly.
+constexpr uint16_t err_queue_full		= err_cat_state | 0x02; // command buffer full; retry shortly.
+constexpr uint16_t err_invalid_state	= err_cat_state | 0x03; // not valid in the current state. detail: state_* flags.
+constexpr uint16_t err_not_homed		= err_cat_state | 0x04; // motion requires homing first. detail: axis_* flags.
+constexpr uint16_t err_interlock		= err_cat_state | 0x05; // door/lid open, e-stop, cooling fault, etc.
+
+// 0x03xx: file transfer problems. The transfer should be restarted.
+constexpr uint16_t err_cat_file = 0x0300;
+constexpr uint16_t err_storage_full		= err_cat_file | 0x01; // not enough space for the file.
+constexpr uint16_t err_transfer			= err_cat_file | 0x02; // chunk/end without a file_begin, or out of sequence.
+
+// 0x04xx: the device failed.
+constexpr uint16_t err_cat_device = 0x0400;
+constexpr uint16_t err_hardware_fault	= err_cat_device | 0x01; // motor driver, laser PSU, sensor, etc.
+constexpr uint16_t err_internal			= err_cat_device | 0x02; // firmware error that fits nowhere else.
+
+// 0xD0xx: reserved for vendor-specific codes.
+constexpr uint16_t err_cat_vendor = 0xD000;
+
+constexpr uint16_t err_unknown = 0xFFFF; // catch-all.
+
 // ----------------------------------------------------------------------------
 // 0x0001: Laser Commands -----------------------------------------------------
 // ----------------------------------------------------------------------------

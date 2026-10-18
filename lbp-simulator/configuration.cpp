@@ -91,7 +91,8 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		out_q.respond(request);
 		return true;
 	}
-	return false;
+	out_q.nack(request, lbp::err_bad_length, 4);
+	return true;
 }
 
 bool Configuration::get(uint16_t key, int32_t &value) const
