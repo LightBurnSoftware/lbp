@@ -75,7 +75,7 @@ uint16_t FileSystem::startReceiving(lbp::MaxPayload &payload)
 	}
 
 	uint32_t size = 0;
-	if (payload.size() != size_cmd + 4 || !payload.readArg(size)) {
+	if (payload.size() != 4 || !payload.readArg(size)) {
 		gLog().error("Cannot start receiving - malformed packet");
 		return err_bad_length;
 	}
@@ -103,9 +103,9 @@ uint16_t FileSystem::receive(const lbp::MaxPayload &payload)
 		return err_internal;
 	}
 
-	const qint64 len = payload.size() - size_cmd;
+	const qint64 len = payload.size();
 	gLog().push(Log::INFO, QString("Receiving %1").arg(len));
-	if (m_file.write((const char *) payload.args(), len) != len) {
+	if (m_file.write((const char *) payload.data(), len) != len) {
 		gLog().error("Cannot receive - write failed");
 		return err_storage_full;
 	}

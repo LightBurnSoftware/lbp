@@ -83,8 +83,8 @@ public:
 		// Cannot fail, the constructor and static limits on Capacity guarantee room to write.
 		writeInt(magic_start);
 		writeShort(txid_none);
-		writeShort(payloadSize());
 		writeShort(cmd);
+		writeShort(argSize());
 	}
 
 	/**
@@ -195,7 +195,7 @@ public:
 	uint16_t size() const { return m_size; }
 
 	/** @return the command code included in this message. */
-	uint16_t cmd() const { return readBE16(m_data + size_payload_offset); }
+	uint16_t cmd() const { return readBE16(m_data + size_cmd_offset); }
 
 	/** @return the transaction id included in this message. */
 	uint16_t txid() const { return m_size >= size_min_msg ? readBE16(m_data + size_txid_offset) : txid_none; }
@@ -218,11 +218,11 @@ public:
 	/** @return the entire raw data from the message. */
 	const uint8_t *data() const { return m_data; }
 
-	/** @return the size of the actual payload (command and argument) portion of this message. */
-	uint16_t payloadSize() const { return m_size >= size_min_msg ? m_size - size_header_footer : 0; }
+	/** @return the size of the argument portion of this message. */
+	uint16_t argSize() const { return m_size >= size_min_msg ? m_size - size_header_footer : 0; }
 
-	/** @return a pointer to the start of the payload (command and argument) portion of this message. */
-	const uint8_t *payloadData() const { return m_data + size_payload_offset; }
+	/** @return a pointer to the argument portion of this message. */
+	const uint8_t *argData() const { return m_data + size_args_offset; }
 
 	/** @return true if we can write the specified number of bytes to the message, false otherwise. */
 	bool canWrite(uint16_t num_bytes) const { return (m_size >= size_min_msg) && (m_cursor + num_bytes) <= (m_size - size_crc); }

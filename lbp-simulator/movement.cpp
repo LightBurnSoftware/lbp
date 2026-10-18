@@ -8,6 +8,7 @@
 #include <lbp/spec.h>
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
 
 /**
@@ -22,11 +23,7 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 		if (high == lbp::move_home) {
 			expected = 0;
 		} else {
-			int axes = 0;
-			for (uint16_t bits = cmd & lbp::mask_axis; bits; bits &= bits - 1) {
-				axes += 1;
-			}
-			expected = 4 * axes;
+			expected = 4 * std::bitset<8>(cmd & lbp::mask_axis).count();
 		}
 		return args == expected;
 	}
@@ -300,7 +297,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_frame_begin:
 	case lbp::cmd_frame_end: {
 		uint32_t expected = 0;
-		if (!argSizeValid(cmd, request.size() - lbp::size_cmd, expected)) {
+		if (!argSizeValid(cmd, request.size(), expected)) {
 			if (source == CmdSource::Wire) {
 				out_q.nack(request, lbp::err_bad_length, expected);
 			} else {
@@ -755,12 +752,12 @@ uint32_t MovementSim::getFwState(uint32_t state)
 void LaserSettings::setRaster(lbp::CmdPayload &payload)
 {
 	if (payload.cmd() != lbp::cmd_raster_power) return;
-	if (payload.size() < 3) {
+	if (payload.size() < 1) {
 		num_rasters = 0;
 		return;
 	}
 
-	num_rasters = (payload.size() - 3) >> 1;
+	num_rasters = (payload.size() - 1) >> 1;
 	//gLog().info(QString("set raster ") + QString::number(num_rasters));
 
 	if (!num_rasters) {

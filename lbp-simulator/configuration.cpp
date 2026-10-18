@@ -80,18 +80,18 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 	if (!isCfg(cmd)) {
 		return false;
 	}
-	if (request.size() == 2) {
+	if (request.size() == 0) {
 		// it's a query
 		gLog().info(QString("Config Get %1: %2").arg(cmd).arg(m_settings[cmd]));
 		out_q.respond(request, m_settings[cmd]);
 		return true;
 	}
-	if (request.size() == 6 && request.readArg(m_scratch[cmd])) {
+	if (request.size() == lbp::size_cfg_args && request.readArg(m_scratch[cmd])) {
 		gLog().push(Log::INFO, QString("Config Set %1: %2").arg(cmd).arg(m_scratch[cmd]));
 		out_q.respond(request);
 		return true;
 	}
-	out_q.nack(request, lbp::err_bad_length, 4);
+	out_q.nack(request, lbp::err_bad_length, lbp::size_cfg_args);
 	return true;
 }
 

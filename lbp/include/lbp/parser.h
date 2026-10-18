@@ -67,6 +67,13 @@ public:
 				break;
 			case State::TxId:
 				if (m_buffer.read(m_txid_buffer, size_txid)) {
+					m_state = State::Cmd;
+				} else {
+					return false;
+				}
+				break;
+			case State::Cmd:
+				if (m_buffer.read(m_cmd_buffer, size_cmd)) {
 					m_state = State::Size;
 				} else {
 					return false;
@@ -75,22 +82,21 @@ public:
 			case State::Size:
 				if (m_buffer.read(m_len_buffer, size_len)) {
 					uint16_t len = readBE16(m_len_buffer);
-					if (len < size_min_payload || len > size_file_payload) {
+					if (len > size_file_args) {
 						// Reject messages of invalid size.
 						size_rejections += 1;
 						m_header = 0;
 						m_buffer.rewind();
 						m_state = State::HeaderSync;
 					} else {
-						m_payload.reset(len);
-						m_payload.setTxid(readBE16(m_txid_buffer));
-						m_state = State::Data;
+						m_payload.reset(readBE16(m_cmd_buffer), readBE16(m_txid_buffer), len);
+						m_state = State::Args;
 					}
 				} else {
 					return false;
 				}
 				break;
-			case State::Data:
+			case State::Args:
 				if (m_buffer.read(m_payload.data(), m_payload.size())) {
 					m_state = State::Checksum;
 				} else {
@@ -102,6 +108,7 @@ public:
 					m_state = State::HeaderSync;
 					uint16_t crc = crc16_begin();
 					crc = crc16_update(crc, m_txid_buffer, size_txid);
+					crc = crc16_update(crc, m_cmd_buffer, size_cmd);
 					crc = crc16_update(crc, m_len_buffer, size_len);
 					crc = crc16_update(crc, m_payload.data(), m_payload.size());
 					if (readBE16(m_crc_buffer) == crc16_end(crc)) {
@@ -166,8 +173,9 @@ private:
 	enum class State {
 		HeaderSync,
 		TxId,
+		Cmd,
 		Size,
-		Data,
+		Args,
 		Checksum
 	};
 
@@ -177,6 +185,7 @@ private:
 	uint32_t m_header = 0;			 	// Storage for the header we're searching for.
 	uint8_t m_crc_buffer[2] = {};	  	// Scratch for read value of the checksum.
 	uint8_t m_txid_buffer[size_txid] = {}; // Raw txid bytes, kept for the checksum computation.
+	uint8_t m_cmd_buffer[size_cmd] = {};	// Raw cmd bytes, kept for the checksum computation.
 	uint8_t m_len_buffer[size_len] = {};	// Raw size bytes, kept for the checksum computation.
 	uint8_t m_byte = 0;					// Buffer for reading one byte at a time.
 };

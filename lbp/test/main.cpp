@@ -26,7 +26,7 @@ int main()
 
 	lbp::MaxPayload &mp = parser.payload();
 
-	assert(mp.size() == 10);
+	assert(mp.size() == 8);
 	assert(mp.cmd() == lbp::cmd_jog_to_xy);
 	int32_t x, y = 0;
 	assert(mp.readArg(x));
@@ -41,7 +41,7 @@ int main()
 	lbp::CmdPayload cp;
 	assert(queue.pop(cp));
 
-	assert(cp.size() == 10);
+	assert(cp.size() == 8);
 	assert(cp.cmd() == lbp::cmd_jog_to_xy);
 
 	x = y = 0;
@@ -52,13 +52,13 @@ int main()
 
 	lbp::CmdPayload moved = std::move(cp);
 
-	// Wire format matches the spec.md handshake example: [DRGN][txid][size][cmd][crc]
+	// Wire format: [DRGN][txid][cmd][size][args][crc]
 	{
 		lbp::CmdMsg hs(lbp::cmd_handshake);
 		assert(hs.complete());
 		assert(hs.txid() == lbp::txid_none);
 		assert(hs.setTxid(1));
-		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x00, 0x02, 0x01, 0xb8, 0x68, 0x69};
+		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x01, 0xb8, 0x00, 0x00, 0xf0, 0xac};
 		assert(hs.size() == sizeof(expected));
 		assert(std::memcmp(hs.data(), expected, sizeof(expected)) == 0);
 	}
@@ -77,8 +77,8 @@ int main()
 		assert(resp.complete());
 		assert(resp.txid() == 0x2a);
 		assert(resp.cmd() == lbp::cmd_pos_x);
-		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x2a, 0x00, 0x06,
-									0x81, 0x01, 0x00, 0x00, 0x4e, 0x20, 0x05, 0xdf};
+		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x2a, 0x81, 0x01,
+									0x00, 0x04, 0x00, 0x00, 0x4e, 0x20, 0x9d, 0x75};
 		assert(resp.size() == sizeof(expected));
 		assert(std::memcmp(resp.data(), expected, sizeof(expected)) == 0);
 
@@ -142,6 +142,34 @@ int main()
 		assert(code == lbp::err_out_of_bounds);
 		assert((code & lbp::mask_err_category) == lbp::err_cat_request);
 		assert(detail == lbp::axis_x);
+	}
+
+	// Zero-argument messages round trip with size 0.
+	{
+		lbp::CmdMsg m(lbp::cmd_get_state);
+		assert(m.size() == lbp::size_min_msg && m.argSize() == 0);
+		assert(parser.feed(m.data(), m.size()) == m.size());
+		assert(parser.parseNext());
+		assert(parser.payload().cmd() == lbp::cmd_get_state);
+		assert(parser.payload().size() == 0);
+	}
+
+	// The largest argument size is accepted; one byte more is rejected as a bad size.
+	{
+		static uint8_t chunk[lbp::size_file_args] = {};
+		lbp::MaxMsg big(lbp::cmd_file_chunk, lbp::size_file_args);
+		assert(big.writeData(chunk, lbp::size_file_args));
+		assert(big.complete() && big.size() == lbp::size_file_msg);
+		assert(parser.feed(big.data(), big.size()) == big.size());
+		assert(parser.parseNext());
+		assert(parser.payload().size() == lbp::size_file_args);
+
+		uint8_t hdr[lbp::size_header] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x00, 0x44, 0xFC, 0x00, 0x00};
+		lbp::writeBE16(lbp::size_file_args + 1, hdr + lbp::size_len_offset);
+		const size_t rejected = parser.size_rejections;
+		assert(parser.feed(hdr, sizeof(hdr)) == sizeof(hdr));
+		assert(!parser.parseNext());
+		assert(parser.size_rejections == rejected + 1);
 	}
 
 	// Version compatibility
