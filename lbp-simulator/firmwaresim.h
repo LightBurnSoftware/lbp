@@ -53,6 +53,9 @@ public:
 	/** Stop all movement, file operations, and queued commands. */
 	void stop();
 
+	/** Simulate a fault (e.g. an open interlock). While active, motion is stopped and refused. */
+	void setFault(bool active);
+
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
@@ -76,4 +79,5 @@ private:
 	TxCallback m_tx_callback; // Callback for sending output messages.
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 	uint16_t m_last_txid = lbp::txid_none; // Most recent transaction id processed, for retry detection.
+	bool m_fault = false; // Simulated fault, reported as state_fault.
 };

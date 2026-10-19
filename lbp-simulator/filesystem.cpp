@@ -24,13 +24,13 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 	case cmd_file_begin: {
 		gLog().push(Log::INFO, "BOF~~~~~~");
 		if (isReading()) {
-			out_q.nack(request, err_invalid_state, state_executing_job);
+			out_q.nack(request, err_wrong_state, state_executing_job);
 			return true;
 		}
 		reset();
 		const uint16_t err = startReceiving(request);
 		if (err) {
-			out_q.nack(request, err, err == err_bad_length ? 4 : 0);
+			out_q.nack(request, err, err == err_invalid_length ? 4 : 0);
 		} else {
 			out_q.respond(request);
 		}
@@ -71,13 +71,13 @@ uint16_t FileSystem::startReceiving(lbp::MaxPayload &payload)
 
 	if (m_state != FileSystem::State::Idle) {
 		gLog().error("Cannot start receiving - state error");
-		return err_invalid_state;
+		return err_wrong_state;
 	}
 
 	uint32_t size = 0;
 	if (payload.size() != 4 || !payload.readArg(size)) {
 		gLog().error("Cannot start receiving - malformed packet");
-		return err_bad_length;
+		return err_invalid_length;
 	}
 
 	if (m_file.open(QIODevice::WriteOnly)) {
@@ -89,7 +89,7 @@ uint16_t FileSystem::startReceiving(lbp::MaxPayload &payload)
 	}
 	gLog().error("Could not open file for writing");
 	m_state = FileSystem::State::Idle;
-	return err_internal;
+	return err_unknown;
 }
 
 uint16_t FileSystem::receive(const lbp::MaxPayload &payload)
@@ -100,7 +100,7 @@ uint16_t FileSystem::receive(const lbp::MaxPayload &payload)
 	}
 	if (!m_file.isOpen()) {
 		gLog().error("Cannot receive - file not open");
-		return err_internal;
+		return err_unknown;
 	}
 
 	const qint64 len = payload.size();

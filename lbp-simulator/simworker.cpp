@@ -87,6 +87,11 @@ void SimWorker::onStopTransportRequested()
 	}
 }
 
+void SimWorker::onFaultRequested(bool active)
+{
+	m_sim.setFault(active);
+}
+
 void SimWorker::onTransportRx(const QByteArray &bytes)
 {
 	m_sim.rxCallback((const uint8_t *) bytes.data(), bytes.size());

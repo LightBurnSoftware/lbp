@@ -126,7 +126,7 @@ int main()
 		assert(parser.feed(req.data(), req.size()) == req.size());
 		assert(parser.parseNext());
 
-		auto nack = lbp::CmdMsg::nackTo(parser.payload(), lbp::err_out_of_bounds, lbp::axis_x);
+		auto nack = lbp::CmdMsg::nackTo(parser.payload(), lbp::err_invalid_arg, 1);
 		assert(nack.complete());
 		assert(nack.cmd() == lbp::cmd_nack);
 		assert(nack.txid() == 0x1234);
@@ -139,9 +139,8 @@ int main()
 		uint32_t detail = 0;
 		assert(p.readArgs(rejected, code, detail));
 		assert(rejected == lbp::cmd_jog_to_xy);
-		assert(code == lbp::err_out_of_bounds);
-		assert((code & lbp::mask_err_category) == lbp::err_cat_request);
-		assert(detail == lbp::axis_x);
+		assert(code == lbp::err_invalid_arg);
+		assert(detail == 1);
 	}
 
 	// Zero-argument messages round trip with size 0.

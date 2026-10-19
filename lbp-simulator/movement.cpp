@@ -299,7 +299,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		uint32_t expected = 0;
 		if (!argSizeValid(cmd, request.size(), expected)) {
 			if (source == CmdSource::Wire) {
-				out_q.nack(request, lbp::err_bad_length, expected);
+				out_q.nack(request, lbp::err_invalid_length, expected);
 			} else {
 				gLog().error(QString("Job command %1 has bad argument size").arg(cmd, 4, 16, QChar('0')));
 			}

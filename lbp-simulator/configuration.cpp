@@ -91,7 +91,7 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		out_q.respond(request);
 		return true;
 	}
-	out_q.nack(request, lbp::err_bad_length, lbp::size_cfg_args);
+	out_q.nack(request, lbp::err_invalid_length, lbp::size_cfg_args);
 	return true;
 }
 

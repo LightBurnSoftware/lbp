@@ -24,6 +24,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, pbStart(new QPushButton("Start", this))
 	, pbStop(new QPushButton("Stop", this))
 	, pbClearSim(new QPushButton("Clear Sim View", this))
+	, cbFault(new QCheckBox("Simulate Fault", this))
 {
 	// Widget setup
 	assert(centralWidget() == nullptr);
@@ -31,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(pbClearSim, &QPushButton::clicked, this, &MainWindow::onClearClicked);
 	connect(pbStop, &QPushButton::clicked, this, &MainWindow::onStopTransportClicked);
 	connect(pbStart, &QPushButton::clicked, this, &MainWindow::onStartTransportClicked);
+	connect(cbFault, &QCheckBox::toggled, this, &MainWindow::faultRequested);
 
 	wSimConsole->setReadOnly(true);
 	wSimConsole->document()->setMaximumBlockCount(MAX_SERVER_CONSOLE_LINES);
@@ -46,6 +48,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	QVBoxLayout *controls = new QVBoxLayout();
 	controls->addLayout(buttons);
+	controls->addWidget(cbFault);
 	controls->addWidget(wTransport);
 	controls->addStretch();
 
@@ -65,6 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	connect(this, &MainWindow::startTransportRequested, m_worker, &SimWorker::onStartTransportRequested);
 	connect(this, &MainWindow::stopTransportRequested, m_worker, &SimWorker::onStopTransportRequested);
+	connect(this, &MainWindow::faultRequested, m_worker, &SimWorker::onFaultRequested);
 	connect(&m_thread, &QThread::started, m_worker, &SimWorker::init);
 	connect(&m_thread, &QThread::finished, m_worker, &SimWorker::deleteLater);
 	m_thread.start();

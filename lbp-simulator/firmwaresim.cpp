@@ -77,10 +77,30 @@ void FirmwareSim::pumpJob()
 	}
 }
 
+void FirmwareSim::setFault(bool active)
+{
+	if (active == m_fault) {
+		return;
+	}
+	m_fault = active;
+	if (active) {
+		gLog().push(Log::WARNING, "Fault: stopping and refusing motion.");
+		stop();
+	} else {
+		gLog().push(Log::INFO, "Fault cleared.");
+	}
+	updateFwState();
+}
+
 void FirmwareSim::updateFwState()
 {
 	m_fw_state = m_filesystem.getFwState(m_fw_state);
 	m_fw_state = m_movement.getFwState(m_fw_state);
+	if (m_fault) {
+		m_fw_state |= lbp::state_fault;
+	} else {
+		m_fw_state &= ~lbp::state_fault;
+	}
 
 	if (m_fw_state & lbp::state_executing_job) {
 		checkJobComplete();
@@ -146,6 +166,14 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		m_last_txid = txid;
 	}
 
+	const uint16_t req_cmd = payload.cmd();
+	const bool starts_motion = (req_cmd & lbp::mask_class) == lbp::cls_move
+		|| req_cmd == lbp::cmd_execute || req_cmd == lbp::cmd_continue;
+	if (m_fault && starts_motion) {
+		m_out_q.nack(payload, lbp::err_fault);
+		return true;
+	}
+
 	// Try to handle this request with one of the components.
 	if (m_filesystem.process(payload, m_out_q)) {
 		return true;
@@ -205,7 +233,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		return true;
 	}
 	default:
-		m_out_q.nack(payload, lbp::err_unknown_cmd);
+		m_out_q.nack(payload, lbp::err_invalid_cmd);
 		break;
 	}
 	return false;

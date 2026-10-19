@@ -40,6 +40,9 @@ public slots:
 	/** Stop the current transport. */
 	void onStopTransportRequested();
 
+	/** Start or clear a simulated fault. */
+	void onFaultRequested(bool active);
+
 private slots:
 	/** Invoked when the transport layer has bytes ready for reading. */
 	void onTransportRx(const QByteArray &bytes);
