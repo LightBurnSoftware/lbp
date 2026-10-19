@@ -16,6 +16,11 @@ namespace lbp {
  */
 uint16_t crc16(const uint8_t *data_p, size_t len);
 
+/** Incremental form: crc16_end(crc16_update(crc16_begin(), a, n), ...) == crc16(a + b...). */
+constexpr uint16_t crc16_begin() { return 0xffff; }
+uint16_t crc16_update(uint16_t crc, const uint8_t *data_p, size_t len);
+uint16_t crc16_end(uint16_t crc);
+
 } // namespace lbp
 
 #endif // LBP_CHECKSUM_H

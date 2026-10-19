@@ -20,6 +20,7 @@ add_library(lbp STATIC
 	include/lbp/queue.h
 	include/lbp/ringbuffer.h
 	include/lbp/spec.h
+	include/lbp/version.h
 )
 
 target_include_directories(lbp PUBLIC

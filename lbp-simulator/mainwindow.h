@@ -8,6 +8,7 @@
 #include "transport.h"
 #include "transportwidget.h"
 
+#include <QCheckBox>
 #include <QMainWindow>
 #include <QPushButton>
 #include <QTextEdit>
@@ -27,6 +28,7 @@ public:
 signals:
 	void startTransportRequested(Transport::Config config);
 	void stopTransportRequested();
+	void faultRequested(bool active);
 
 protected:
 	void timerEvent(QTimerEvent *event) override;
@@ -45,6 +47,7 @@ private:
 	QPushButton *pbStart = nullptr;
 	QPushButton *pbStop = nullptr;
 	QPushButton *pbClearSim = nullptr;
+	QCheckBox *cbFault = nullptr;
 
 	// members
 	SimWorker *m_worker; // harness to operate the firmware simulation

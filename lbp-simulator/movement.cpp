@@ -8,7 +8,60 @@
 #include <lbp/spec.h>
 
 #include <algorithm>
+#include <bitset>
 #include <cmath>
+
+/**
+ * @brief Check the argument size of a command this component queues.
+ * @param expected Out: the expected argument size, for the nack detail.
+ * @return True if args is a valid argument size for cmd.
+ */
+static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
+{
+	const uint16_t high = cmd & 0xFF00;
+	if ((cmd & lbp::mask_class) == lbp::cls_move) {
+		if (high == lbp::move_home) {
+			expected = 0;
+		} else {
+			expected = 4 * std::bitset<8>(cmd & lbp::mask_axis).count();
+		}
+		return args == expected;
+	}
+	if (high == lbp::setting_speed) {
+		expected = 4;
+		return args == expected;
+	}
+	switch (cmd) {
+	case lbp::cmd_laser_power_min:
+	case lbp::cmd_laser_power_max:
+		expected = 3;
+		break;
+	case lbp::cmd_laser_freq:
+		expected = 5;
+		break;
+	case lbp::cmd_laser_enable:
+	case lbp::cmd_laser_disable:
+	case lbp::cmd_laser_on:
+	case lbp::cmd_laser_off:
+	case lbp::cmd_cut_from:
+		expected = 1;
+		break;
+	case lbp::cmd_cut_type:
+		expected = 2;
+		break;
+	case lbp::cmd_dwell:
+		expected = 4;
+		break;
+	case lbp::cmd_raster_power:
+		// laser index + up to 15 uint16 powers
+		expected = 1;
+		return args >= 1 && args <= 31 && (args % 2) == 1;
+	default:
+		expected = 0;
+		break;
+	}
+	return args == expected;
+}
 
 static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535.f; }
 
@@ -69,29 +122,29 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	switch (cmd) {
 	case lbp::cmd_pos_x:
 		gLog().push(Log::DEBUG, QString("X Axis Query: %1").arg(m_pos.x));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.x)));
+		out_q.respond(request, toWire(m_pos.x));
 		return true;
 	case lbp::cmd_pos_y:
 		gLog().push(Log::DEBUG, QString("Y Axis Query: %1").arg(m_pos.y));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.y)));
+		out_q.respond(request, toWire(m_pos.y));
 		return true;
 	case lbp::cmd_pos_z:
 		gLog().push(Log::DEBUG, QString("Z Axis Query: %1").arg(m_pos.z));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.z)));
+		out_q.respond(request, toWire(m_pos.z));
 		return true;
 	case lbp::cmd_pos_u:
 		gLog().push(Log::DEBUG, QString("U Axis Query: %1").arg(m_pos.u));
-		out_q.push(lbp::CmdMsg(cmd, 4, toWire(m_pos.u)));
+		out_q.respond(request, toWire(m_pos.u));
 		return true;
 	case lbp::cmd_pos_xy: {
-		lbp::CmdMsg m(cmd, 8);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 8);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		out_q.push(m);
 		return true;
 	}
 	case lbp::cmd_pos_xyz: {
-		lbp::CmdMsg m(cmd, 12);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 12);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		m.writeInt(toWire(m_pos.z));
@@ -101,7 +154,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_pos_xyzu: {
 		gLog().push(Log::DEBUG, "XYZU Axis Query");
 
-		lbp::CmdMsg m(cmd, 16);
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 16);
 		m.writeInt(toWire(m_pos.x));
 		m.writeInt(toWire(m_pos.y));
 		m.writeInt(toWire(m_pos.z));
@@ -111,67 +164,67 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	}
 	case lbp::cmd_jog_start_pos_x:
 		beginJog(Vec4(1, 0, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_x:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_x:
 		beginJog(Vec4(-1, 0, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_x:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_y:
 		beginJog(Vec4(0, 1, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_y:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_y:
 		beginJog(Vec4(0, -1, 0, 0), m_target_vel_xy);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_y:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_z:
 		beginJog(Vec4(0, 0, 1, 0), m_target_vel_z);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_z:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_z:
 		beginJog(Vec4(0, 0, -1, 0), m_target_vel_z);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_z:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_u:
 		beginJog(Vec4(0, 0, 0, 1), m_target_vel_u);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_u:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_u:
 		beginJog(Vec4(0, 0, 0, -1), m_target_vel_u);
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_u:
 		endJog();
-		out_q.push(lbp::CmdMsg(cmd));
+		out_q.respond(request);
 		return true;
 	case lbp::cmd_cut_from:
 	case lbp::cmd_cut_type:
@@ -242,14 +295,28 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_job_header_begin:
 	case lbp::cmd_job_header_end:
 	case lbp::cmd_frame_begin:
-	case lbp::cmd_frame_end:
+	case lbp::cmd_frame_end: {
+		uint32_t expected = 0;
+		if (!argSizeValid(cmd, request.size(), expected)) {
+			if (source == CmdSource::Wire) {
+				out_q.nack(request, lbp::err_invalid_length, expected);
+			} else {
+				gLog().error(QString("Job command %1 has bad argument size").arg(cmd, 4, 16, QChar('0')));
+			}
+			return true;
+		}
 		if (!m_cmd_q.push(toCmd(request))) {
 			gLog().error("Move command queue full");
+			if (source == CmdSource::Wire) {
+				out_q.nack(request, lbp::err_queue_full);
+			}
+			return true;
 		}
 		if (source == CmdSource::Wire) {
-			out_q.push(lbp::CmdMsg(cmd));
+			out_q.respond(request);
 		}
 		return true;
+	}
 	default:
 		break;
 	}
@@ -685,12 +752,12 @@ uint32_t MovementSim::getFwState(uint32_t state)
 void LaserSettings::setRaster(lbp::CmdPayload &payload)
 {
 	if (payload.cmd() != lbp::cmd_raster_power) return;
-	if (payload.size() < 3) {
+	if (payload.size() < 1) {
 		num_rasters = 0;
 		return;
 	}
 
-	num_rasters = (payload.size() - 3) >> 1;
+	num_rasters = (payload.size() - 1) >> 1;
 	//gLog().info(QString("set raster ") + QString::number(num_rasters));
 
 	if (!num_rasters) {

@@ -58,9 +58,11 @@ public:
 
 private:
 	enum class State { Idle, Receiving, Reading };
-	void startReceiving(lbp::MaxPayload &payload);
+	/** @return 0 on success, or an err_* code. */
+	uint16_t startReceiving(lbp::MaxPayload &payload);
 	void stopReceiving();
-	void receive(const lbp::MaxPayload &payload);
+	/** @return 0 on success, or an err_* code. */
+	uint16_t receive(const lbp::MaxPayload &payload);
 
 	State m_state = State::Idle;
 	FileParser m_parser;

@@ -7,34 +7,44 @@
 #include <cstdint>
 
 // Specification for the LightBurn Protocol.
+// Currently in Alpha state. Codes and framing are subject to change.
 
 namespace lbp {
 
 //header of every message
-constexpr uint32_t cmd_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+constexpr uint32_t magic_start = 0x4452474E; //'DRGN' in ascii, short for "dragon".
+
+// Message layout: [magic 4][txid 2][cmd 2][size 2][args n][crc 2]
+// size counts the args only (may be 0). crc covers txid, cmd, size, and args.
 
 //sizes of message components
-constexpr uint8_t size_start = sizeof(cmd_start); // 4 bytes for start header
-constexpr uint8_t size_len = 2; // 2 bytes to store payload size
-constexpr uint8_t size_crc = 2; // 2 bytes to store crc16 at end of message
+constexpr uint8_t size_start = sizeof(magic_start); // 4 bytes for start header
+constexpr uint8_t size_txid = 2; // 2 bytes for the transaction id
 constexpr uint8_t size_cmd = 2; // 2 bytes for the lbp command code.
-constexpr uint8_t size_min_payload = size_cmd; // smallest is just a 16 bit command
-constexpr uint8_t size_cfg_payload = size_cmd + 4; // all cfg payloads are just the command plus a 4-byte value.
-constexpr uint8_t size_header_footer = size_start + size_len + size_crc; // size of everything *except* the payload.
-constexpr uint8_t size_min_msg = size_header_footer + size_min_payload; // size of the smallest permitted message.
-constexpr uint8_t size_payload_offset = size_start + size_len; // index of the first byte of the payload
-constexpr uint8_t size_arg_offset = size_payload_offset + size_min_payload; // index of the first byte of payload "arguments"
+constexpr uint8_t size_len = 2; // 2 bytes to store the argument size
+constexpr uint8_t size_crc = 2; // 2 bytes to store crc16 at end of message
+constexpr uint8_t size_header = size_start + size_txid + size_cmd + size_len; // everything before the args.
+constexpr uint8_t size_header_footer = size_header + size_crc; // size of everything *except* the args.
+constexpr uint8_t size_min_args = 0; // a message may have no arguments.
+constexpr uint8_t size_cfg_args = 4; // all cfg args are a single 4-byte value.
+constexpr uint8_t size_min_msg = size_header_footer + size_min_args; // size of the smallest permitted message.
+constexpr uint8_t size_txid_offset = size_start; // index of the transaction id
+constexpr uint8_t size_cmd_offset = size_txid_offset + size_txid; // index of the command code
+constexpr uint8_t size_len_offset = size_cmd_offset + size_cmd; // index of the argument size
+constexpr uint8_t size_args_offset = size_header; // index of the first argument byte
+constexpr uint8_t size_crc_offset = size_txid_offset; // index of the first byte covered by the checksum
 
-// sizes of common msgs and payloads (defined to facilitate static allocations).
+constexpr uint16_t txid_none = 0; // transaction id for messages that aren't part of a request/response pair.
+
+// Protocol version exchanged in cmd_handshake: upper byte major, lower byte minor. See lbp/version.h.
+constexpr uint16_t protocol_version = 0x0009; // 0.9
+
+// sizes of common msgs and args (defined to facilitate static allocations).
 constexpr int size_max_cmd_args = 32; // no commands require more than eight 4-byte integers.
-constexpr int size_max_cmd_payload = size_max_cmd_args + size_cmd; // largest expected command payload.
-constexpr int size_max_cmd_msg = size_header_footer + size_max_cmd_payload; // largest expected command message.
+constexpr int size_max_cmd_msg = size_header_footer + size_max_cmd_args; // largest expected command message.
 constexpr int size_file_msg = 512; // total size of a file message.
-constexpr int size_file_payload = size_file_msg - size_header_footer; // size of a file payload.
-constexpr int size_file_chunk = size_file_msg - size_header_footer - size_cmd; // length of the actual file segment sent in a cmd_file_chunk message.
-
-static_assert(size_min_payload >= size_cmd, "Minimum payload is a command.");
-
+constexpr int size_file_args = size_file_msg - size_header_footer; // largest args of any message.
+constexpr int size_file_chunk = size_file_args; // length of the file segment sent in a cmd_file_chunk message.
 
 // LBP command codes are broken into 16 headings.
 // The most significant nibble (four bits) represents the broad command category.
@@ -109,6 +119,35 @@ constexpr uint16_t cmd_frame_begin = 0x0FAB; // Marks beginning of a frame comma
 constexpr uint16_t cmd_frame_end = 0x0FAE; // Marks the end of frame commands.
 
 constexpr uint16_t cmd_commit_cfg = 0x0CCC; // commit changes sent with cfg_ commands.
+
+// Sent by the firmware instead of the normal response when it rejects a request.
+// Carries the rejected request's transaction id. Args: uint16 rejected cmd, uint16 err_* code, uint32 detail.
+constexpr uint16_t cmd_nack = 0x0BAD;
+constexpr uint8_t size_nack_args = 2 + 2 + 4;
+
+// ----------------------------------------------------------------------------
+// Error codes for cmd_nack ---------------------------------------------------
+// ----------------------------------------------------------------------------
+// Codes are loosely grouped by upper byte. Detail is code-specific (noted below), 0 if unused.
+// Error codes are works in progress and subject to changes and additions.
+
+// 0x01xx: the request itself is invalid.
+constexpr uint16_t err_invalid_cmd		= 0x0101; // command not recognized or not implemented by this firmware.
+constexpr uint16_t err_invalid_length	= 0x0102; // argument size wrong for this command. detail: expected size.
+constexpr uint16_t err_invalid_arg		= 0x0103; // argument value invalid or out of range. detail: index of the bad argument.
+
+// 0x02xx: the machine can't do it right now.
+constexpr uint16_t err_queue_full		= 0x0201; // command buffer full; retry shortly.
+constexpr uint16_t err_wrong_state		= 0x0202; // command not allowed in the current state. detail: state_* flags.
+constexpr uint16_t err_fault			= 0x0203; // refused because a fault is active (see state_fault).
+
+// 0x04xx: filesystem-related error.
+constexpr uint16_t err_storage_full		= 0x0401; // not enough space for the file.
+constexpr uint16_t err_transfer			= 0x0402; // chunk/end without a file_begin, or out of sequence.
+
+// 0xD0xx: reserved for vendor-specific codes.
+
+constexpr uint16_t err_unknown = 0xFFFF; // catch-all.
 
 // ----------------------------------------------------------------------------
 // 0x0001: Laser Commands -----------------------------------------------------
@@ -411,6 +450,7 @@ constexpr uint32_t state_paused = 0x0008;			// machine is paused mid-job.
 constexpr uint32_t state_receiving = 0x0010;		// machine is receiving a file from LB
 constexpr uint32_t state_file_loaded = 0x0020;		// a file is loaded and ready to execute.
 constexpr uint32_t state_computing = 0x0040;		// machine is performing a non-trivial computation.
+constexpr uint32_t state_fault = 0x0080;			// a fault prevents operation (interlock, e-stop, hardware). Set while the fault persists.
 
 // Position Queries
 constexpr uint16_t query_pos = cls_state_query | 0x0100;
