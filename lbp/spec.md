@@ -122,7 +122,7 @@ The Transaction ID lets LightBurn match each response to the request that caused
 - **Behavior does not depend on the ID:** Whether and how the firmware responds to a command depends only on the command. A request with Transaction ID `0` receives the same response as any other; the response simply carries ID `0`.
 - **Unsolicited messages:** Messages the firmware originates on its own, rather than in response to a request, must have Transaction ID `0`.
 - **Job files:** Transaction IDs of messages read from a job file must be ignored. Job file commands are executed, not responded to.
-- **Duplicate requests:** The firmware must remember the most recent non-zero Transaction ID it has processed. If a request arrives carrying that same ID, it is a retry of a request the firmware has already handled (its response was probably lost). The firmware must:
+- **Duplicate requests:**: The firmware should use the Transaction ID to identify duplicate requests. Sequential, identical Transaction IDs indicate that Lightburn is retrying a request. The firmware should:
   - respond again, with the same command code and Transaction ID, and
   - **not** repeat the command's side effects. A retried relative move must not move the laser a second time, and a retried file chunk must not be written twice.
 
