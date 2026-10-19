@@ -130,7 +130,8 @@ Queries have no side effects, so the firmware may simply answer a retried query 
 
 This applies only to requests the firmware **executed**. A request the firmware rejected with `cmd_nack` had no side effects, so a retry of it must be evaluated again from scratch. The machine's state may have changed in the meantime (for example, a full queue may have drained). Consequently, the firmware must only send `cmd_nack` for a request it did not act on at all.
 
-Because LightBurn has at most one request outstanding, remembering only the most recent ID is sufficient.
+**Note**
+message.h contains the helper function `respondTo(...)` to assist firmware authors in adopting this change.
 
 ### Unsolicited Messages
 The firmware may send messages that are not responses to any request, at any time. These always carry Transaction ID `0`, and LightBurn never responds to them.
@@ -183,6 +184,9 @@ Codes are loosely grouped by their upper byte: `0x01xx` for problems with the re
 | `0x0401` | `err_storage_full`   | Not enough space for the file. | 0 |
 | `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or out of sequence. | 0 |
 | `0xFFFF` | `err_unknown`        | Catch-all. | 0 |
+
+**Note**
+message.h contains the helper function `nackTo(...)` to assist firmware authors in adopting this change.
 
 ## Command Code Design
 LBP command codes are unsigned 16-bit integers. We do not require all 65,536 possible values,
