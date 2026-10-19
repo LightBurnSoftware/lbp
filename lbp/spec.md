@@ -16,7 +16,7 @@ LBP is intended to function over a variety of different transport layers, e.g. s
 | Magic        | Transaction ID | Command | Size | Arguments | Checksum |
 | [4B]: "DRGN" | [2B]           | [2B]    | [2B] | [Size B]  | [2B]     |
 +--------------+----------------+---------+------+-----------+----------+
- \________________ header (10 bytes) _________________/
+ \____________ header (10 bytes) _______________/
 ```
 
 - **Magic (4 bytes):** The 4-byte sequence `0x4452474E`, which is the ASCII encoding of `DRGN` (short for "dragon").
