@@ -19,6 +19,7 @@ struct LaserSettings {
 	float power_max = 0.f;
 	size_t num_rasters = 0;
 	float raster_powers[lbp::size_max_cmd_args >> 1] = {};
+	int32_t pulse_width_ns = 0; // galvo MOPA sources (cmd_laser_pulse_width)
 	bool on = false;
 	bool enabled = false;
 
@@ -77,9 +78,13 @@ public:
 	 * @param request The request to process.
 	 * @param out_q Storage for resulting output packets.
 	 * @param source identies the source of the command to be processed.
+	 * @param file_offset For a job-file command, its offset in the file (for job progress); else kNoFileOffset.
 	 * @return True if the  was able to process the request, false otherwise.
 	 */
-	bool process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source);
+	bool process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source, uint32_t file_offset = kNoFileOffset);
+
+	/** @return job progress: bytes of the job file whose commands have finished (the offset of the one running now). */
+	uint32_t executedBytes() const { return m_exec_offset; }
 
 	/** @brief Advance position and laser state by dt_s seconds. Exact for any dt (moves are interpolated). */
 	void step(double dt_s);
@@ -112,6 +117,16 @@ public:
 	/** @return true if nothing is executing and no commands are pending. */
 	bool isIdle() const;
 
+	/**
+	 * @brief Switch between gantry and galvo behaviour: travel limits and galvo command support.
+	 * Call FirmwareSim::setMode instead, which also stops everything first.
+	 */
+	void setMode(MachineMode mode);
+	MachineMode mode() const { return m_mode; }
+
+	/** @brief Recompute travel limits from the mode and configuration (e.g. after cfg_field_size changes). */
+	void refreshBounds();
+
 private:
 	enum class State { Idle, Jogging, Moving, Dwelling, Paused };
 	struct PausedState {
@@ -133,9 +148,20 @@ private:
 
 	bool decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta);
 
+	/** Speeds for each axis group, in um/s (0 = not set). */
+	struct SpeedSet {
+		uint32_t xy = 0;
+		uint32_t z = 0;
+		uint32_t u = 0;
+	};
+
+	/** Store a cut, travel, or jog speed command in its family. @return False if p is not a speed command. */
+	bool takeSpeed(lbp::CmdPayload &p);
+	/** The speeds that govern a move command: its family's, or the configured defaults. */
+	SpeedSet speedsFor(uint16_t cmd) const;
 	/** Choose the path metric and rate for a move. */
-	bool pacingFor(const Vec4 &delta, double &length, double &speed) const;
-	bool beginMove(const Vec4 &delta);
+	bool pacingFor(const Vec4 &delta, const SpeedSet &speeds, double &length, double &speed) const;
+	bool beginMove(const Vec4 &delta, const SpeedSet &speeds);
 	void beginJog(const Vec4 &dir, int32_t target_vel);
 	void endJog();
 
@@ -149,16 +175,31 @@ private:
 	int m_rotary_axis = -1; // rotary axis index, or -1 for none, refreshed when a move or jog begins.
 	Vec4 m_pos;				// current laser position
 	Vec4 m_job_origin;		// origin offset for absolute moves during the current job.
-	Vec4 m_max_pos;			// configured maximum dimension (assume Quadrant I).
+	MachineMode m_mode = MachineMode::Gantry;
+	Vec4 m_min_pos;			// travel limits per axis: gantry [0, max]; galvo X/Y [-field/2, +field/2].
+	Vec4 m_max_pos;
 	double m_dwell_remaining_s = 0.0;  // remaining seconds to dwell if in dwelling state.
-	uint32_t m_target_vel_xy = 0; // user-specified target velocity (xy)
-	uint32_t m_target_vel_z = 0;  // user-specified target velocity (z)
-	uint32_t m_target_vel_u = 0;  // user-specified target velocity (u)
+	SpeedSet m_cut_speed;		  // speeds for cut moves (cmd_cut_speed_*)
+	SpeedSet m_travel_speed;	  // speeds for travel moves (cmd_travel_speed_*)
+	SpeedSet m_jog_speed;		  // speeds for operator moves (cmd_jog_speed_*)
 	LaserSettings m_laser_1;	  // current settings for laser 1
 	LaserSettings m_laser_2;	  // current settings for laser 2
 	PausedState m_paused;		  // state to resume after pause.
 	CmdQueue m_cmd_q;			  // queue for scheduled movement commands.
+	uint32_t m_exec_offset = 0;	  // job file offset of the command running now (job progress); reset by stop()
 	bool m_in_job = false;		  // state boolean - are we currently executing a job?
 	bool m_in_frame = false;	  // state boolean - are we currently framing?
 	bool m_job_ended = false;	// latching flag to indicate a job has completed.
+
+	// Galvo state (galvo mode only). The simulator stores these; it doesn't simulate their timing yet.
+	int32_t m_galvo_laser_on_delay_us = 0;
+	int32_t m_galvo_laser_off_delay_us = 0;
+	int32_t m_galvo_polygon_delay_us = 0;
+	int32_t m_galvo_end_delay_us = 0;
+	int32_t m_galvo_travel_delay_min_us = 0;
+	int32_t m_galvo_travel_delay_max_us = 0;
+	int32_t m_galvo_travel_delay_dist_um = 0;
+	bool m_guide_light = false;
+	bool m_focus_light = false;
+	bool m_warned_galvo_rotary = false; // logged once per mode change: rotary on X/Y is ignored in galvo mode
 };

@@ -7,7 +7,7 @@ LBP is a transport-agnostic command-and-response binary protocol for controlling
 
 LBP is also a work-in-progress. Some functionality has not yet been implemented, and the structure of some messages and workflows is still to be determined. Feedback and commentary is welcome.
 
-LBP is intended to function over a variety of different transport layers, e.g. serial, TCP, UDP, websocket, etc. This specification assumes that the transport layer will deliver LBP messages quickly and in the correct order.
+LBP is intended to function over a variety of different transport layers, e.g. serial, TCP, websocket, etc. This specification assumes that the transport layer will deliver LBP messages quickly, reliably, and in the correct order.
 
 ## Message Structure
 
@@ -24,9 +24,24 @@ LBP is intended to function over a variety of different transport layers, e.g. s
 - **Command (2 bytes):** The 16-bit command code. See `spec.h`.
 - **Size (2 bytes):** A 16-bit unsigned integer encoding the size, in bytes, of the **Arguments** that immediately follow it. It may be `0`, and must not exceed `size_file_args`.
 - **Arguments ("Size" bytes):** The command's argument data, if any.
-- **Checksum (2 bytes):** The CRC16 checksum computed over the **Transaction ID, Command, Size, and Arguments** fields, in that order (everything after the Magic). See `checksum.cpp` for the crc16 algorithm.
+- **Checksum (2 bytes):** A CRC-16 computed over the **Transaction ID, Command, Size, and Arguments** fields, in that order (everything after the Magic). See [Checksum](#checksum).
 
-**IMPORTANT** All multi-byte fields are encoded in **Big-Endian Format**. (Helper functions are provided in `lbp/beio.h`)
+**IMPORTANT** All multi-byte fields are encoded in **Big-Endian Format**, except the Checksum (see below). (Helper functions are provided in `lbp/beio.h`)
+
+### Checksum
+The checksum is **CRC-16/X-25** (also known as CRC-16/IBM-SDLC):
+
+| Parameter        | Value                                   |
+|------------------|-----------------------------------------|
+| Width            | 16 bits                                 |
+| Polynomial       | `0x1021` (`0x8408` in reflected form)   |
+| Initial value    | `0xFFFF`                                |
+| Reflect in / out | yes / yes                               |
+| Final XOR        | `0xFFFF`                                |
+| Check value      | `0x906E` (the CRC of ASCII `123456789`) |
+
+Like every other field, the checksum is sent **big-endian**: a CRC of `0x906E` appears on the wire as `90 6e`.
+The reference implementation is `lbp/src/checksum.cpp`.
 
 A message without arguments is therefore 12 bytes long. The largest permitted message is `size_file_msg` (512 bytes), which leaves room for 500 bytes of arguments.
 
@@ -52,22 +67,22 @@ The Handshake confirms communication between LightBurn and the firmware, and exc
 ```
 +--------------+-------+-------+-------+-----------+----------+
 | Magic        | TxID  | Cmd   | Size  | Arguments | Checksum |
-| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 09     | 50 34    |
+| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 0a     | 06 cb    |
 +--------------+-------+-------+-------+-----------+----------+
 ```
 
-The command is `cmd_handshake` (`01 b8`), and its 2-byte argument is LightBurn's protocol version, `0x0009` (0.9). LightBurn has assigned this request Transaction ID `1`.
+The command is `cmd_handshake` (`01 b8`), and its 2-byte argument is LightBurn's protocol version, `0x000A` (0.10). LightBurn has assigned this request Transaction ID `1`.
 
 **Firmware Responds:**
 
 ```
 +--------------+-------+-------+-------+-----------+----------+
 | Magic        | TxID  | Cmd   | Size  | Arguments | Checksum |
-| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 09     | 50 34    |
+| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 0a     | 06 cb    |
 +--------------+-------+-------+-------+-----------+----------+
 ```
 
-The firmware responds with the same command code and Transaction ID, followed by the protocol version **the firmware** speaks. Here both sides speak 0.9, so the response happens to be identical to the request.
+The firmware responds with the same command code and Transaction ID, followed by the protocol version **the firmware** speaks. Here both sides speak 0.10, so the response happens to be identical to the request.
 
 #### Protocol Version
 
@@ -75,7 +90,7 @@ The firmware responds with the same command code and Transaction ID, followed by
 |------------------|------------------------------|-------------------------------|---------------|
 | `cmd_handshake`  | uint16 LightBurn's version   | uint16 firmware's version     | 2             |
 
-- The version is a 16-bit value: the **upper byte is the major** version and the **lower byte is the minor** version. `0x0009` is version 0.9; `0x0102` would be 1.2. The current version is `protocol_version` in `spec.h`.
+- The version is a 16-bit value: the **upper byte is the major** version and the **lower byte is the minor** version. `0x000A` is version 0.10; `0x0102` would be 1.2. The current version is `protocol_version` in `spec.h`.
 - The firmware must **always** respond to a handshake with its own version, even if LightBurn's version differs. LightBurn decides whether the two are compatible, so a mismatch can be reported to the user clearly instead of appearing as a timeout.
 - Compatibility (see `lbp/version.h`): major versions must match. Before 1.0, minor versions must match too, since any 0.x release may contain breaking changes. From 1.0 on, minor versions only add functionality, and LightBurn will not send commands that the firmware's minor version does not support.
 - The handshake has no side effects, and may be sent at any time.
@@ -89,7 +104,7 @@ Here we use the command code `cmd_pos_x`, defined in `lbp/spec.h`, to ask for th
 ```
 +--------------+-------+-------+-------+----------+
 | Magic        | TxID  | Cmd   | Size  | Checksum |
-| 44 52 47 4e  | 00 2a | 81 01 | 00 00 | bf b0    |
+| 44 52 47 4e  | 00 2a | 81 01 | 00 00 | b0 bf    |
 +--------------+-------+-------+-------+----------+
 ```
 
@@ -98,7 +113,7 @@ Here we use the command code `cmd_pos_x`, defined in `lbp/spec.h`, to ask for th
 ```
 +--------------+-------+-------+-------+-------------+----------+
 | Magic        | TxID  | Cmd   | Size  | Arguments   | Checksum |
-| 44 52 47 4e  | 00 2a | 81 01 | 00 04 | 00 00 4e 20 | 9d 75    |
+| 44 52 47 4e  | 00 2a | 81 01 | 00 04 | 00 00 4e 20 | 75 9d    |
 +--------------+-------+-------+-------+-------------+----------+
 ```
 
@@ -115,14 +130,22 @@ The Transaction ID lets LightBurn match each response to the request that caused
 - IDs are assigned when a request is created, incrementing by one for each new request and wrapping from `0xFFFF` back to `1`. `0` is never assigned.
 - When LightBurn **retries** a request (for example, after a timeout), it re-sends the request with the **same** Transaction ID.
 - Consecutive distinct requests therefore always have distinct Transaction IDs.
+- The first request LightBurn sends on every new connection is `cmd_handshake`. Because the handshake has no side effects, it is harmless if the firmware mistakes it for a retry of a request from a previous connection that happened to have the same ID.
+- LightBurn never sends Transaction ID `0` over a connection (the firmware ignores it there; see below). Only messages inside job files carry Transaction ID `0`.
 - Messages written into job files always have Transaction ID `0`.
 
 ### Rules for the Firmware
-- **Responses:** When responding to a request, the firmware must copy the request's Transaction ID into the response unchanged, including `0`.
-- **Behavior does not depend on the ID:** Whether and how the firmware responds to a command depends only on the command. A request with Transaction ID `0` receives the same response as any other; the response simply carries ID `0`.
+- **Transaction ID `0` from the connection is ignored.** LightBurn never sends it, so a message with Transaction ID `0` that
+  arrives over the connection is either noise or a frame from *inside* a `cmd_file_chunk` (a job file is itself a list of
+  frames) that the parser found after losing sync on a corrupted message. Executing it could run a job command live.
+  The firmware must discard it: not execute it, not respond to it, and not NACK it.
+- **Responses:** When responding to a request, the firmware must copy the request's Transaction ID into the response unchanged.
+- **Behavior does not otherwise depend on the ID:** Whether and how the firmware responds to a command depends only on the command.
 - **Unsolicited messages:** Messages the firmware originates on its own, rather than in response to a request, must have Transaction ID `0`.
 - **Job files:** Transaction IDs of messages read from a job file must be ignored. Job file commands are executed, not responded to.
-- **Duplicate requests:**: The firmware should use the Transaction ID to identify duplicate requests. Sequential, identical Transaction IDs indicate that Lightburn is retrying a request. The firmware should:
+- **Duplicate requests:** The firmware should use the Transaction ID **and the command code** to identify duplicate requests.
+  A request with the same Transaction ID and the same command code as the previous request is LightBurn retrying it.
+  (The same Transaction ID with a different command code is a new request, not a retry: treat it normally.) The firmware should:
   - respond again, with the same command code and Transaction ID, and
   - **not** repeat the command's side effects. A retried relative move must not move the laser a second time, and a retried file chunk must not be written twice.
 
@@ -131,13 +154,71 @@ Queries have no side effects, so the firmware may simply answer a retried query 
 This applies only to requests the firmware **executed**. A request the firmware rejected with `cmd_nack` had no side effects, so a retry of it must be evaluated again from scratch. The machine's state may have changed in the meantime (for example, a full queue may have drained). Consequently, the firmware must only send `cmd_nack` for a request it did not act on at all.
 
 **Note**
-message.h contains the helper function `respondTo(...)` to assist firmware authors in adopting this change.
+message.h contains the helper function `responseTo(...)` to assist firmware authors in adopting this change.
 
 ### Unsolicited Messages
 The firmware may send messages that are not responses to any request, at any time. These always carry Transaction ID `0`, and LightBurn never responds to them.
 LightBurn must ignore any unsolicited message whose command it does not recognize. This allows future versions of LBP to add new notifications without breaking existing LightBurn versions.
 
-Currently, the firmware sends `cmd_job_end` unsolicited when a job finishes.
+Currently, the only unsolicited message is `cmd_event` (see [Events](#events)).
+
+## Events
+The firmware reports things that *happen* with `cmd_event`, sent unsolicited (Transaction ID `0`).
+
+| Command     | Arguments                                   | Arg Size |
+|-------------|---------------------------------------------|----------|
+| `cmd_event` | uint8 kind, uint16 code, uint32 detail       | 7        |
+
+| Kind            | Value  | Meaning | `code` | `detail` |
+|-----------------|--------|---------|--------|----------|
+| `event_fault`   | `0x01` | The machine can't operate until the fault is cleared with `cmd_clear_fault`. `state_fault` is set until then (see [Faults](#faults)). | `err_*` reason | Context (e.g. which axis), or 0 |
+| `event_warning` | `0x02` | Something is wrong, but the machine is still operable (e.g. a source temperature warning). | Warning code | Context, or 0 |
+| `event_input`   | `0x03` | An operator input happened. | `input_start`, `input_frame`, or `input_stop` | 0 |
+| `event_result`  | `0x04` | A long-running request has finished. | `0` on success, otherwise an `err_*` code (`err_canceled` if it was stopped) | Transaction ID of the original request |
+| `event_job_progress` | `0x05` | Progress of a job running from a file (see [Job Progress](#job-progress)). | `progress_*`: the unit | The progress, in that unit |
+
+`0` is not a valid kind. LightBurn ignores events of a kind it does not recognize, and handles unrecognized codes within a known kind
+generically (for example, by showing an unknown fault to the user).
+
+**Events are notifications, not the source of truth.** They are never acknowledged or retried, so one may be lost.
+Anything LightBurn must not miss is also reflected in the state flags (see [Machine State](#machine-state)), and if an event and the
+state flags ever disagree, the state flags win.
+
+**Conditions vs. happenings.** A condition that is true or false right now (the door is open, the pedal is held) is a state flag.
+Something that happens at a moment (the pedal was pressed, homing finished) is an event. A pedal tap between two state queries
+would be missed, so LightBurn acts on `event_input`, not on `state_pedal_down`.
+
+**Results.** The firmware sends `event_result` only after it has sent the response to the original request, and only for long-running
+requests (such as homing, focusing, and executing a job), never for each move within a job. Requests with Transaction ID `0` (including
+commands in a job file) cannot be matched to a result.
+
+**Job results.** A job started by `cmd_execute` reports how it ended with `event_result`, `detail` = the `cmd_execute`'s Transaction ID:
+`0` when it ran to the end, `err_canceled` when stopped (`cmd_stop` or an operator stop), or `err_fault` when a fault ended it.
+A job the machine started on its own (for example from a foot pedal or its panel) has no request, so its `event_result` carries
+`detail` `0`. LightBurn never uses Transaction ID `0` for a request, so this can't be mistaken for one of its own.
+The job's final `event_job_progress` comes first (see [Job Progress](#job-progress)).
+
+The firmware should debounce inputs and limit repeated events, so that a flapping switch cannot flood the connection.
+
+### Job Progress
+While a job runs from a file (`cmd_execute`), the firmware reports how far it has got with `event_job_progress`.
+`code` names the unit of `detail`:
+
+| Code | Value | `detail` |
+|------|-------|----------|
+| `progress_bytes_executed` | `0x0001` | The number of bytes of the job file whose messages have **finished** executing. While a message runs, this is that message's starting offset in the file; when the job finishes, it is the file size. |
+
+`0` is not a valid unit. More units may be added; LightBurn ignores units it doesn't recognize. A firmware sends one unit.
+
+- **Executed, not read.** Firmware reads ahead into its command buffer; progress must count what has run, not what has been
+  parsed. The simplest way: when a message is taken from the buffer to run, report the file offset it came from.
+  `lbp::Parser::messageOffset()` gives each message's offset when the parser is fed the file from its first byte.
+- **How often:** at most every 250 ms, and only when the value has changed; at least every 2 seconds while the job runs;
+  and once more when the job ends, before its `event_result`: the file size if it ran to the end, or where it stopped.
+- **Only for jobs run from a file.** Commands streamed over the connection are not reported: LightBurn tracks those itself.
+- Like every event, a report may be lost; the next one corrects it.
+
+LightBurn knows the file's size (it sent `cmd_file_begin`), so it shows `detail / size` as the job's progress.
 
 ## Errors
 
@@ -178,11 +259,15 @@ Codes are loosely grouped by their upper byte: `0x01xx` for problems with the re
 | `0x0101` | `err_invalid_cmd`    | The command code is not recognized or not implemented by this firmware. Retrying will not help. | 0 |
 | `0x0102` | `err_invalid_length` | The argument size is wrong for this command. | Expected argument size |
 | `0x0103` | `err_invalid_arg`    | An argument value is invalid or out of range. | Index of the bad argument (0-based) |
-| `0x0201` | `err_queue_full`     | The command buffer is full; retry shortly. | 0 |
+| `0x0201` | `err_buffer_full`    | The command buffer is full; retry shortly. | 0 |
 | `0x0202` | `err_wrong_state`    | A recognized command that is not allowed in the current state (e.g. `cmd_continue` when not paused, `cmd_execute` with no file loaded). | `state_*` flags |
 | `0x0203` | `err_fault`          | Refused because a fault is active (see `state_fault`). | 0 |
+| `0x0204` | `err_canceled`       | Stopped (by `cmd_stop` or an operator stop) before it finished. Used in `event_result`. | 0 |
 | `0x0401` | `err_storage_full`   | Not enough space for the file. | 0 |
-| `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or out of sequence. | 0 |
+| `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or a chunk that would end past the file's declared size. | The declared size, or 0 |
+| `0x0403` | `err_invalid_file`   | The received file failed validation: its CRC-32 doesn't match `cmd_file_end`, its length doesn't match its header, or its contents are malformed. | 0 |
+| `0x0404` | `err_invalid_header` | The received file's header is not recognized or not supported: wrong magic, unsupported version, or values this machine can never accept. | Byte offset of the offending header field |
+| `0x0405` | `err_file_mismatch`  | A valid stored file doesn't fit the current configuration, such as a correction table whose field size differs from `cfg_field_size`. Sent when the file is applied (`cmd_galvo_correction`), not when it is received. | Byte offset of the header field that doesn't match |
 | `0xFFFF` | `err_unknown`        | Catch-all. | 0 |
 
 **Note**
@@ -228,7 +313,7 @@ The purpose of this compositional approach is two-fold:
 
 ### Axis flags
 Classic flag-based composition isn't always appropriate, but in the cases of positional axes it makes a lot of sense for readability.
-When appropriate, the LSB (Least Significant Nibble) of certain commands may consist of:
+When appropriate, the LSB (least significant byte) of certain commands may consist of:
 - `0x0001`: X Axis
 - `0x0002`: Y Axis
 - `0x0004`: Z Axis
@@ -246,7 +331,7 @@ However, some fancier machines may have "flying galvonometer" operations, or spe
 Thus we reserve 8 axis flags, enabling terse yet expressive commands for simultaneous movements via bitwise flag
 combinations, with reasonable headroom for the future.
 Generally speaking, we expect most machines to use X,Y,Z, and possibly either A or U:
-XYZ for primary positional control, and either A for rotary or U for feed.
+YZ for primary positional control, and either A for rotary or U for feed.
 
 We expect XYZABC configurations to be utilized for true 6-axis positioning, such as flying galvonometer systems.
 
@@ -296,38 +381,62 @@ So, all together, we have:
 - **absolute travel**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
 - **relative cut**: move the laser a specified distance from its current position. The laser **is expected** to be active and cutting.
 - **absolute cut**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`).The laser **is expected** to be active and cutting.
-- **dwell**: perform no movement for a specified number of milliseconds.
+- **dwell**: perform no movement for a specified number of microseconds.
 
 These distinctions exist to provide the firmware with as much **context** as possible for the command. They also allow for more granular
 configuration of default speeds and movement behaviors. The intention is to help make LBP-capable firmware easier to write and maintain.
 
-**Note**: These **programmed movement** commands **do not** automatically turn the laser on or off. The user is expected to program those commands separately,
-prior to the movement commands.
+#### Moves and the Laser
+Each laser is either **lit** or **dark**. Moves decide this, so the firmware never needs to look ahead:
+
+1. A **cut** move lights every enabled laser (see `cmd_laser_enable`) when it starts. Lasers already lit stay lit.
+2. A **travel** move, on any axis, darkens every laser before it starts.
+3. **Operator** moves (jog, go-to, home) never fire: darken every laser before they start.
+4. `cmd_laser_on` lights the laser it names, if that laser is enabled; `cmd_laser_off` and `cmd_laser_disable` darken the laser they name.
+5. `cmd_stop` darkens every laser immediately (see "Executing a Job").
+6. Anything else (a dwell, a settings change, the end of a job or frame) leaves the lasers as they are. A dwell straight after a cut is lit.
+
+`cmd_laser_on/off` are only needed to fire **in place**, without moving: dots, and piercing at the start or end of a shape.
 
 ### Movement Speed
-These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands, see below).
-If no speed has been set by the user since the last power cycle, the laser should move at the rate specified by configured defaults.
+There are three families of speed command, one for each kind of move:
 
-| Command        | Arguments (speed in axis units / second)  | Arg Size       |
-|----------------|-------------------------------------------|----------------|
-| `cmd_speed_xy` | int32 movement speed in the xy plane      | 4              |
-| `cmd_speed_x`  | int32 movement speed along the x axis*    | 4              |
-| `cmd_speed_y`  | int32 movement speed along the y axis*    | 4              |
-| `cmd_speed_z`  | int32 movement speed along the z axis     | 4              |
-| `cmd_speed_a`  | int32 movement speed along the a axis     | 4              |
-| `cmd_speed_b`  | int32 movement speed along the b axis     | 4              |
-| `cmd_speed_c`  | int32 movement speed along the c axis     | 4              |
-| `cmd_speed_u`  | int32 movement speed along the u axis     | 4              |
-| `cmd_speed_v`  | int32 movement speed along the v axis     | 4              |
+| Family       | Commands               | Governs                                                    | Galvo meaning |
+|--------------|------------------------|------------------------------------------------------------|---------------|
+| Cut speed    | `cmd_cut_speed_*`      | programmed cut moves (`cmd_cut_*`)                         | mark speed    |
+| Travel speed | `cmd_travel_speed_*`   | programmed travel moves (`cmd_travel_*`)                   | jump speed    |
+| Jog speed    | `cmd_jog_speed_*`      | operator moves (`cmd_jog_start_*`, `cmd_jog_step_*`, `cmd_jog_to_*`) | —   |
 
-`cmd_speed_x` and `cmd_speed_y` are provided for machines that cannot move diagonally,
+Each family's command code mirrors the code of the moves it governs: cut speeds are `0x5Axx` (cut moves are `0x6Axx`/`0x6Bxx`),
+travel speeds are `0x58xx` (travel moves are `0x68xx`/`0x69xx`), and jog speeds are `0x56xx` (jog moves are `0x66xx`/`0x67xx`).
+The low byte carries axis flags, as for movement commands.
+
+Every speed command takes a single int32 argument: the speed in axis units per second (micrometers/second for linear axes),
+whatever axis flags the command carries.
+
+- Each speed is **sticky**: it applies to every following move of its kind until it is changed. Setting one family never
+  changes another, so a jog never disturbs the speed of a job's cuts, and a travel speed never changes the cut speed.
+- If a speed has not been set since the last power cycle, the firmware uses its configured default for that kind of move.
+- **Homing** ignores all speed commands. Each axis homes at its configured home speed (`cfg_*_home_speed`).
+
+The table below lists the cut-speed commands. The travel and jog families define the same set of axis combinations,
+with `travel` or `jog` in place of `cut`.
+
+| Command           | Arguments (speed in axis units / second)  | Arg Size       |
+|-------------------|-------------------------------------------|----------------|
+| `cmd_cut_speed_xy`| int32 movement speed in the xy plane      | 4              |
+| `cmd_cut_speed_x` | int32 movement speed along the x axis*    | 4              |
+| `cmd_cut_speed_y` | int32 movement speed along the y axis*    | 4              |
+| `cmd_cut_speed_z` | int32 movement speed along the z axis     | 4              |
+| `cmd_cut_speed_a` | int32 movement speed along the a axis     | 4              |
+| `cmd_cut_speed_b` | int32 movement speed along the b axis     | 4              |
+| `cmd_cut_speed_c` | int32 movement speed along the c axis     | 4              |
+| `cmd_cut_speed_u` | int32 movement speed along the u axis     | 4              |
+| `cmd_cut_speed_v` | int32 movement speed along the v axis     | 4              |
+| `cmd_cut_speed_ab`| int32 movement speed in the ab plane      | 4              |
+
+\* The single-axis x and y commands are provided for machines that cannot move diagonally,
 or whose x and y axis movement mechanisms meaningfully differ.
-
-#### TODO: Granular Movement Speed Commands
-It may be useful to define different speed commands for the different kinds of movement.
-We may do this in the future. For now, `cmd_speed_*` overrides default behavior for all moves,
-and most movement commands are expected to be preceeded with a `cmd_speed_*` if they wish to
-have different speeds than preceding movements.
 
 ### Movement Commands
 Movement commands are composed of valid movement categories in the MSB and bitwise combinations of axis flags in the LSB.
@@ -447,7 +556,7 @@ or contradictory command is received, or a fault occurs (such as contact with a 
 
 This specification neither forbids nor requires the capability for simultaneous axis jogging -
 it simply provides the command definitions.
-If the user sends `cmd_jog_x_pos_start` immediately followed by `cmd_jog_y_pos_start`, and
+If the user sends `cmd_jog_start_pos_x` immediately followed by `cmd_jog_start_pos_y`, and
 your hardware is capable of said movement, we leave the resulting behaviour to your discretion.
 It is reasonable to either cancel the X jog and begin a Y Jog, begin jogging diagonally, or cancel both requests.
 
@@ -455,8 +564,7 @@ It is reasonable to either cancel the X jog and begin a Y Jog, begin jogging dia
 These commands are expected to appear in the context of an cutting/engraving job.
 
 #### Cut
-**Cut** commands are programmed moves that signal to the firmware that the laser is expected to be on and cutting during the movement.
-Crucially though, these commands **do not turn on the laser**. They simply tell the firmware to move as if the laser is cutting.
+**Cut** commands are programmed moves that fire the laser: every enabled laser is lit for the move (see "Moves and the Laser").
 Cut commands can be either relative or absolute. The following tables list the most probably examples of cut commands.
 
 #### Absolute Cut
@@ -485,12 +593,12 @@ Each command includes one 32-bit integer argument corresponding to the desired a
 | `cmd_cut_rel_xy`      | int32 X, int32 Y                     | 8              |
 | `cmd_cut_rel_ab`      | int32 A, int32 B                     | 8              |
 
-#### Rapid
-**Rapid** Commands are programmed moves that signal to the firmware that the laser is **not expected** to be
-on and cutting during the move. Rapid moves are expected to be faster than cuts.
+#### Travel
+**Travel** commands (also known as "rapid" moves, or "jumps" on a galvo) are programmed moves that never fire the laser:
+every laser is darkened before the move starts. Travel moves are expected to be faster than cuts.
 
-#### Absolute Rapid
-Just like Absolute Cuts, Absolute Rapid arguments are axis positions **relative to the jog origin**.
+#### Absolute Travel
+Just like Absolute Cuts, Absolute Travel arguments are axis positions **relative to the job origin**.
 Job Origin is set in the Job Header using the `cmd_cut_from` message.
 
 | Command                 | Arguments (positions in axis units)                   | Arg Size       |
@@ -509,8 +617,8 @@ Job Origin is set in the Job Header using the `cmd_cut_from` message.
 | `cmd_travel_abs_xyzu`   | int32 X, int32 Y, int32 Z, int32 U                    | 16             |
 | `cmd_travel_abs_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C  | 24             |
 
-#### Relative Rapid
-| Command                 | Arguments (distnaces in axis units)                   | Arg Size       |
+#### Relative Travel
+| Command                 | Arguments (distances in axis units)                   | Arg Size       |
 |-------------------------|-------------------------------------------------------|----------------|
 | `cmd_travel_rel_x`      | int32 X                                               | 4              |
 | `cmd_travel_rel_y`      | int32 Y                                               | 4              |
@@ -527,35 +635,41 @@ Job Origin is set in the Job Header using the `cmd_cut_from` message.
 | `cmd_travel_rel_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C  | 24             |
 
 #### Dwell
-While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of milliseconds.
+While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of microseconds.
 This can occur whether the laser is on or off.
 
 | Command     | Arguments (code)   | Arg Size       |
 |-------------|--------------------|----------------|
-| `cmd_dwell` | int32 milliseconds | 4              |
+| `cmd_dwell` | int32 microseconds | 4              |
 
 ## Controlling the Laser
 Your machine may have more than one laser tube. All laser control commands have 1-byte laser index argument
 in addition to any respective numerical arguments. This index is `0`-based, with index `0` corresponding to the first laser,
 `1` to the second, etc.
 
+A laser command whose index names a laser the machine doesn't have is refused with `cmd_nack` and `err_invalid_arg`
+(detail `0`, the index argument). Whether a laser exists never changes, so this can be checked when the command arrives.
+
 | Command               | Arguments                                  | Arg Size       |
 |-----------------------|--------------------------------------------|----------------|
-| `cmd_laser_enable`    | int8 laser index                           | 1              |
-| `cmd_laser_disable`   | int8 laser index                           | 1              |
-| `cmd_laser_power_max` | int8 laser index, int16 max power (%)*     | 3              |
-| `cmd_laser_power_min` | int8 laser index, int16 max power (%)*     | 3              |
-| `cmd_laser_freq`      | int8 laser index, int32 PWM frequency (Hz) | 5              |
+| `cmd_laser_enable`    | uint8 laser index                          | 1              |
+| `cmd_laser_disable`   | uint8 laser index                          | 1              |
+| `cmd_laser_power_max` | uint8 laser index, uint16 max power (%)*   | 3              |
+| `cmd_laser_power_min` | uint8 laser index, uint16 min power (%)*   | 3              |
+| `cmd_laser_freq`      | uint8 laser index, int32 PWM frequency (Hz)| 5              |
 
 These laser settings are expected to persist until the respective commands are sent again.
 
 ### \*Note: Percentages in LBP
 All percentages in LBP are represented as unsigned 16-bit integer arguments, where each integer value is 1/65535 of 100%, or 1/655.35 %.
 For example, 100% is represented as `65535`, 50% as `32768`, and 1% as `655`.
+Configuration values (`cfg_*`) use the same scale in their `int32` argument; factors that can exceed 100% (acceleration, speed) go above `65535`.
+Every value is a real percentage: there is no special value meaning "use the default".
 
 ### Enabling Laser Tubes
 Before embarking on a cut, LB will send `cmd_laser_enable` (and possibly `cmd_laser_disable`) messages
-to indicate to the firmware that these lasers are intended to be used soon.
+to select which lasers the following cut moves fire. Disabling a lit laser also darkens it.
+Any number of lasers may be enabled at once; a cut move then fires all of them together.
 
 ### Laser Power
 Laser power for a cut is sent as a percentage of the laser's configured maximum output power.
@@ -564,13 +678,54 @@ The minimum and maximum output power for each laser involved in a cut should be 
 ### Laser Frequency (PWM)
 In addition to power, it is also necessary to set the laser's PWM frequency. This is given in int32 Hz.
 
-### Turning the Laser On
-Once the laser settings have been sent, it is still necessary to turn the enabled lasers on and off.
+### Firing in Place
+Cut moves fire the enabled lasers, and travel moves darken them, so ordinary cuts need no on/off commands.
+To fire **without moving**, LightBurn uses `cmd_laser_on` and `cmd_laser_off`:
 
 | Command         | Arguments        | Arg Size       |
 |-----------------|------------------|----------------|
-| `cmd_laser_on`  | int8 laser index | 1              |
-| `cmd_laser_off` | int8 laser index | 1              |
+| `cmd_laser_on`  | uint8 laser index | 1              |
+| `cmd_laser_off` | uint8 laser index | 1              |
+
+`cmd_laser_on` for a laser that isn't enabled has **no effect**: the laser stays dark, just as a cut move only lights
+enabled lasers. It is not refused, because the firmware checks the enable when the command runs, not when it arrives
+(an enable sent just before it may still be waiting in the command buffer).
+
+A laser lit by `cmd_laser_on` stays lit until `cmd_laser_off`, `cmd_laser_disable`, or a travel move. For example, a dot:
+
+```
+cmd_travel_abs_xy   x y        move to the dot, dark
+cmd_laser_on        0
+cmd_dwell           500        fire for 500 us
+cmd_laser_off       0
+```
+
+A pierce at the end of a shape relies on rule 5 of "Moves and the Laser": the last cut leaves the laser lit, a `cmd_dwell`
+holds it there, and `cmd_laser_off` ends it.
+
+### Guide and Focus Lights
+Many machines have low-power pointers in addition to their lasers. These are **not** lasers in the LBP sense:
+they have no power or frequency, are never enabled with `cmd_laser_enable`, and are typically safe to use with the lid open.
+
+| Command               | Arguments        | Arg Size |
+|-----------------------|------------------|----------|
+| `cmd_guide_light_on`  | uint8 laser index | 1        |
+| `cmd_guide_light_off` | uint8 laser index | 1        |
+| `cmd_focus_light_on`  | none             | 0        |
+| `cmd_focus_light_off` | none             | 0        |
+
+**Guide light:** an aiming beam that shows where a laser source's beam will land, such as a galvo's red dot
+(which travels through the mirrors), or a gantry's pointer. On fiber sources it is often built into the source itself,
+so the laser index selects *which source's* aiming beam.
+
+If your machine has a single aiming beam shared by all sources (an external red diode, for example),
+implement index `0` only, and reply to any other index with `cmd_nack` and `err_invalid_arg` (detail `0`).
+LightBurn will then use index `0` regardless of which source is selected.
+
+**Focus light:** a separate pointer (often two, angled to meet at the focal distance) used to set the focus height.
+It is never steered, so it takes no arguments.
+
+Firmware without one of these lights should reply to its commands with `cmd_nack` and `err_invalid_cmd`.
 
 ### Cut Type
 This command is a work-in-progress, intended to give the firmware information about the upcoming cuts that might be helpful in motion planning.
@@ -589,18 +744,18 @@ Where value may be:
 ## Making a Cut
 Generally, cuts or engravings will be programmed in the following pattern:
 1. Settings for the cut, if they differ from those for the previous cut, are sent with respective commands - lasers are enabled or disabled, laser power and frequency are set, movement speed is set, etc.
-2. If the laser is not already positioned at the start of the cut, a `cmd_laser_off` is sent, followed by and `cmd_travel_xy`.
-3. `cmd_laser_on` and `cmd_cut_xy` are sent, turning on the laser(s) and performing the cut.
+2. If the laser is not already positioned at the start of the cut, a `cmd_travel_abs_xy` moves it there, dark.
+3. `cmd_cut_abs_xy` commands perform the cut, firing the enabled laser(s).
 
 ## Raster Engraving
 To aid in motion planning, LBP offers a special command for encoding raster lines.
 
 | Command             | Arguments                                         | Arg Size     |
 |---------------------|---------------------------------------------------|--------------|
-| `cmd_raster_power`  | int8 laser index, 0 <= N <= 15 uint16 power values | 1 + 2N       |
+| `cmd_raster_power`  | uint8 laser index, 0 <= N <= 15 uint16 power values| 1 + 2N       |
 
-If the firmware receives this command, the next `cmd_cut_x`, `cmd_cut_y`, or `cmd_cut_xy` should be assumed to be a raster line.
-This `cmd_cut` will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
+If the firmware receives this command, the next cut move (any `cmd_cut_abs_*` or `cmd_cut_rel_*`) should be assumed to be a raster line.
+That cut move will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
 The laser is to perform the movement at the set speed, changing output power as it moves to engrave all N pixel values in one pass.
 
 ## Jobs
@@ -633,7 +788,7 @@ Jobs are encoded with the following series of messages:
   - `cmd_job_body_end`
 - `cmd_job_end`
 
-The `cmd_job_start` and `cmd_job_end` bookends are important because they let the firmware know that a job is being executed.
+The `cmd_job_begin` and `cmd_job_end` bookends are important because they let the firmware know that a job is being executed.
 
 **Note**
 Currently, the Lightburn LBP implementation and the LBP simulator support only the following workflow for jobs:
@@ -670,8 +825,16 @@ LBP provides the following commands to inform the firmware of the boundaries of 
 | `cmd_bounds_max_y`    | int32 maximum y position | 4              |
 | `cmd_bounds_min_z`    | int32 minimum z position | 4              |
 | `cmd_bounds_max_z`    | int32 maximum z position | 4              |
+| `cmd_bounds_min_a`    | int32 minimum a position | 4              |
+| `cmd_bounds_max_a`    | int32 maximum a position | 4              |
+| `cmd_bounds_min_b`    | int32 minimum b position | 4              |
+| `cmd_bounds_max_b`    | int32 maximum b position | 4              |
+| `cmd_bounds_min_c`    | int32 minimum c position | 4              |
+| `cmd_bounds_max_c`    | int32 maximum c position | 4              |
 | `cmd_bounds_min_u`    | int32 minimum u position | 4              |
 | `cmd_bounds_max_u`    | int32 maximum u position | 4              |
+| `cmd_bounds_min_v`    | int32 minimum v position | 4              |
+| `cmd_bounds_max_v`    | int32 maximum v position | 4              |
 
 ### The Job Body
 This is where the action of the job is programmed. This will mostly consist of:
@@ -680,26 +843,43 @@ This is where the action of the job is programmed. This will mostly consist of:
 - commands for moving and cutting
 
 ### Files
-A LBP **file** is simply a concatenated list of valid and complete LBP messages.
+A LBP **file** is a block of bytes transferred between LightBurn and the firmware. Every file has a **type**,
+which says what its contents are:
+
+| File Type              | Value  | Contents                                                        |
+|------------------------|--------|-----------------------------------------------------------------|
+| `file_type_job`        | `0x01` | A job: a list of LBP messages (see below). `cmd_execute` runs it. |
+| `file_type_correction` | `0x02` | A galvo lens correction table: an `.lbpcor` file (see [Lens Correction Files](#lens-correction-files)). |
+
+`0` is not a valid file type. Firmware that does not support a file type rejects it with `cmd_nack` and
+`err_invalid_arg` (detail `0`, the file type argument).
+
+A **job file** is simply a concatenated list of valid and complete LBP messages.
 (Including the magic, Transaction ID, command, size, and checksum fields.)
-Thus, the bytes in a file can be parsed using the same algorithms as bytes coming in off the wire.
-Messages in a file always have Transaction ID `0`.
+Thus, the bytes in a job file can be parsed using the same algorithms as bytes coming in off the wire.
+Messages in a job file always have Transaction ID `0`.
 
 ### Receiving a File
 A **file** is sent with the following commands:
 
-| Command          | Arguments                | Arg Size              |
-|------------------|--------------------------|-----------------------|
-| `cmd_file_begin` | int32 file size in bytes | 4                     |
-| `cmd_file_chunk` | Slice of file content    | 0 - `size_file_chunk` |
-| `cmd_file_end`   | None                     | 0                     |
+| Command          | Arguments                                     | Arg Size              |
+|------------------|-----------------------------------------------|-----------------------|
+| `cmd_file_begin` | uint8 file type, uint32 file size in bytes                    | 5                         |
+| `cmd_file_chunk` | uint32 offset in bytes, then a slice of the file's contents   | 4 + (0 - `size_file_chunk`) |
+| `cmd_file_end`   | uint32 CRC-32 of the whole file                               | 4                         |
 
-Files are sent in messages of the maximum permitted size.
-Firmware is expected to use the argument of `cmd_file_begin` to prepare storage for the incoming file.
-It will then concatenate the arguments of all `cmd_file_chunk` messages in the order they are received.
+1. **`cmd_file_begin`:** prepare storage for `size` bytes.
+2. **`cmd_file_chunk`:** write the data at `offset`. If `offset` plus the data's length would end past `size`,
+   refuse it with `err_transfer` (detail: `size`); this is the only check a chunk needs. Chunks may arrive in any order,
+   and a repeated chunk simply rewrites the same bytes.
+3. **`cmd_file_end`:** compute the CRC-32 (zlib / ISO-HDLC, the same as `lbp::crc32`; check value `0xCBF43926`) of the
+   file's `size` bytes. If it doesn't match the argument, refuse with `err_invalid_file`. This one check catches missing,
+   corrupted, and stray data, so the firmware never needs to track which chunks arrived.
 
-### TODO: File chunk ordering
-It may prove necessary to add a "sequence number" or "file offset" argument to each `cmd_file_chunk` message.
+LightBurn sends chunks in order, starting at offset `0`, each up to `size_file_chunk` bytes. Firmware that can only
+append (for example, streaming to an SD card) may append in arrival order and ignore the offset: the CRC still catches
+anything that went wrong. `lbp/checksum.h` provides `crc32` and an incremental `crc32_begin/update/end`.
+Only one file transfer may be in progress at a time.
 
 ### TODO: More filesystem commands
 More filesystem commands are planned but their designs are not finalized.
@@ -708,6 +888,98 @@ Possible functionalities include:
 - Loading saved files
 - Listing all files saved on the machine
 - Deleting files saved on the machine
+
+### Lens Correction Files
+A galvo's lens and mirrors bend straight lines (bulge, skew, trapezoid) and stretch the field (scale).
+The firmware removes that distortion using a **correction table**, uploaded by LightBurn as a file of type
+`file_type_correction`. The table is an `.lbpcor` file. All multi-byte fields are big-endian.
+
+| Part    | Contents                                                                                  |
+|---------|-------------------------------------------------------------------------------------------|
+| Header  | `header_size` bytes, described below.                                                     |
+| Grid    | `grid_x * grid_y` nodes. Each node is an int32 `dx` then an int32 `dy`, in micrometers.   |
+
+The file has no checksum of its own; the transfer's `cmd_file_end` carries its CRC-32. Its length is exactly
+`header_size + grid_x * grid_y * 8` bytes.
+
+**Header** (version 1, 20 bytes):
+
+| Field          | Type   | Value                                                                  |
+|----------------|--------|------------------------------------------------------------------------|
+| `magic`        | uint32 | `0x4C425043`, ASCII `LBPC` (`lbpcor_magic`)                            |
+| `version`      | uint16 | `1` (`lbpcor_version`)                                                 |
+| `header_size`  | uint16 | Size of the header in bytes; `20` for version 1                        |
+| `grid_x`       | uint16 | Nodes per row: `65`                                                    |
+| `grid_y`       | uint16 | Rows: `65`                                                             |
+| `layers`       | uint16 | `1`                                                                    |
+| `flags`        | uint16 | Linear corrections baked into the table (below)                        |
+| `field_size`   | int32  | Field span covered by the grid, edge to edge (μm). The field is square. |
+
+A reader skips any header bytes past the fields it knows, using `header_size`, so later versions can add fields.
+
+**Grid.** Nodes are stored row by row, with x varying fastest. Node (`col`, `row`) sits at
+`x = -field_size/2 + col * field_size / (grid_x - 1)` and
+`y = -field_size/2 + row * field_size / (grid_y - 1)`, so row 0 is the most negative y.
+Coordinates are field-centre coordinates, the same as `cut_from_absolute` positions on the wire.
+
+**Applying the table.** Each node stores the field's **distortion** at that point: where the beam actually lands,
+minus where it was commanded. To correct a target point `p`, the firmware interpolates the grid bilinearly at `p` and
+**subtracts** the result: it commands `p - grid(p)`. (This is the EZCAD3 convention.) An all-zero table applies no correction.
+
+**Flags.** The table can also carry linear corrections: whatever linear error was present when the grid was measured.
+`flags` records which ones are baked in, so the same correction is not also applied by LightBurn:
+
+| Bit    | Name                    | Meaning                          |
+|--------|-------------------------|----------------------------------|
+| `0x01` | `lbpcor_flag_scale`     | Field scale is in the table.     |
+| `0x02` | `lbpcor_flag_rotation`  | Field rotation is in the table.  |
+| `0x04` | `lbpcor_flag_offset`    | Field offset is in the table.    |
+
+Bits 3–15 are reserved and must be `0`. The firmware ignores `flags` and applies the table as written.
+LightBurn reads them before uploading, and uses identity (scale 1, rotation 0, offset 0) for each part of its
+own field transform whose bit is set. Bulge, skew and trapezoid are always the table's job.
+
+**Receiving the file.** At `cmd_file_end`, after the transfer's CRC-32 check, the firmware checks the file **on its own**:
+a length that does not match the header is rejected with `err_invalid_file`; an unrecognized magic, an unsupported version, or a
+header value this machine can never accept is rejected with `err_invalid_header`, with the byte offset of the offending
+field as the detail. A file that passes is **stored, but not applied**: it replaces any previously stored table,
+and correction is off until it is applied with `cmd_galvo_correction`. Whether the table fits the machine's current
+configuration is checked when it is applied, not when it is received.
+
+**Lifetime.** LightBurn keeps the correction file and uploads it on every connection. Firmware may keep the
+table across power cycles, but is not required to, and LightBurn never reads a table back.
+
+#### Applying Correction
+
+| Command                | Arguments                 | Arg Size |
+|------------------------|---------------------------|----------|
+| `cmd_galvo_correction` | uint8 enable (`0` or `1`) | 1        |
+
+`cmd_galvo_correction` with `1` **applies** the stored table. The firmware first checks the table against its
+current configuration, and refuses the request if it does not fit:
+
+| Problem                                                           | Error               | Detail                                   |
+|-------------------------------------------------------------------|---------------------|------------------------------------------|
+| No valid table is stored                                          | `err_wrong_state`   | state flags                              |
+| `field_size` differs from `cfg_field_size`                        | `err_file_mismatch` | byte offset of the mismatched header field (`16`) |
+
+A table made for a different field almost always means a stale table from another lens, or a mistyped field size,
+so the firmware refuses it rather than guessing. LightBurn reports the mismatch to the user.
+
+`cmd_galvo_correction` with `0` stops applying the table; the table stays stored. LightBurn does this while its
+correction wizard marks a test pattern, so it measures the lens's raw distortion, and applies the table again when
+the wizard closes.
+
+Correction is **off** until applied, and goes back to off when:
+- a new table is received;
+- `cfg_field_size` changes, since the table may no longer fit.
+
+Otherwise it keeps its last state; in particular, a handshake does not change it (the handshake has no side effects).
+LightBurn uploads and applies the table on every connection, so a host that disconnects mid-calibration leaves
+correction off only until it reconnects.
+
+On connecting, LightBurn sends the configuration, uploads the table, then applies it. Firmware that keeps the table
+across power cycles may also apply it at power-on, for operation without a host, provided it makes the same check.
 
 ### Executing a Job
 Lightburn will concatenate all the commands for a job into a **file** and send using the commands listed above.
@@ -718,7 +990,44 @@ Once a file has been sent, Lightburn can send `cmd_execute` to begin execution o
 | `cmd_execute`  | 0              | Execute the file currently loaded as a job.    |
 | `cmd_pause`    | 0              | Pause the job that is currently executing.     |
 | `cmd_continue` | 0              | Continue a paused job.                         |
-| `cmd_stop`     | 0              | Stop any job and/or cancel all queued actions. |
+| `cmd_stop`     | 0              | Stop all movement, turn off every laser, and cancel any job and all queued actions. |
+
+`cmd_stop` is a safety command. The firmware must act on it **immediately**, ahead of anything in its command buffer,
+and must never refuse it:
+
+- **All movement stops**, including jogs and homing.
+- **Every laser is turned off**, whether it was lit by a cut move or by `cmd_laser_on`.
+  This is the one place a laser goes dark without a move or `cmd_laser_off`. Guide lights are not affected.
+- **Any job or frame ends**, and the command buffer is discarded. For a job that was running, its `event_result` reports `err_canceled`.
+
+`cmd_stop` does not clear a fault.
+
+### Faults
+A **fault** is anything that makes it unsafe to keep operating: an e-stop, a hard limit, an open interlock (on firmware that
+treats it as a fault), a source or driver error.
+
+| Command           | Arg Size | Description                                  |
+|-------------------|----------|----------------------------------------------|
+| `cmd_clear_fault` | 0        | Acknowledge and clear a latched fault.       |
+
+1. **When a fault happens, the firmware acts as if it had received `cmd_stop`:** all movement stops, every laser is turned off,
+   any job or frame ends, and the command buffer is discarded. A running job's `event_result` reports `err_fault`.
+   It sets `state_fault` and sends `event_fault` with the reason.
+2. **Faults latch.** `state_fault` stays set until `cmd_clear_fault`, even if the cause goes away (a limit switch is released,
+   an e-stop is reset). This makes the operator acknowledge it.
+3. **While `state_fault` is set,** commands that would start motion or fire a laser are refused with `err_fault`.
+   Queries, configuration, file transfers, `cmd_stop`, and `cmd_clear_fault` are still accepted.
+4. **`cmd_clear_fault`:**
+   - If the cause is still present (the e-stop is still pressed, the interlock is still open), it is refused with `err_fault`,
+     and the fault stays latched.
+   - Otherwise the firmware clears `state_fault` and responds. The machine is idle: nothing resumes, and no laser turns on.
+     A loaded file stays loaded.
+   - With no fault latched, it does nothing and responds, so a retry is always safe.
+5. **Position.** If the fault may have cost the machine its position (a hard limit, or stopping abruptly mid-move),
+   the firmware also sets `state_needs_home`. Clearing the fault does not clear it; homing does.
+
+**Conditions that aren't faults.** An open door (`state_door_open`) only reflects the door right now; it does not latch and
+needs no clearing. Firmware decides which of its conditions are faults; those that are must follow the rules above.
 
 One advantage of sending a job as a file is that a job can be sent once and then executed multiple times, enabling workflows
 such as manual moving of the material or changing the **user origin** between executions.
@@ -740,6 +1049,57 @@ the contained movement commands are part of a framing operation.
 | `cmd_frame_begin`  | 0              | Indicates that all following movement commands are part of a framing operation. |
 | `cmd_frame_end`    | 0              | Marks the end of a framing operation.                                           |
 
+A frame uses the ordinary movement and light commands, and the ordinary rules for which moves fire.
+A frame traced with the guide light (a galvo, or a gantry with a pointer) uses **travel** moves, so the laser never fires,
+and switches the guide light with `cmd_guide_light_on/off`. A gantry that frames with the laser at low power uses
+**cut** moves, with the cut speed set to the frame speed.
+
+### Example: Guide Light Frame
+Two shapes, framed with the guide light, with the guide light blanked while moving between them:
+
+```
+cmd_frame_begin
+cmd_travel_speed_xy        frame speed
+cmd_galvo_laser_on_delay   0          (galvo: all galvo delays are zeroed while framing)
+cmd_galvo_laser_off_delay  0
+cmd_galvo_polygon_delay    0
+cmd_galvo_end_delay        0
+cmd_galvo_travel_delay     0 0 0
+cmd_guide_light_on         0
+cmd_travel_abs_xy  ...                outline of the first shape, guide light on
+cmd_guide_light_off        0          blank before moving to the next shape
+cmd_travel_abs_xy                     to the second shape
+cmd_dwell                  settle time (us), so the light comes on where the mirrors have stopped
+cmd_guide_light_on         0
+cmd_travel_abs_xy  ...                outline of the second shape, guide light on
+cmd_guide_light_off        0
+cmd_frame_end
+```
+
+The laser on/off delays apply only to lasers lit by cut moves, never to guide lights, so the firmware toggles the guide light
+exactly where it appears in the sequence. Framing zeroes all galvo delays; the explicit `cmd_dwell` lets the mirrors
+settle before the guide light comes back on.
+
+## Galvo Delays
+A galvo's mirrors lag behind the commanded position: they take time to speed up, trail behind while moving, and
+ring when they stop. The laser switches almost instantly. These delays line the laser up with where the mirrors
+really are. They are the same settings galvo controllers such as EZCAD and BSL use.
+
+| Command                     | Arguments                         | Applies                                                              | Also known as        |
+|-----------------------------|-----------------------------------|----------------------------------------------------------------------|----------------------|
+| `cmd_galvo_laser_on_delay`  | int32 μs (may be negative)        | When a cut move lights a dark laser: the laser fires this long after the move starts (negative: before it starts) | Laser On TC          |
+| `cmd_galvo_laser_off_delay` | int32 μs                          | When lasers lit by a cut move go dark (a travel move or `cmd_laser_off`): they stay lit this long after that cut move ends | Laser Off TC         |
+| `cmd_galvo_polygon_delay`   | int32 μs                          | At each vertex between two consecutive cut moves, scaled by the turn angle t: delay × min(t, 90°) / 90° | Polygon TC           |
+| `cmd_galvo_end_delay`       | int32 μs                          | After the last cut move before the lasers go dark: wait this long, measured from the end of that cut move, before continuing | End TC, mark delay   |
+| `cmd_galvo_travel_delay`    | int32 min μs, int32 max μs, int32 dist μm | After each travel move of length d: max if d ≥ dist (or dist ≤ 0), else min + (max − min) × d / dist; none if d = 0 | Jump delay           |
+
+- **Per layer.** LightBurn sends all five with each layer's settings. Each stays in effect until it is changed.
+- **Defaults.** Until a job sets them, the firmware uses its `cfg_galvo_*` defaults.
+- **Dwells are exact.** `cmd_dwell` never has a galvo delay added: it waits exactly as long as it says.
+- **Firing in place is never delayed.** `cmd_laser_on` and `cmd_laser_off` with no cut move between them switch the laser
+  exactly where they appear, like a dwell.
+- **Guide lights are never delayed.** The laser on/off delays apply only to lasers.
+
 
 ## Queries
 The responses to all commands discussed above have been quite simple - an acknowledgment consisting of the same command code and no arguments.
@@ -749,7 +1109,7 @@ Let's start with the most straightforward queries: what is the current laser pos
 
 ### Current Position
 The following queries are received from LightBurn with no arguments. Much like movement commands,
-any commands composed of the `cmd_pos` MSB and a bitwise combination of `axis_*` values
+any commands composed of `query_pos` (the high byte) and a bitwise combination of `axis_*` values
 constitutes a valid position query, and responses values should be sent as `int32` values in the following order,
 for each axis present:
 `x`, `y`, `z`, `a`, `b`, `c`, `u`, `v`.
@@ -790,11 +1150,34 @@ The response argument is a bitwise-OR composition of one or more of the followin
 - `state_receiving`: The machine is currently receiving a file from LightBurn.
 - `state_file_loaded`: A file is loaded and ready to execute.
 - `state_computing`: The machine is performing a non-trivial calculation.
-- `state_fault`: A fault prevents operation (e.g. an open interlock, e-stop, or hardware fault). Set for as long as the fault persists. While it is set, the firmware should refuse commands that would start motion, with `cmd_nack` and `err_fault`.
+- `state_fault`: A fault prevents operation (e.g. an open interlock, e-stop, or hardware fault). Latched: it stays set until LightBurn clears it with `cmd_clear_fault`, even if the cause has gone. While it is set, the firmware refuses commands that would start motion or fire a laser, with `cmd_nack` and `err_fault`. See [Faults](#faults).
+- `state_pedal_down`: The foot pedal (start input) is currently pressed. Presses themselves are reported by `event_input`.
+- `state_door_open`: The enclosure door or lid is open.
+- `state_interlock_open`: The safety interlock circuit is open, so the laser cannot fire. A firmware that treats this as a fault also sets `state_fault`.
+- `state_needs_home`: The machine's position can't be trusted: it hasn't homed since power-up, or a fault may have cost it its position. Cleared by homing. LightBurn offers to home before running a job. Machines without homing (including galvos) never set it.
 
 Many simulatenous flags are possible - for example it is quite reasonable to be moving during a job.
 
 **Note:** More state flags may prove necessary as development continues.
+
+### Command Buffer
+The firmware holds programmed commands in a command buffer and executes them in order. When LightBurn streams
+commands (for example while framing), it uses these queries to send no more than the buffer has room for, instead of
+filling it and being refused with `err_buffer_full`.
+
+| Command (Query)       | Response Arguments                      | Arg Size |
+|-----------------------|-----------------------------------------|----------|
+| `cmd_buffer_capacity` | uint32 total command slots              | 4        |
+| `cmd_buffer_free`     | uint32 command slots free right now     | 4        |
+
+- **The unit is one buffered command.** Every command that goes into the buffer takes one slot, whatever its size:
+  moves, settings, dwells, and laser and light switching. Queries and immediate commands (`cmd_stop`, `cmd_pause`,
+  `cmd_continue`, jog start and stop) never take a slot and are never refused with `err_buffer_full`.
+- **`cmd_buffer_capacity` is fixed** for the firmware. LightBurn reads it once after the handshake.
+- **`cmd_buffer_free` is a guarantee:** if it reports *n*, the next *n* buffered commands will not be refused with
+  `err_buffer_full`. Commands executed meanwhile may free more.
+- Firmware that doesn't provide these queries answers them with `cmd_nack` and `err_invalid_cmd`. LightBurn then
+  paces streamed commands by time instead.
 
 ## Configuration
 The machine's configuration represent characteristics or settings of the machine that are expected to persist between power settings.

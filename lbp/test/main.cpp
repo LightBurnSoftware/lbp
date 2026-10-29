@@ -58,7 +58,36 @@ int main()
 		assert(hs.complete());
 		assert(hs.txid() == lbp::txid_none);
 		assert(hs.setTxid(1));
-		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x01, 0xb8, 0x00, 0x00, 0xf0, 0xac};
+		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x01, 0xb8, 0x00, 0x00, 0xac, 0xf0};
+		assert(hs.size() == sizeof(expected));
+		assert(std::memcmp(hs.data(), expected, sizeof(expected)) == 0);
+	}
+
+	// Checksum is CRC-16/X-25 (check value 0x906E), sent big-endian: see spec.md "Checksum".
+	{
+		const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+		assert(lbp::crc16(check, sizeof(check)) == 0x906E);
+		uint8_t wire[2];
+		lbp::writeBE16(lbp::crc16(check, sizeof(check)), wire);
+		assert(wire[0] == 0x90 && wire[1] == 0x6e);
+	}
+
+	// .lbpcor trailer is CRC-32 (zlib): check value 0xCBF43926.
+	{
+		const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+		assert(lbp::crc32(check, sizeof(check)) == 0xCBF43926u);
+		uint32_t crc = lbp::crc32_begin();
+		crc = lbp::crc32_update(crc, check, 4);
+		crc = lbp::crc32_update(crc, check + 4, sizeof(check) - 4);
+		assert(lbp::crc32_end(crc) == 0xCBF43926u);
+		assert(lbp::crc32(check, 0) == lbp::crc32_end(lbp::crc32_begin()));
+	}
+
+	// The handshake example in spec.md.
+	{
+		lbp::CmdMsg hs(lbp::cmd_handshake, 2, lbp::protocol_version);
+		assert(hs.setTxid(1));
+		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x01, 0xb8, 0x00, 0x02, 0x00, 0x0a, 0x06, 0xcb};
 		assert(hs.size() == sizeof(expected));
 		assert(std::memcmp(hs.data(), expected, sizeof(expected)) == 0);
 	}
@@ -78,7 +107,7 @@ int main()
 		assert(resp.txid() == 0x2a);
 		assert(resp.cmd() == lbp::cmd_pos_x);
 		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x2a, 0x81, 0x01,
-									0x00, 0x04, 0x00, 0x00, 0x4e, 0x20, 0x9d, 0x75};
+									0x00, 0x04, 0x00, 0x00, 0x4e, 0x20, 0x75, 0x9d};
 		assert(resp.size() == sizeof(expected));
 		assert(std::memcmp(resp.data(), expected, sizeof(expected)) == 0);
 
@@ -169,6 +198,33 @@ int main()
 		assert(parser.feed(hdr, sizeof(hdr)) == sizeof(hdr));
 		assert(!parser.parseNext());
 		assert(parser.size_rejections == rejected + 1);
+	}
+
+	// Message offsets: each parsed message's first byte, counted since clear(), even past a corrupted message.
+	{
+		lbp::Parser<512> p;
+		const lbp::CmdMsg m1(lbp::cmd_dwell, 4, 100);			// 16 bytes
+		const lbp::CmdMsg m2(lbp::cmd_laser_on, 1, 0);			// 13 bytes
+		const lbp::CmdMsg m3(lbp::cmd_dwell, 4, 200);			// 16 bytes
+		uint8_t bad[lbp::size_file_msg];
+		std::memcpy(bad, m2.data(), m2.size());
+		bad[m2.size() - 1] ^= 0xFF;								// corrupt the checksum
+
+		assert(p.feed(m1.data(), m1.size()) == m1.size());
+		assert(p.feed(m2.data(), m2.size()) == m2.size());
+		assert(p.feed(bad, m2.size()) == m2.size());
+		assert(p.feed(m3.data(), m3.size()) == m3.size());
+
+		assert(p.parseNext() && p.payload().cmd() == lbp::cmd_dwell && p.messageOffset() == 0);
+		assert(p.parseNext() && p.payload().cmd() == lbp::cmd_laser_on && p.messageOffset() == m1.size());
+		// The corrupted copy is skipped; m3 still reports its true position.
+		assert(p.parseNext() && p.payload().cmd() == lbp::cmd_dwell);
+		assert(p.messageOffset() == size_t(m1.size() + m2.size() + m2.size()));
+		assert(p.checksum_rejections == 1);
+		assert(!p.parseNext());
+
+		p.clear();
+		assert(p.messageOffset() == 0);
 	}
 
 	// Version compatibility

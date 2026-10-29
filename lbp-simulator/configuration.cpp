@@ -81,9 +81,10 @@ bool Configuration::process(lbp::MaxPayload &request, OutputQueue &out_q)
 		return false;
 	}
 	if (request.size() == 0) {
-		// it's a query
-		gLog().info(QString("Config Get %1: %2").arg(cmd).arg(m_settings[cmd]));
-		out_q.respond(request, m_settings[cmd]);
+		// it's a query. Unset keys report their default (without storing it).
+		const int32_t value = getOrDefault(cmd);
+		gLog().info(QString("Config Get %1: %2").arg(cmd).arg(value));
+		out_q.respond(request, value);
 		return true;
 	}
 	if (request.size() == lbp::size_cfg_args && request.readArg(m_scratch[cmd])) {
@@ -103,6 +104,15 @@ bool Configuration::get(uint16_t key, int32_t &value) const
 	}
 	value = found->second;
 	return true;
+}
+
+int32_t Configuration::getOrDefault(uint16_t key) const
+{
+	int32_t value = 0;
+	if (!get(key, value)) {
+		getConfigDefault(key, value);
+	}
+	return value;
 }
 
 static constexpr uint16_t cgf_codes[] = {
@@ -263,6 +273,15 @@ static constexpr uint16_t cgf_codes[] = {
 	cfg_wireless_panel_fast,
 	cfg_wireless_panel_slow,
 	cfg_axis_auto_home,
+	cfg_field_size,
+	cfg_galvo_laser_on_delay,
+	cfg_galvo_laser_off_delay,
+	cfg_galvo_polygon_delay,
+	cfg_galvo_end_delay,
+	cfg_galvo_travel_delay_min,
+	cfg_galvo_travel_delay_max,
+	cfg_galvo_travel_delay_dist,
+	cfg_travel_speed,
 };
 
 using NameToCmdMap = std::unordered_map<std::string_view, uint16_t>;
@@ -773,6 +792,33 @@ bool cmdToName(std::uint16_t cmd, std::string_view &name)
 	case cfg_axis_auto_home:
 		name = "cfg_axis_auto_home";
 		return true;
+	case cfg_field_size:
+		name = "cfg_field_size";
+		return true;
+	case cfg_galvo_laser_on_delay:
+		name = "cfg_galvo_laser_on_delay";
+		return true;
+	case cfg_galvo_laser_off_delay:
+		name = "cfg_galvo_laser_off_delay";
+		return true;
+	case cfg_galvo_polygon_delay:
+		name = "cfg_galvo_polygon_delay";
+		return true;
+	case cfg_galvo_end_delay:
+		name = "cfg_galvo_end_delay";
+		return true;
+	case cfg_galvo_travel_delay_min:
+		name = "cfg_galvo_travel_delay_min";
+		return true;
+	case cfg_galvo_travel_delay_max:
+		name = "cfg_galvo_travel_delay_max";
+		return true;
+	case cfg_galvo_travel_delay_dist:
+		name = "cfg_galvo_travel_delay_dist";
+		return true;
+	case cfg_travel_speed:
+		name = "cfg_travel_speed";
+		return true;
 
 	default:
 		return false;
@@ -939,7 +985,18 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_wireless_panel_fast:
 	case cfg_wireless_panel_slow:
 	case cfg_axis_auto_home:
+	case cfg_galvo_laser_on_delay:
+	case cfg_galvo_laser_off_delay:
+	case cfg_galvo_polygon_delay:
+	case cfg_galvo_end_delay:
+	case cfg_galvo_travel_delay_min:
+	case cfg_galvo_travel_delay_max:
+	case cfg_galvo_travel_delay_dist:
+	case cfg_travel_speed:
 		value = 0;
+		return true;
+	case cfg_field_size:
+		value = 110000; // micrometers
 		return true;
 	default:
 		return false;

@@ -25,6 +25,7 @@ qt_add_executable(lbp-simulator
     simstate.h
     vec4.h vec4.cpp
     filesystem.h filesystem.cpp
+    correction.h correction.cpp
     simutils.h simutils.cpp
     transportwidget.h transportwidget.cpp
 )

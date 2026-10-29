@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "correction.h"
 #include "simutils.h"
 
 #include <QFile>
@@ -53,18 +54,44 @@ public:
 
 	/** @return True if a file was successfully opened and reading begun. */
 	bool startReading();
+	/** @return the size of the job file being read (valid while reading), for job progress. */
+	qint64 jobFileSize() const { return m_file.size(); }
 	void stopReading();
 	bool isReading() const;
+
+	/** @brief Galvo mode accepts file_type_correction. Leaving galvo mode discards any stored table. */
+	void setGalvo(bool galvo);
+
+	/** @return The stored lens correction table (valid == false if none). */
+	const CorrectionTable &correction() const { return m_correction; }
+
+	/** @return True once after a new correction table has been received and stored. */
+	bool takeNewCorrection();
 
 private:
 	enum class State { Idle, Receiving, Reading };
 	/** @return 0 on success, or an err_* code. */
 	uint16_t startReceiving(lbp::MaxPayload &payload);
 	void stopReceiving();
-	/** @return 0 on success, or an err_* code. */
-	uint16_t receive(const lbp::MaxPayload &payload);
+	/** Write one cmd_file_chunk at its offset. @return 0 on success, or an err_* code (detail filled in). */
+	uint16_t receive(const lbp::MaxPayload &payload, uint32_t &detail);
+	/** Handle cmd_file_end: check the CRC-32, then store the file. Ends the transfer either way.
+	 *  @return 0 on success, or an err_* code. */
+	uint16_t finishReceiving(const lbp::MaxPayload &payload);
+	/** Close and delete the .part file of an unfinished or failed transfer. */
+	void discardReceiveFile();
+
+	/** Validate and store a received correction file. @return 0 on success, or an err_* code. */
+	uint16_t finishCorrection(uint32_t &detail);
 
 	State m_state = State::Idle;
 	FileParser m_parser;
-	QFile m_file;
+	QFile m_file;						// the stored job, while it's being read
+	QFile m_receive_file;				// "<target>.part": the file being received, sized by cmd_file_begin
+	QString m_receive_target;			// where it goes once its CRC-32 checks out
+	uint32_t m_receive_size = 0;		// declared size, for the chunk bounds check
+	uint8_t m_receiving_type = 0;		// file_type_* of the file being received
+	bool m_galvo = false;
+	CorrectionTable m_correction;
+	bool m_new_correction = false;
 };
