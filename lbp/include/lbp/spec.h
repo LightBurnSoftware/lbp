@@ -118,9 +118,7 @@ constexpr uint16_t cmd_stop 	= 0x0CFF;	// Stop job and/or any movement and cutti
 constexpr uint16_t cmd_frame_begin = 0x0FAB; // Marks beginning of a frame commands.
 constexpr uint16_t cmd_frame_end = 0x0FAE; // Marks the end of frame commands.
 
-// GALVO (stub): galvos frame with a guide (red) laser instead of the main laser at low power,
-// usually repeating the outline until stopped. Both are only valid between frame begin and end.
-constexpr uint16_t cmd_frame_guide_laser = 0x0FA6; // GALVO (stub): trace this frame with the guide laser. No args.
+// GALVO (stub): only valid between frame begin and end.
 constexpr uint16_t cmd_frame_repeat = 0x0FA2; // GALVO (stub): repeat this frame until cmd_stop. No args.
 
 constexpr uint16_t cmd_commit_cfg = 0x0CCC; // commit changes sent with cfg_ commands.
@@ -129,6 +127,11 @@ constexpr uint16_t cmd_commit_cfg = 0x0CCC; // commit changes sent with cfg_ com
 // Carries the rejected request's transaction id. Args: uint16 rejected cmd, uint16 err_* code, uint32 detail.
 constexpr uint16_t cmd_nack = 0x0BAD;
 constexpr uint8_t size_nack_args = 2 + 2 + 4;
+
+// Sent by the firmware, unsolicited (txid 0), when something happens. Never acknowledged or retried.
+// Args: uint8 event kind, uint16 code, uint32 detail. See the event_* kinds below.
+constexpr uint16_t cmd_event = 0x0E7E;
+constexpr uint8_t size_event_args = 1 + 2 + 4;
 
 // ----------------------------------------------------------------------------
 // Error codes for cmd_nack ---------------------------------------------------
@@ -145,14 +148,29 @@ constexpr uint16_t err_invalid_arg		= 0x0103; // argument value invalid or out o
 constexpr uint16_t err_queue_full		= 0x0201; // command buffer full; retry shortly.
 constexpr uint16_t err_wrong_state		= 0x0202; // command not allowed in the current state. detail: state_* flags.
 constexpr uint16_t err_fault			= 0x0203; // refused because a fault is active (see state_fault).
+constexpr uint16_t err_canceled			= 0x0204; // stopped (cmd_stop or an operator stop) before it finished.
 
 // 0x04xx: filesystem-related error.
 constexpr uint16_t err_storage_full		= 0x0401; // not enough space for the file.
 constexpr uint16_t err_transfer			= 0x0402; // chunk/end without a file_begin, or out of sequence.
+constexpr uint16_t err_invalid_file		= 0x0403; // file failed validation (checksum, length, malformed contents).
+constexpr uint16_t err_invalid_header	= 0x0404; // file header not recognized or not supported. Detail: byte offset of the offending field.
 
 // 0xD0xx: reserved for vendor-specific codes.
 
 constexpr uint16_t err_unknown = 0xFFFF; // catch-all.
+
+// Event kinds for cmd_event. 0 is not a valid kind. LightBurn ignores unknown kinds, and handles
+// unknown codes within a known kind generically.
+constexpr uint8_t event_fault	= 0x01; // the machine can't operate until cleared (state_fault is set). code: err_* reason. detail: context.
+constexpr uint8_t event_warning	= 0x02; // something is wrong but the machine is still operable. code: warning code. detail: context.
+constexpr uint8_t event_input	= 0x03; // an operator input happened. code: input_*. detail: 0.
+constexpr uint8_t event_result	= 0x04; // a long-running request finished. code: 0 on success, else err_*. detail: the request's txid.
+
+// Codes for event_input.
+constexpr uint16_t input_start	= 0x0001; // start marking (typically a foot pedal)
+constexpr uint16_t input_frame	= 0x0002; // start framing
+constexpr uint16_t input_stop	= 0x0003; // stop marking
 
 // ----------------------------------------------------------------------------
 // 0x0001: Laser Commands -----------------------------------------------------
@@ -177,21 +195,32 @@ constexpr uint16_t cmd_raster_power = cls_laser | 0x05AA; // int8 laser index, u
 // after a change before marking.
 constexpr uint16_t cmd_laser_pulse_width = cls_laser | 0x05D0; // GALVO (stub): int8 laser index, int32 pulse width (ns)
 
-// GALVO (stub): focus pointer, a separate light used to set focus height. Not the framing guide laser.
-constexpr uint16_t cmd_focus_light_off = cls_laser | 0x0FC1; // GALVO (stub): no args
-constexpr uint16_t cmd_focus_light_on = cls_laser | 0x0FC2; // GALVO (stub): no args
+// Guide light: a low-power aiming beam that shows where a laser source's beam will land (a galvo's
+// red dot, or a gantry's pointer). Not a laser: it has no power or frequency and is never enabled.
+// The index selects whose aiming beam. Firmware with one aiming beam shared by all sources
+// implements index 0 only and NACKs other indices with err_invalid_arg (detail 0).
+constexpr uint16_t cmd_guide_light_off = cls_laser | 0x0FB1; // int8 laser index
+constexpr uint16_t cmd_guide_light_on = cls_laser | 0x0FB2; // int8 laser index
+
+// Focus light: separate pointer(s) used to set focus height. Not a guide light.
+constexpr uint16_t cmd_focus_light_off = cls_laser | 0x0FC1; // no args
+constexpr uint16_t cmd_focus_light_on = cls_laser | 0x0FC2; // no args
 
 // ----------------------------------------------------------------------------
 // 0x0004: Files --------------------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t cls_files = 0x4000; // (4 starts with "F", for "Files")
 
-constexpr uint16_t cmd_file_begin		= cls_files | 0x0401; // Arg: int32 file size
+constexpr uint16_t cmd_file_begin		= cls_files | 0x0401; // Args: uint8 file type, int32 file size (bytes)
 constexpr uint16_t cmd_file_end			= cls_files | 0x0402; // Marks the end of a sent file.
 constexpr uint16_t cmd_file_chunk		= cls_files | 0x04FC; // Mark a file chunk.
 
 // Filesystem queries:
 constexpr uint16_t cmd_flash_available	= cls_files | 0x05FA; // TODO: return int64 bytes
+
+// File types, for cmd_file_begin. 0 is not a valid type.
+constexpr uint8_t file_type_job			= 0x01; // a list of LBP messages; cmd_execute runs it
+constexpr uint8_t file_type_correction	= 0x02; // galvo lens correction table (format TBD)
 constexpr uint16_t cmd_mainboard_version = cls_files | 0x05B0; // TODO
 
 // ----------------------------------------------------------------------------
@@ -246,8 +275,7 @@ constexpr uint16_t cmd_cut_from = cls_settings | 0x0CCF; // arg: int8 value, lis
 // options for cmd_cut_from
 constexpr uint8_t cut_from_current_position = 0x0;
 constexpr uint8_t cut_from_user_origin = 0x1;
-constexpr uint8_t cut_from_absolute = 0x2;
-constexpr uint8_t cut_from_field_center = 0x3; // GALVO (stub): (0,0) is the centre of the marking field.
+constexpr uint8_t cut_from_absolute = 0x2; // GALVO (stub): on a galvo, absolute (0,0) is the centre of the marking field.
 
 // Cut Type
 constexpr uint16_t cmd_cut_type = cls_settings | 0x0CC7;
@@ -262,15 +290,23 @@ constexpr uint16_t cut_type_scan_bi_x = scan_bi | axis_x;
 constexpr uint16_t cut_type_scan_bi_y = scan_bi | axis_y;
 
 // GALVO (stub): mirror timing delays. Sent in a job body (per layer) to override the machine
-// defaults. All arguments are one int32. Delays are microseconds; the laser on delay may be negative.
+// defaults. Unless noted, the argument is one int32. Delays are microseconds; the laser on delay may be negative.
+// The laser on/off delays apply only to lasers (cmd_laser_on/off), never to guide lights.
 constexpr uint16_t setting_galvo_delay = cls_settings | 0x0D00;
 constexpr uint16_t cmd_galvo_laser_on_delay		= setting_galvo_delay | 0x01; // GALVO (stub): start of a cut move to laser on (us)
 constexpr uint16_t cmd_galvo_laser_off_delay	= setting_galvo_delay | 0x02; // GALVO (stub): end of a cut move to laser off (us)
-constexpr uint16_t cmd_galvo_polygon_delay		= setting_galvo_delay | 0x03; // GALVO (stub): pause at each corner within a cut (us)
+// GALVO (stub): the full polygon delay (us), applied with the laser on at each vertex between two
+// consecutive cut moves, scaled by the turn angle t (0 = straight on, 180 = reversal) that the
+// firmware computes from those moves: delay * min(t, 90) / 90. Full delay at 90 degrees or sharper.
+constexpr uint16_t cmd_galvo_polygon_delay		= setting_galvo_delay | 0x03;
 constexpr uint16_t cmd_galvo_end_delay			= setting_galvo_delay | 0x04; // GALVO (stub): pause after the last cut move of a shape (us)
-constexpr uint16_t cmd_galvo_jump_delay_min		= setting_galvo_delay | 0x05; // GALVO (stub): settle time after a short travel move (us)
-constexpr uint16_t cmd_galvo_jump_delay_max		= setting_galvo_delay | 0x06; // GALVO (stub): settle time after a long travel move (us)
-constexpr uint16_t cmd_galvo_jump_delay_dist	= setting_galvo_delay | 0x07; // GALVO (stub): travel length at which the max delay applies (um)
+
+// GALVO (stub): OPTIONAL. Mirror settle time after each travel move, scaled by the move's length d:
+//   d >= dist (or dist <= 0): max;  otherwise: min + (max - min) * d / dist.  No delay for d == 0.
+// Args: int32 min (us), int32 max (us), int32 dist (um).
+// Firmware must advertise support (mechanism TBD). Without it, LightBurn sends cmd_dwell after each
+// travel move instead, and never sends both: this delay is the only automatic delay after a travel move.
+constexpr uint16_t cmd_galvo_jump_delay			= setting_galvo_delay | 0x05;
 
 // ----------------------------------------------------------------------------
 // 0x6000: Movement -----------------------------------------------------------
@@ -481,6 +517,9 @@ constexpr uint32_t state_receiving = 0x0010;		// machine is receiving a file fro
 constexpr uint32_t state_file_loaded = 0x0020;		// a file is loaded and ready to execute.
 constexpr uint32_t state_computing = 0x0040;		// machine is performing a non-trivial computation.
 constexpr uint32_t state_fault = 0x0080;			// a fault prevents operation (interlock, e-stop, hardware). Set while the fault persists.
+constexpr uint32_t state_pedal_down = 0x0100;		// the foot pedal (start input) is currently pressed. Presses are reported by event_input.
+constexpr uint32_t state_door_open = 0x0200;		// the enclosure door or lid is open.
+constexpr uint32_t state_interlock_open = 0x0400;	// the safety interlock circuit is open; the laser cannot fire.
 
 // Position Queries
 constexpr uint16_t query_pos = cls_state_query | 0x0100;
@@ -671,6 +710,14 @@ constexpr uint16_t cfg_v_backlash			= axis_index_v | axis_backlash;
 constexpr uint16_t cfg_v_docking_pos		= axis_index_v | axis_docking_pos;
 constexpr uint16_t cfg_v_step_length		= axis_index_v | axis_step_length;
 
+// GALVO (stub): Galvo field size, per mirror axis.
+// The marking field is the area the mirrors can reach through the lens (usually square).
+// Field size is the span of each mirror axis, edge to edge, in micrometers. Galvo coordinates on the
+// wire stay in micrometers; the firmware converts them to its own mirror command units by mapping
+// +/- size/2 onto its full command range (which only the firmware knows).
+constexpr uint16_t cfg_field_size_x	= cls_cfg | 0x0F10 | axis_index_x;	// GALVO (stub): micrometers
+constexpr uint16_t cfg_field_size_y	= cls_cfg | 0x0F10 | axis_index_y;	// GALVO (stub): micrometers
+
 // User Origin
 constexpr uint16_t cfg_user_origin_x = cls_cfg | 0x0060 | axis_index_x;
 constexpr uint16_t cfg_user_origin_y = cls_cfg | 0x0060 | axis_index_y;
@@ -749,13 +796,9 @@ constexpr uint16_t cfg_wireless_panel_slow = cls_cfg | 0x0225; // micrometers/se
 constexpr uint16_t cfg_axis_auto_home = cls_cfg | 0x0402;
 
 // GALVO (stub): Configurables - Galvo field
-// The marking field is the square area the mirrors can reach through the lens.
-constexpr uint16_t cfg_field_size		= cls_cfg | 0x0F10;					// GALVO (stub): micrometers
-constexpr uint16_t cfg_field_offset_x	= cls_cfg | 0x0F20 | axis_index_x;	// GALVO (stub): micrometers
-constexpr uint16_t cfg_field_offset_y	= cls_cfg | 0x0F20 | axis_index_y;	// GALVO (stub): micrometers
-constexpr uint16_t cfg_field_angle		= cls_cfg | 0x0F30;					// GALVO (stub): millidegrees
-// GALVO (stub): TODO if the firmware applies lens correction: per-galvo axis swap, sign, scale, bulge,
-// skew and trapezoid, and a way to upload a correction table (possibly via the file commands).
+// Field offset, rotation, flips and axis swap are applied by LightBurn before sending.
+// GALVO (stub): TODO lens correction (scale, bulge, skew, trapezoid), applied by the firmware:
+// a correction table upload (possibly via the file commands) or parameters.
 
 // GALVO (stub): machine defaults for the per-layer galvo delays (cmd_galvo_*), same units.
 constexpr uint16_t cfg_galvo_laser_on_delay		= cls_cfg | 0x0F41; // GALVO (stub): microseconds

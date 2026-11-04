@@ -115,6 +115,8 @@ The Transaction ID lets LightBurn match each response to the request that caused
 - IDs are assigned when a request is created, incrementing by one for each new request and wrapping from `0xFFFF` back to `1`. `0` is never assigned.
 - When LightBurn **retries** a request (for example, after a timeout), it re-sends the request with the **same** Transaction ID.
 - Consecutive distinct requests therefore always have distinct Transaction IDs.
+- The first request LightBurn sends on every new connection is `cmd_handshake`. Because the handshake has no side effects, it is harmless if the firmware mistakes it for a retry of a request from a previous connection that happened to have the same ID.
+- LightBurn never sends Transaction ID `0` over a connection. Only messages inside job files carry Transaction ID `0`.
 - Messages written into job files always have Transaction ID `0`.
 
 ### Rules for the Firmware
@@ -137,7 +139,38 @@ message.h contains the helper function `respondTo(...)` to assist firmware autho
 The firmware may send messages that are not responses to any request, at any time. These always carry Transaction ID `0`, and LightBurn never responds to them.
 LightBurn must ignore any unsolicited message whose command it does not recognize. This allows future versions of LBP to add new notifications without breaking existing LightBurn versions.
 
-Currently, the firmware sends `cmd_job_end` unsolicited when a job finishes.
+Currently, the firmware sends `cmd_job_end` unsolicited when a job finishes, and `cmd_event` (see [Events](#events)).
+
+## Events
+The firmware reports things that *happen* with `cmd_event`, sent unsolicited (Transaction ID `0`).
+
+| Command     | Arguments                                   | Arg Size |
+|-------------|---------------------------------------------|----------|
+| `cmd_event` | uint8 kind, uint16 code, uint32 detail       | 7        |
+
+| Kind            | Value  | Meaning | `code` | `detail` |
+|-----------------|--------|---------|--------|----------|
+| `event_fault`   | `0x01` | The machine can't operate until the fault is cleared. `state_fault` is set while it lasts. | `err_*` reason | Context (e.g. which axis), or 0 |
+| `event_warning` | `0x02` | Something is wrong, but the machine is still operable (e.g. a source temperature warning). | Warning code | Context, or 0 |
+| `event_input`   | `0x03` | An operator input happened. | `input_start`, `input_frame`, or `input_stop` | 0 |
+| `event_result`  | `0x04` | A long-running request has finished. | `0` on success, otherwise an `err_*` code (`err_canceled` if it was stopped) | Transaction ID of the original request |
+
+`0` is not a valid kind. LightBurn ignores events of a kind it does not recognize, and handles unrecognized codes within a known kind
+generically (for example, by showing an unknown fault to the user).
+
+**Events are notifications, not the source of truth.** They are never acknowledged or retried, so one may be lost.
+Anything LightBurn must not miss is also reflected in the state flags (see [Machine State](#machine-state)), and if an event and the
+state flags ever disagree, the state flags win.
+
+**Conditions vs. happenings.** A condition that is true or false right now (the door is open, the pedal is held) is a state flag.
+Something that happens at a moment (the pedal was pressed, homing finished) is an event. A pedal tap between two state queries
+would be missed, so LightBurn acts on `event_input`, not on `state_pedal_down`.
+
+**Results.** The firmware sends `event_result` only after it has sent the response to the original request, and only for long-running
+requests (such as homing, focusing, and executing a job), never for each move within a job. Requests with Transaction ID `0` (including
+commands in a job file) cannot be matched to a result.
+
+The firmware should debounce inputs and limit repeated events, so that a flapping switch cannot flood the connection.
 
 ## Errors
 
@@ -181,8 +214,11 @@ Codes are loosely grouped by their upper byte: `0x01xx` for problems with the re
 | `0x0201` | `err_queue_full`     | The command buffer is full; retry shortly. | 0 |
 | `0x0202` | `err_wrong_state`    | A recognized command that is not allowed in the current state (e.g. `cmd_continue` when not paused, `cmd_execute` with no file loaded). | `state_*` flags |
 | `0x0203` | `err_fault`          | Refused because a fault is active (see `state_fault`). | 0 |
+| `0x0204` | `err_canceled`       | Stopped (by `cmd_stop` or an operator stop) before it finished. Used in `event_result`. | 0 |
 | `0x0401` | `err_storage_full`   | Not enough space for the file. | 0 |
 | `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or out of sequence. | 0 |
+| `0x0403` | `err_invalid_file`   | The received file failed validation: its checksum doesn't match, its length doesn't match its header, or its contents are malformed. | 0 |
+| `0x0404` | `err_invalid_header` | The received file's header is not recognized or not supported: wrong magic, unsupported version, or values this machine can't accept (such as a field size that doesn't match its configuration). | Byte offset of the offending header field |
 | `0xFFFF` | `err_unknown`        | Catch-all. | 0 |
 
 **Note**
@@ -296,7 +332,7 @@ So, all together, we have:
 - **absolute travel**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`). It is **not expected** that the laser is cutting.
 - **relative cut**: move the laser a specified distance from its current position. The laser **is expected** to be active and cutting.
 - **absolute cut**: move the laser to a specific position (relative to the origin set by `cmd_cut_from`).The laser **is expected** to be active and cutting.
-- **dwell**: perform no movement for a specified number of milliseconds.
+- **dwell**: perform no movement for a specified number of microseconds.
 
 These distinctions exist to provide the firmware with as much **context** as possible for the command. They also allow for more granular
 configuration of default speeds and movement behaviors. The intention is to help make LBP-capable firmware easier to write and maintain.
@@ -527,12 +563,12 @@ Job Origin is set in the Job Header using the `cmd_cut_from` message.
 | `cmd_travel_rel_xyzabc` | int32 X, int32 Y, int32 Z, int32 A, int32 B, int32 C  | 24             |
 
 #### Dwell
-While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of milliseconds.
+While not technically a "movement", "dwell" commands the laser to remain in place for a specified number of microseconds.
 This can occur whether the laser is on or off.
 
 | Command     | Arguments (code)   | Arg Size       |
 |-------------|--------------------|----------------|
-| `cmd_dwell` | int32 milliseconds | 4              |
+| `cmd_dwell` | int32 microseconds | 4              |
 
 ## Controlling the Laser
 Your machine may have more than one laser tube. All laser control commands have 1-byte laser index argument
@@ -571,6 +607,30 @@ Once the laser settings have been sent, it is still necessary to turn the enable
 |-----------------|------------------|----------------|
 | `cmd_laser_on`  | int8 laser index | 1              |
 | `cmd_laser_off` | int8 laser index | 1              |
+
+### Guide and Focus Lights
+Many machines have low-power pointers in addition to their lasers. These are **not** lasers in the LBP sense:
+they have no power or frequency, are never enabled with `cmd_laser_enable`, and are typically safe to use with the lid open.
+
+| Command               | Arguments        | Arg Size |
+|-----------------------|------------------|----------|
+| `cmd_guide_light_on`  | int8 laser index | 1        |
+| `cmd_guide_light_off` | int8 laser index | 1        |
+| `cmd_focus_light_on`  | none             | 0        |
+| `cmd_focus_light_off` | none             | 0        |
+
+**Guide light:** an aiming beam that shows where a laser source's beam will land, such as a galvo's red dot
+(which travels through the mirrors), or a gantry's pointer. On fiber sources it is often built into the source itself,
+so the laser index selects *which source's* aiming beam.
+
+If your machine has a single aiming beam shared by all sources (an external red diode, for example),
+implement index `0` only, and reply to any other index with `cmd_nack` and `err_invalid_arg` (detail `0`).
+LightBurn will then use index `0` regardless of which source is selected.
+
+**Focus light:** a separate pointer (often two, angled to meet at the focal distance) used to set the focus height.
+It is never steered, so it takes no arguments.
+
+Firmware without one of these lights should reply to its commands with `cmd_nack` and `err_invalid_cmd`.
 
 ### Cut Type
 This command is a work-in-progress, intended to give the firmware information about the upcoming cuts that might be helpful in motion planning.
@@ -680,23 +740,35 @@ This is where the action of the job is programmed. This will mostly consist of:
 - commands for moving and cutting
 
 ### Files
-A LBP **file** is simply a concatenated list of valid and complete LBP messages.
+A LBP **file** is a block of bytes transferred between LightBurn and the firmware. Every file has a **type**,
+which says what its contents are:
+
+| File Type              | Value  | Contents                                                        |
+|------------------------|--------|-----------------------------------------------------------------|
+| `file_type_job`        | `0x01` | A job: a list of LBP messages (see below). `cmd_execute` runs it. |
+| `file_type_correction` | `0x02` | A galvo lens correction table. Format to be documented.         |
+
+`0` is not a valid file type. Firmware that does not support a file type rejects it with `cmd_nack` and
+`err_invalid_arg` (detail `0`, the file type argument).
+
+A **job file** is simply a concatenated list of valid and complete LBP messages.
 (Including the magic, Transaction ID, command, size, and checksum fields.)
-Thus, the bytes in a file can be parsed using the same algorithms as bytes coming in off the wire.
-Messages in a file always have Transaction ID `0`.
+Thus, the bytes in a job file can be parsed using the same algorithms as bytes coming in off the wire.
+Messages in a job file always have Transaction ID `0`.
 
 ### Receiving a File
 A **file** is sent with the following commands:
 
-| Command          | Arguments                | Arg Size              |
-|------------------|--------------------------|-----------------------|
-| `cmd_file_begin` | int32 file size in bytes | 4                     |
-| `cmd_file_chunk` | Slice of file content    | 0 - `size_file_chunk` |
-| `cmd_file_end`   | None                     | 0                     |
+| Command          | Arguments                                     | Arg Size              |
+|------------------|-----------------------------------------------|-----------------------|
+| `cmd_file_begin` | uint8 file type, int32 file size in bytes     | 5                     |
+| `cmd_file_chunk` | Slice of file content                         | 0 - `size_file_chunk` |
+| `cmd_file_end`   | None                                          | 0                     |
 
 Files are sent in messages of the maximum permitted size.
-Firmware is expected to use the argument of `cmd_file_begin` to prepare storage for the incoming file.
+Firmware is expected to use the arguments of `cmd_file_begin` to prepare storage for the incoming file.
 It will then concatenate the arguments of all `cmd_file_chunk` messages in the order they are received.
+Only one file transfer may be in progress at a time.
 
 ### TODO: File chunk ordering
 It may prove necessary to add a "sequence number" or "file offset" argument to each `cmd_file_chunk` message.
@@ -739,6 +811,33 @@ the contained movement commands are part of a framing operation.
 |--------------------|----------------|---------------------------------------------------------------------------------|
 | `cmd_frame_begin`  | 0              | Indicates that all following movement commands are part of a framing operation. |
 | `cmd_frame_end`    | 0              | Marks the end of a framing operation.                                           |
+
+A frame uses the ordinary movement and emission commands. Cut and travel moves say how to move;
+`cmd_laser_on/off` or `cmd_guide_light_on/off` say what, if anything, is lit. A gantry may frame with
+the laser at low power, while a galvo (or a gantry with a pointer) frames with its guide light.
+
+### Example: Guide Light Frame
+Two shapes, framed with the guide light, with the guide light blanked while moving between them:
+
+```
+cmd_frame_begin
+cmd_speed_xy               frame speed
+cmd_speed_travel_xy        frame speed
+cmd_galvo_polygon_delay    0          (galvo: no marking delays while framing)
+cmd_guide_light_on         0
+cmd_cut_abs_xy  ...                   outline of the first shape, lit
+cmd_guide_light_off        0          blank before the dark move
+cmd_travel_abs_xy                     to the second shape
+cmd_dwell                  settle time (us), so the light comes on where the mirrors have stopped
+cmd_guide_light_on         0
+cmd_cut_abs_xy  ...                   outline of the second shape, lit
+cmd_guide_light_off        0
+cmd_frame_end
+```
+
+The laser on/off delays apply only to lasers, never to guide lights, so the firmware toggles the guide light
+exactly where it appears in the sequence. If the firmware applies `cmd_galvo_jump_delay`, that delay also follows
+the travel move above; LightBurn sends either the jump delay or the `cmd_dwell`, never both.
 
 
 ## Queries
@@ -791,6 +890,9 @@ The response argument is a bitwise-OR composition of one or more of the followin
 - `state_file_loaded`: A file is loaded and ready to execute.
 - `state_computing`: The machine is performing a non-trivial calculation.
 - `state_fault`: A fault prevents operation (e.g. an open interlock, e-stop, or hardware fault). Set for as long as the fault persists. While it is set, the firmware should refuse commands that would start motion, with `cmd_nack` and `err_fault`.
+- `state_pedal_down`: The foot pedal (start input) is currently pressed. Presses themselves are reported by `event_input`.
+- `state_door_open`: The enclosure door or lid is open.
+- `state_interlock_open`: The safety interlock circuit is open, so the laser cannot fire. A firmware that treats this as a fault also sets `state_fault`.
 
 Many simulatenous flags are possible - for example it is quite reasonable to be moving during a job.
 

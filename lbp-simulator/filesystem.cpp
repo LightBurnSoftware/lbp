@@ -30,7 +30,7 @@ bool FileSystem::process(MaxPayload &request, OutputQueue &out_q)
 		reset();
 		const uint16_t err = startReceiving(request);
 		if (err) {
-			out_q.nack(request, err, err == err_invalid_length ? 4 : 0);
+			out_q.nack(request, err, err == err_invalid_length ? 5 : 0);
 		} else {
 			out_q.respond(request);
 		}
@@ -74,10 +74,15 @@ uint16_t FileSystem::startReceiving(lbp::MaxPayload &payload)
 		return err_wrong_state;
 	}
 
+	uint8_t type = 0;
 	uint32_t size = 0;
-	if (payload.size() != 4 || !payload.readArg(size)) {
+	if (payload.size() != 5 || !payload.readArgs(type, size)) {
 		gLog().error("Cannot start receiving - malformed packet");
 		return err_invalid_length;
+	}
+	if (type != file_type_job) {
+		gLog().error(QString("Cannot start receiving - unsupported file type %1").arg(type));
+		return err_invalid_arg; // detail 0: the file type argument
 	}
 
 	if (m_file.open(QIODevice::WriteOnly)) {
