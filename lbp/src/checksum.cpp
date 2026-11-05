@@ -29,4 +29,18 @@ uint16_t crc16(const uint8_t *data_p, size_t len)
 {
 	return crc16_end(crc16_update(crc16_begin(), data_p, len));
 }
+
+uint32_t crc32(const uint8_t *data_p, size_t len)
+{
+	// Bitwise form: small and table-free, for firmware with little memory.
+	static constexpr uint32_t POLY = 0xEDB88320u;
+	uint32_t crc = 0xFFFFFFFFu;
+	while (len--) {
+		crc ^= *data_p++;
+		for (int i = 0; i < 8; i++) {
+			crc = (crc & 1u) ? (crc >> 1) ^ POLY : crc >> 1;
+		}
+	}
+	return ~crc;
+}
 } // namespace lbp

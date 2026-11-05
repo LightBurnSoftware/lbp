@@ -56,6 +56,9 @@ public:
 	/** Simulate a fault (e.g. an open interlock). While active, motion is stopped and refused. */
 	void setFault(bool active);
 
+	/** Switch between gantry and galvo simulation. A full reset: stops everything first. */
+	void setMode(MachineMode mode);
+
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
@@ -71,6 +74,9 @@ private:
 
 	void updateFwState();
 
+	/** Handle cmd_galvo_correction (galvo mode). */
+	void processCorrection(lbp::MaxPayload &payload);
+
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
 	Configuration m_config; // Manages reading, writing, and storing config values.
 	MovementSim m_movement; // Movement component - simulates movement and laser actions.
@@ -80,4 +86,5 @@ private:
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 	uint16_t m_last_txid = lbp::txid_none; // Most recent transaction id processed, for retry detection.
 	bool m_fault = false; // Simulated fault, reported as state_fault.
+	bool m_correction_on = false; // Galvo lens correction applied (cmd_galvo_correction).
 };

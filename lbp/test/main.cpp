@@ -63,6 +63,29 @@ int main()
 		assert(std::memcmp(hs.data(), expected, sizeof(expected)) == 0);
 	}
 
+	// Checksum is CRC-16/X-25 (check value 0x906E), sent low byte first: see spec.md "Checksum".
+	{
+		const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+		uint8_t wire[2];
+		lbp::writeBE16(lbp::crc16(check, sizeof(check)), wire);
+		assert(wire[0] == 0x6e && wire[1] == 0x90);
+	}
+
+	// .lbpcor trailer is CRC-32 (zlib): check value 0xCBF43926.
+	{
+		const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
+		assert(lbp::crc32(check, sizeof(check)) == 0xCBF43926u);
+	}
+
+	// The handshake example in spec.md.
+	{
+		lbp::CmdMsg hs(lbp::cmd_handshake, 2, lbp::protocol_version);
+		assert(hs.setTxid(1));
+		const uint8_t expected[] = {0x44, 0x52, 0x47, 0x4e, 0x00, 0x01, 0x01, 0xb8, 0x00, 0x02, 0x00, 0x0a, 0xcb, 0x06};
+		assert(hs.size() == sizeof(expected));
+		assert(std::memcmp(hs.data(), expected, sizeof(expected)) == 0);
+	}
+
 	// Position query response example, including txid round trip through the parser and toCmd.
 	{
 		lbp::CmdMsg req(lbp::cmd_pos_x);

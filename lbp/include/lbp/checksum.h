@@ -21,6 +21,13 @@ constexpr uint16_t crc16_begin() { return 0xffff; }
 uint16_t crc16_update(uint16_t crc, const uint8_t *data_p, size_t len);
 uint16_t crc16_end(uint16_t crc);
 
+/**
+ * CRC-32 as used by zlib (CRC-32/ISO-HDLC): reflected polynomial 0xEDB88320, initial value and
+ * final XOR 0xFFFFFFFF. Check value: crc32("123456789") == 0xCBF43926.
+ * Used for the trailer of .lbpcor correction files (see spec.md, "Lens Correction Files").
+ */
+uint32_t crc32(const uint8_t *data_p, size_t len);
+
 } // namespace lbp
 
 #endif // LBP_CHECKSUM_H

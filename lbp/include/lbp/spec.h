@@ -37,7 +37,7 @@ constexpr uint8_t size_crc_offset = size_txid_offset; // index of the first byte
 constexpr uint16_t txid_none = 0; // transaction id for messages that aren't part of a request/response pair.
 
 // Protocol version exchanged in cmd_handshake: upper byte major, lower byte minor. See lbp/version.h.
-constexpr uint16_t protocol_version = 0x0009; // 0.9
+constexpr uint16_t protocol_version = 0x000A; // 0.10
 
 // sizes of common msgs and args (defined to facilitate static allocations).
 constexpr int size_max_cmd_args = 32; // no commands require more than eight 4-byte integers.
@@ -155,6 +155,7 @@ constexpr uint16_t err_storage_full		= 0x0401; // not enough space for the file.
 constexpr uint16_t err_transfer			= 0x0402; // chunk/end without a file_begin, or out of sequence.
 constexpr uint16_t err_invalid_file		= 0x0403; // file failed validation (checksum, length, malformed contents).
 constexpr uint16_t err_invalid_header	= 0x0404; // file header not recognized or not supported. Detail: byte offset of the offending field.
+constexpr uint16_t err_file_mismatch	= 0x0405; // a valid stored file does not fit the current configuration. Detail: byte offset of the header field that doesn't match.
 
 // 0xD0xx: reserved for vendor-specific codes.
 
@@ -173,41 +174,41 @@ constexpr uint16_t input_frame	= 0x0002; // start framing
 constexpr uint16_t input_stop	= 0x0003; // stop marking
 
 // ----------------------------------------------------------------------------
-// 0x0001: Laser Commands -----------------------------------------------------
+// 0x1000: Laser Commands -----------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t cls_laser = 0x1000; // (1 = "L", for "Laser")
 
-constexpr uint16_t cmd_laser_power_min	= cls_laser | 0x05A0; // int8 laser index, int16 percent of max configured power
-constexpr uint16_t cmd_laser_power_max	= cls_laser | 0x05A1; // int8 laser index, int16 percent of max configured power
-constexpr uint16_t cmd_laser_freq 		= cls_laser | 0x05F0; // int8 laser index, int32 frequency (Hz)
-constexpr uint16_t cmd_laser_enable 	= cls_laser | 0x05E1; // int8 laser index
-constexpr uint16_t cmd_laser_disable 	= cls_laser | 0x05E2; // int8 laser index
+constexpr uint16_t cmd_laser_power_min	= cls_laser | 0x05A0; // uint8 laser index, int16 percent of max configured power
+constexpr uint16_t cmd_laser_power_max	= cls_laser | 0x05A1; // uint8 laser index, int16 percent of max configured power
+constexpr uint16_t cmd_laser_freq 		= cls_laser | 0x05F0; // uint8 laser index, int32 frequency (Hz)
+constexpr uint16_t cmd_laser_enable 	= cls_laser | 0x05E1; // uint8 laser index
+constexpr uint16_t cmd_laser_disable 	= cls_laser | 0x05E2; // uint8 laser index
 
-constexpr uint16_t cmd_laser_off 		= cls_laser | 0x05C1; // int8 laser index
-constexpr uint16_t cmd_laser_on 		= cls_laser | 0x05C2; // int8 laser index
+constexpr uint16_t cmd_laser_off 		= cls_laser | 0x05C1; // uint8 laser index
+constexpr uint16_t cmd_laser_on 		= cls_laser | 0x05C2; // uint8 laser index
 
 constexpr uint16_t cmd_focus_z 			= cls_laser | 0x0F00 | axis_z; // arguments TODO
-constexpr uint16_t cmd_laser_offset_xy	= cls_laser | 0x0100 | axis_x | axis_y; // int8 laser index, int32 x, y offsets (um) // TODO
+constexpr uint16_t cmd_laser_offset_xy	= cls_laser | 0x0100 | axis_x | axis_y; // uint8 laser index, int32 x, y offsets (um) // TODO
 
-constexpr uint16_t cmd_raster_power = cls_laser | 0x05AA; // int8 laser index, up to fifteen 16-bit power % arguments
+constexpr uint16_t cmd_raster_power = cls_laser | 0x05AA; // uint8 laser index, up to fifteen 16-bit power % arguments
 
 // GALVO (stub): pulse width for MOPA fiber sources. Firmware should allow the source to settle
 // after a change before marking.
-constexpr uint16_t cmd_laser_pulse_width = cls_laser | 0x05D0; // GALVO (stub): int8 laser index, int32 pulse width (ns)
+constexpr uint16_t cmd_laser_pulse_width = cls_laser | 0x05D0; // GALVO (stub): uint8 laser index, int32 pulse width (ns)
 
 // Guide light: a low-power aiming beam that shows where a laser source's beam will land (a galvo's
 // red dot, or a gantry's pointer). Not a laser: it has no power or frequency and is never enabled.
 // The index selects whose aiming beam. Firmware with one aiming beam shared by all sources
 // implements index 0 only and NACKs other indices with err_invalid_arg (detail 0).
-constexpr uint16_t cmd_guide_light_off = cls_laser | 0x0FB1; // int8 laser index
-constexpr uint16_t cmd_guide_light_on = cls_laser | 0x0FB2; // int8 laser index
+constexpr uint16_t cmd_guide_light_off = cls_laser | 0x0FB1; // uint8 laser index
+constexpr uint16_t cmd_guide_light_on = cls_laser | 0x0FB2; // uint8 laser index
 
 // Focus light: separate pointer(s) used to set focus height. Not a guide light.
 constexpr uint16_t cmd_focus_light_off = cls_laser | 0x0FC1; // no args
 constexpr uint16_t cmd_focus_light_on = cls_laser | 0x0FC2; // no args
 
 // ----------------------------------------------------------------------------
-// 0x0004: Files --------------------------------------------------------------
+// 0x4000: Files --------------------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t cls_files = 0x4000; // (4 starts with "F", for "Files")
 
@@ -220,32 +221,73 @@ constexpr uint16_t cmd_flash_available	= cls_files | 0x05FA; // TODO: return int
 
 // File types, for cmd_file_begin. 0 is not a valid type.
 constexpr uint8_t file_type_job			= 0x01; // a list of LBP messages; cmd_execute runs it
-constexpr uint8_t file_type_correction	= 0x02; // galvo lens correction table (format TBD)
+constexpr uint8_t file_type_correction	= 0x02; // galvo lens correction table: an .lbpcor file (below)
 constexpr uint16_t cmd_mainboard_version = cls_files | 0x05B0; // TODO
+
+// GALVO: .lbpcor, the galvo lens correction table (file_type_correction). See spec.md, "Lens Correction Files".
+// Layout, big-endian: header, then grid_x * grid_y (dx, dy) int32 micrometer pairs (row-major, x fastest),
+// then a CRC-32 (zlib) of everything before it.
+// Header: uint32 magic, uint16 version, uint16 header_size, uint16 grid_x, uint16 grid_y, uint16 layers,
+//         uint16 flags, int32 field_size_x (um), int32 field_size_y (um).
+// Readers skip header bytes beyond the fields they know, using header_size.
+constexpr uint32_t lbpcor_magic			= 0x4C425043; // 'LBPC'
+constexpr uint16_t lbpcor_version		= 1;
+constexpr uint16_t lbpcor_header_size	= 24; // size of the version 1 header, in bytes
+constexpr uint16_t lbpcor_grid_size		= 65; // grid_x and grid_y: 65 x 65 nodes
+constexpr uint16_t lbpcor_layers		= 1;
+// flags: which linear corrections are baked into the table. The firmware ignores them; LightBurn uses
+// identity for each baked-in part of its own field transform so it isn't applied twice.
+constexpr uint16_t lbpcor_flag_scale	= 0x0001;
+constexpr uint16_t lbpcor_flag_rotation	= 0x0002;
+constexpr uint16_t lbpcor_flag_offset	= 0x0004;
+constexpr uint16_t lbpcor_flags_reserved = 0xFFF8; // must be 0
 
 // ----------------------------------------------------------------------------
 // 0x5000: Settings -----------------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t cls_settings = 0x5000; // (5 = "S", for "Settings")
 
-// Speed commands
-constexpr uint16_t setting_speed = cls_settings | 0x0100;
+// Speed commands: one family per kind of move. Each family's sub-code mirrors the movement
+// sub-code of the moves it governs (cut 0x6A.., travel 0x68.., jog 0x66..).
+// Argument: one int32 speed in axis units/second (e.g. micrometers/sec), whatever the axis flags.
+// Each speed is sticky until changed. Until a speed has been set, the firmware uses its
+// configured default. Homing (cmd_home_*) ignores these and uses the configured home speed.
+constexpr uint16_t setting_speed_jog	= cls_settings | 0x0600; // operator moves: cmd_jog_start_*, cmd_jog_step_*, cmd_jog_to_*
+constexpr uint16_t setting_speed_travel	= cls_settings | 0x0800; // cmd_travel_* (a galvo "jump")
+constexpr uint16_t setting_speed_cut	= cls_settings | 0x0A00; // cmd_cut_* (a galvo "mark")
 
-constexpr uint16_t cmd_speed_xy = setting_speed | axis_x | axis_y;
-constexpr uint16_t cmd_speed_ab = setting_speed | axis_a | axis_b;
-constexpr uint16_t cmd_speed_x = setting_speed | axis_x;
-constexpr uint16_t cmd_speed_y = setting_speed | axis_y;
-constexpr uint16_t cmd_speed_z = setting_speed | axis_z;
-constexpr uint16_t cmd_speed_a = setting_speed | axis_a;
-constexpr uint16_t cmd_speed_b = setting_speed | axis_b;
-constexpr uint16_t cmd_speed_c = setting_speed | axis_c;
-constexpr uint16_t cmd_speed_u = setting_speed | axis_u;
-constexpr uint16_t cmd_speed_v = setting_speed | axis_v;
+constexpr uint16_t cmd_cut_speed_xy = setting_speed_cut | axis_x | axis_y;
+constexpr uint16_t cmd_cut_speed_ab = setting_speed_cut | axis_a | axis_b;
+constexpr uint16_t cmd_cut_speed_x = setting_speed_cut | axis_x;
+constexpr uint16_t cmd_cut_speed_y = setting_speed_cut | axis_y;
+constexpr uint16_t cmd_cut_speed_z = setting_speed_cut | axis_z;
+constexpr uint16_t cmd_cut_speed_a = setting_speed_cut | axis_a;
+constexpr uint16_t cmd_cut_speed_b = setting_speed_cut | axis_b;
+constexpr uint16_t cmd_cut_speed_c = setting_speed_cut | axis_c;
+constexpr uint16_t cmd_cut_speed_u = setting_speed_cut | axis_u;
+constexpr uint16_t cmd_cut_speed_v = setting_speed_cut | axis_v;
 
-// GALVO (stub): speed for programmed travel moves (a galvo "jump"). cmd_speed_xy remains the cut
-// ("mark") speed. Argument: int32 micrometers/sec.
-constexpr uint16_t setting_speed_travel = cls_settings | 0x0400;
-constexpr uint16_t cmd_speed_travel_xy = setting_speed_travel | axis_x | axis_y; // GALVO (stub)
+constexpr uint16_t cmd_travel_speed_xy = setting_speed_travel | axis_x | axis_y;
+constexpr uint16_t cmd_travel_speed_ab = setting_speed_travel | axis_a | axis_b;
+constexpr uint16_t cmd_travel_speed_x = setting_speed_travel | axis_x;
+constexpr uint16_t cmd_travel_speed_y = setting_speed_travel | axis_y;
+constexpr uint16_t cmd_travel_speed_z = setting_speed_travel | axis_z;
+constexpr uint16_t cmd_travel_speed_a = setting_speed_travel | axis_a;
+constexpr uint16_t cmd_travel_speed_b = setting_speed_travel | axis_b;
+constexpr uint16_t cmd_travel_speed_c = setting_speed_travel | axis_c;
+constexpr uint16_t cmd_travel_speed_u = setting_speed_travel | axis_u;
+constexpr uint16_t cmd_travel_speed_v = setting_speed_travel | axis_v;
+
+constexpr uint16_t cmd_jog_speed_xy = setting_speed_jog | axis_x | axis_y;
+constexpr uint16_t cmd_jog_speed_ab = setting_speed_jog | axis_a | axis_b;
+constexpr uint16_t cmd_jog_speed_x = setting_speed_jog | axis_x;
+constexpr uint16_t cmd_jog_speed_y = setting_speed_jog | axis_y;
+constexpr uint16_t cmd_jog_speed_z = setting_speed_jog | axis_z;
+constexpr uint16_t cmd_jog_speed_a = setting_speed_jog | axis_a;
+constexpr uint16_t cmd_jog_speed_b = setting_speed_jog | axis_b;
+constexpr uint16_t cmd_jog_speed_c = setting_speed_jog | axis_c;
+constexpr uint16_t cmd_jog_speed_u = setting_speed_jog | axis_u;
+constexpr uint16_t cmd_jog_speed_v = setting_speed_jog | axis_v;
 
 // Boundary commands
 constexpr uint16_t setting_bounds_min = cls_settings | 0x0200;
@@ -293,8 +335,12 @@ constexpr uint16_t cut_type_scan_bi_y = scan_bi | axis_y;
 // defaults. Unless noted, the argument is one int32. Delays are microseconds; the laser on delay may be negative.
 // The laser on/off delays apply only to lasers (cmd_laser_on/off), never to guide lights.
 constexpr uint16_t setting_galvo_delay = cls_settings | 0x0D00;
-constexpr uint16_t cmd_galvo_laser_on_delay		= setting_galvo_delay | 0x01; // GALVO (stub): start of a cut move to laser on (us)
-constexpr uint16_t cmd_galvo_laser_off_delay	= setting_galvo_delay | 0x02; // GALVO (stub): end of a cut move to laser off (us)
+// GALVO (stub): the laser on and off delays apply once per cmd_laser_on / cmd_laser_off, not per cut move.
+// On delay: the laser fires this long after the first cut move following cmd_laser_on starts (negative: before).
+// Off delay: at cmd_laser_off, the laser stays on this long after the preceding cut move ends.
+// Between consecutive cut moves with the laser on, only the polygon delay applies.
+constexpr uint16_t cmd_galvo_laser_on_delay		= setting_galvo_delay | 0x01; // GALVO (stub): int32 us
+constexpr uint16_t cmd_galvo_laser_off_delay	= setting_galvo_delay | 0x02; // GALVO (stub): int32 us
 // GALVO (stub): the full polygon delay (us), applied with the laser on at each vertex between two
 // consecutive cut moves, scaled by the turn angle t (0 = straight on, 180 = reversal) that the
 // firmware computes from those moves: delay * min(t, 90) / 90. Full delay at 90 degrees or sharper.
@@ -308,26 +354,36 @@ constexpr uint16_t cmd_galvo_end_delay			= setting_galvo_delay | 0x04; // GALVO 
 // travel move instead, and never sends both: this delay is the only automatic delay after a travel move.
 constexpr uint16_t cmd_galvo_jump_delay			= setting_galvo_delay | 0x05;
 
+// GALVO: apply (1) or stop applying (0) the stored lens correction table (file_type_correction).
+// Arg: uint8 enable (0 or 1). Uploading a table stores it but does not apply it; enabling checks the stored
+// table against the current configuration, then applies it. Refused with err_wrong_state if no valid table
+// is stored, or err_file_mismatch if the table does not fit the configuration (e.g. its field size differs
+// from cfg_field_size_x/y). Correction is off until enabled, and off again after a new table is uploaded
+// or a change to cfg_field_size_x/y. Otherwise it keeps its last state.
+// LightBurn sends the configuration, uploads the table, then enables it; and disables correction while its
+// correction wizard marks an uncorrected test pattern.
+constexpr uint16_t cmd_galvo_correction = cls_settings | 0x0C0E;
+
 // ----------------------------------------------------------------------------
 // 0x6000: Movement -----------------------------------------------------------
 // ----------------------------------------------------------------------------
 constexpr uint16_t cls_move = 0x6000; // (6 = "G", for "Go")
-// Home
-constexpr int16_t move_home = cls_move | 0x0100;
+// Home: each axis homes at its configured home speed (cfg_*_home_speed); speed commands do not apply.
+constexpr uint16_t move_home = cls_move | 0x0100;
 
-constexpr int16_t cmd_home_x = move_home | axis_x;
-constexpr int16_t cmd_home_y = move_home | axis_y;
-constexpr int16_t cmd_home_z = move_home | axis_z;
-constexpr int16_t cmd_home_a = move_home | axis_a;
-constexpr int16_t cmd_home_b = move_home | axis_b;
-constexpr int16_t cmd_home_c = move_home | axis_c;
-constexpr int16_t cmd_home_u = move_home | axis_u;
-constexpr int16_t cmd_home_v = move_home | axis_v;
-constexpr int16_t cmd_home_xy = move_home | axis_x | axis_y;
-constexpr int16_t cmd_home_xyz = move_home | axis_x | axis_y | axis_z;
-constexpr int16_t cmd_home_xyzu = move_home | axis_x | axis_y | axis_z | axis_u;
-constexpr int16_t cmd_home_abc = move_home | axis_a | axis_b | axis_c;
-constexpr int16_t cmd_home_xyzabc = move_home | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_home_x = move_home | axis_x;
+constexpr uint16_t cmd_home_y = move_home | axis_y;
+constexpr uint16_t cmd_home_z = move_home | axis_z;
+constexpr uint16_t cmd_home_a = move_home | axis_a;
+constexpr uint16_t cmd_home_b = move_home | axis_b;
+constexpr uint16_t cmd_home_c = move_home | axis_c;
+constexpr uint16_t cmd_home_u = move_home | axis_u;
+constexpr uint16_t cmd_home_v = move_home | axis_v;
+constexpr uint16_t cmd_home_xy = move_home | axis_x | axis_y;
+constexpr uint16_t cmd_home_xyz = move_home | axis_x | axis_y | axis_z;
+constexpr uint16_t cmd_home_xyzu = move_home | axis_x | axis_y | axis_z | axis_u;
+constexpr uint16_t cmd_home_abc = move_home | axis_a | axis_b | axis_c;
+constexpr uint16_t cmd_home_xyzabc = move_home | axis_x | axis_y | axis_z | axis_a | axis_b | axis_c;
 
 // Operator Moves: Continuous Jogging
 constexpr uint16_t move_jog_start_pos = cls_move | 0x0200;
@@ -524,7 +580,7 @@ constexpr uint32_t state_interlock_open = 0x0400;	// the safety interlock circui
 // Position Queries
 constexpr uint16_t query_pos = cls_state_query | 0x0100;
 
-// return one uint32_t value in axis units per indicated axis.
+// return one int32_t value in axis units per indicated axis.
 constexpr uint16_t cmd_pos_x = query_pos | axis_x;
 constexpr uint16_t cmd_pos_y = query_pos | axis_y;
 constexpr uint16_t cmd_pos_z = query_pos | axis_z;
@@ -797,8 +853,8 @@ constexpr uint16_t cfg_axis_auto_home = cls_cfg | 0x0402;
 
 // GALVO (stub): Configurables - Galvo field
 // Field offset, rotation, flips and axis swap are applied by LightBurn before sending.
-// GALVO (stub): TODO lens correction (scale, bulge, skew, trapezoid), applied by the firmware:
-// a correction table upload (possibly via the file commands) or parameters.
+// Lens correction (bulge, skew, trapezoid, and usually scale) is applied by the firmware, from an
+// uploaded .lbpcor table (file_type_correction). See cmd_galvo_correction.
 
 // GALVO (stub): machine defaults for the per-layer galvo delays (cmd_galvo_*), same units.
 constexpr uint16_t cfg_galvo_laser_on_delay		= cls_cfg | 0x0F41; // GALVO (stub): microseconds

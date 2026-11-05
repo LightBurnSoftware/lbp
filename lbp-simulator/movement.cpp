@@ -27,7 +27,7 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 		}
 		return args == expected;
 	}
-	if (high == lbp::setting_speed) {
+	if (high == lbp::setting_speed_cut || high == lbp::setting_speed_travel || high == lbp::setting_speed_jog) {
 		expected = 4;
 		return args == expected;
 	}
@@ -37,6 +37,7 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 		expected = 3;
 		break;
 	case lbp::cmd_laser_freq:
+	case lbp::cmd_laser_pulse_width:
 		expected = 5;
 		break;
 	case lbp::cmd_laser_enable:
@@ -44,7 +45,15 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 	case lbp::cmd_laser_on:
 	case lbp::cmd_laser_off:
 	case lbp::cmd_cut_from:
+	case lbp::cmd_guide_light_on:
+	case lbp::cmd_guide_light_off:
 		expected = 1;
+		break;
+	case lbp::cmd_galvo_laser_on_delay:
+	case lbp::cmd_galvo_laser_off_delay:
+	case lbp::cmd_galvo_polygon_delay:
+	case lbp::cmd_galvo_end_delay:
+		expected = 4;
 		break;
 	case lbp::cmd_cut_type:
 		expected = 2;
@@ -63,12 +72,31 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 	return args == expected;
 }
 
+/** @return True for the commands only a galvo supports (queued by MovementSim in galvo mode). */
+static bool isGalvoCmd(uint16_t cmd)
+{
+	switch (cmd) {
+	case lbp::cmd_galvo_laser_on_delay:
+	case lbp::cmd_galvo_laser_off_delay:
+	case lbp::cmd_galvo_polygon_delay:
+	case lbp::cmd_galvo_end_delay:
+	case lbp::cmd_laser_pulse_width:
+	case lbp::cmd_guide_light_on:
+	case lbp::cmd_guide_light_off:
+	case lbp::cmd_focus_light_on:
+	case lbp::cmd_focus_light_off:
+		return true;
+	default:
+		return false;
+	}
+}
+
 static inline float normalize(uint16_t power) { return static_cast<float>(power) / 65535.f; }
 
-static inline int64_t clampTo(int64_t v, int64_t limit)
+static inline int64_t clampTo(int64_t v, int64_t lo, int64_t hi)
 {
-	if (limit > 0) {
-		return std::clamp<int64_t>(v, 0, limit);
+	if (hi > lo) {
+		return std::clamp<int64_t>(v, lo, hi);
 	}
 	return v;
 }
@@ -108,16 +136,59 @@ static Vec4 advance(const Vec4 &base, const Vec4 &offset, double scale)
 	return result;
 }
 
+// Gantry travel limits, hardcoded for now (micrometers).
+static const Vec4 kGantryMaxPos(300000, 180000, 120000, 60000);
+
 MovementSim::MovementSim(Configuration &config)
 	: m_config(config)
-	, m_max_pos(300000, 180000, 120000, 60000) // hardcoded for now.
+	, m_max_pos(kGantryMaxPos)
 {
 	// Empty
+}
+
+void MovementSim::setMode(MachineMode mode)
+{
+	m_mode = mode;
+	m_guide_light = false;
+	m_focus_light = false;
+	refreshBounds();
+	gLog().push(Log::INFO, mode == MachineMode::Galvo ? "Galvo mode" : "Gantry mode");
+}
+
+void MovementSim::refreshBounds()
+{
+	m_min_pos = Vec4();
+	m_max_pos = kGantryMaxPos;
+	if (m_mode == MachineMode::Galvo) {
+		// The marking field is centred on (0,0). Z and U keep their gantry limits (e.g. a lift axis).
+		const int32_t field_x = m_config.getOrDefault(lbp::cfg_field_size_x);
+		const int32_t field_y = m_config.getOrDefault(lbp::cfg_field_size_y);
+		m_min_pos.x = -field_x / 2;
+		m_max_pos.x = field_x / 2;
+		m_min_pos.y = -field_y / 2;
+		m_max_pos.y = field_y / 2;
+	}
+	m_pos = applyLimits(m_pos);
 }
 
 bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source)
 {
 	const uint16_t cmd = request.cmd();
+
+	if (isGalvoCmd(cmd) && m_mode != MachineMode::Galvo) {
+		return false; // a gantry doesn't implement these: FirmwareSim answers err_invalid_cmd
+	}
+
+	// One aiming beam, shared by all sources: only index 0 exists.
+	if ((cmd == lbp::cmd_guide_light_on || cmd == lbp::cmd_guide_light_off) && request.size() == 1
+		&& request.data()[0] != 0) {
+		if (source == CmdSource::Wire) {
+			out_q.nack(request, lbp::err_invalid_arg, 0);
+		} else {
+			gLog().error("Guide light index must be 0");
+		}
+		return true;
+	}
 
 	switch (cmd) {
 	case lbp::cmd_pos_x:
@@ -163,7 +234,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		return true;
 	}
 	case lbp::cmd_jog_start_pos_x:
-		beginJog(Vec4(1, 0, 0, 0), m_target_vel_xy);
+		beginJog(Vec4(1, 0, 0, 0), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_x:
@@ -171,7 +242,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_x:
-		beginJog(Vec4(-1, 0, 0, 0), m_target_vel_xy);
+		beginJog(Vec4(-1, 0, 0, 0), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_x:
@@ -179,7 +250,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_y:
-		beginJog(Vec4(0, 1, 0, 0), m_target_vel_xy);
+		beginJog(Vec4(0, 1, 0, 0), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_y:
@@ -187,7 +258,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_y:
-		beginJog(Vec4(0, -1, 0, 0), m_target_vel_xy);
+		beginJog(Vec4(0, -1, 0, 0), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_y:
@@ -195,7 +266,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_z:
-		beginJog(Vec4(0, 0, 1, 0), m_target_vel_z);
+		beginJog(Vec4(0, 0, 1, 0), m_jog_speed.z);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_z:
@@ -203,7 +274,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_z:
-		beginJog(Vec4(0, 0, -1, 0), m_target_vel_z);
+		beginJog(Vec4(0, 0, -1, 0), m_jog_speed.z);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_z:
@@ -211,7 +282,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_u:
-		beginJog(Vec4(0, 0, 0, 1), m_target_vel_u);
+		beginJog(Vec4(0, 0, 0, 1), m_jog_speed.u);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_u:
@@ -219,7 +290,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_u:
-		beginJog(Vec4(0, 0, 0, -1), m_target_vel_u);
+		beginJog(Vec4(0, 0, 0, -1), m_jog_speed.u);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_u:
@@ -228,13 +299,23 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		return true;
 	case lbp::cmd_cut_from:
 	case lbp::cmd_cut_type:
-	case lbp::cmd_speed_x:
-	case lbp::cmd_speed_y:
 	case lbp::cmd_home_xy:
 	case lbp::cmd_home_z:
-	case lbp::cmd_speed_xy:
-	case lbp::cmd_speed_z:
-	case lbp::cmd_speed_u:
+	case lbp::cmd_cut_speed_x:
+	case lbp::cmd_cut_speed_y:
+	case lbp::cmd_cut_speed_xy:
+	case lbp::cmd_cut_speed_z:
+	case lbp::cmd_cut_speed_u:
+	case lbp::cmd_travel_speed_x:
+	case lbp::cmd_travel_speed_y:
+	case lbp::cmd_travel_speed_xy:
+	case lbp::cmd_travel_speed_z:
+	case lbp::cmd_travel_speed_u:
+	case lbp::cmd_jog_speed_x:
+	case lbp::cmd_jog_speed_y:
+	case lbp::cmd_jog_speed_xy:
+	case lbp::cmd_jog_speed_z:
+	case lbp::cmd_jog_speed_u:
 	case lbp::cmd_jog_step_x:
 	case lbp::cmd_jog_step_y:
 	case lbp::cmd_jog_step_z:
@@ -295,7 +376,16 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_job_header_begin:
 	case lbp::cmd_job_header_end:
 	case lbp::cmd_frame_begin:
-	case lbp::cmd_frame_end: {
+	case lbp::cmd_frame_end:
+	case lbp::cmd_galvo_laser_on_delay:
+	case lbp::cmd_galvo_laser_off_delay:
+	case lbp::cmd_galvo_polygon_delay:
+	case lbp::cmd_galvo_end_delay:
+	case lbp::cmd_laser_pulse_width:
+	case lbp::cmd_guide_light_on:
+	case lbp::cmd_guide_light_off:
+	case lbp::cmd_focus_light_on:
+	case lbp::cmd_focus_light_off: {
 		uint32_t expected = 0;
 		if (!argSizeValid(cmd, request.size(), expected)) {
 			if (source == CmdSource::Wire) {
@@ -375,36 +465,22 @@ MovementSim::State MovementSim::takeNextCommand()
 	while (m_cmd_q.pop(p)) {
 		const uint16_t cmd = p.cmd();
 		gLog().debug(QString("Dequeued a command: %1 of %2").arg(cmd).arg(m_cmd_q.size()));
+		if (takeSpeed(p)) {
+			continue;
+		}
 		if (isMoveCmd(cmd)) {
 			Vec4 delta;
 			if (!decodeMoveDelta(p, delta)) {
 				badPayload(p);
 				continue; // malformed: discard, try the next
 			}
-			if (!beginMove(delta)) {
+			if (!beginMove(delta, speedsFor(cmd))) {
 				continue; // nothing to move: consumed, try the next
 			}
 			return State::Moving;
 		}
 
 		switch (p.cmd()) {
-		case lbp::cmd_speed_x:
-		case lbp::cmd_speed_y:
-		case lbp::cmd_speed_xy:
-			if (!p.readArg(m_target_vel_xy)) {
-				badPayload(p);
-			}
-			break;
-		case lbp::cmd_speed_z:
-			if (!p.readArg(m_target_vel_z)) {
-				badPayload(p);
-			}
-			break;
-		case lbp::cmd_speed_u:
-			if (!p.readArg(m_target_vel_u)) {
-				badPayload(p);
-			}
-			break;
 		case lbp::cmd_laser_enable: {
 			gLog().push(Log::DEBUG, "Laser enable");
 			uint8_t index = 0;
@@ -577,6 +653,61 @@ MovementSim::State MovementSim::takeNextCommand()
 			m_job_ended = true;
 			m_job_origin.reset();
 			break;
+		case lbp::cmd_galvo_laser_on_delay:
+		case lbp::cmd_galvo_laser_off_delay:
+		case lbp::cmd_galvo_polygon_delay:
+		case lbp::cmd_galvo_end_delay: {
+			// Stored and logged; the simulator doesn't apply galvo delays to its timing yet.
+			int32_t us = 0;
+			if (!p.readArg(us)) {
+				badPayload(p);
+				continue;
+			}
+			const char *name = "end";
+			int32_t *target = &m_galvo_end_delay_us;
+			if (p.cmd() == lbp::cmd_galvo_laser_on_delay) {
+				name = "laser on";
+				target = &m_galvo_laser_on_delay_us;
+			} else if (p.cmd() == lbp::cmd_galvo_laser_off_delay) {
+				name = "laser off";
+				target = &m_galvo_laser_off_delay_us;
+			} else if (p.cmd() == lbp::cmd_galvo_polygon_delay) {
+				name = "polygon";
+				target = &m_galvo_polygon_delay_us;
+			}
+			if (*target != us) {
+				gLog().push(Log::DEBUG, QString("Galvo %1 delay: %2 us").arg(name).arg(us));
+			}
+			*target = us;
+		} break;
+		case lbp::cmd_laser_pulse_width: {
+			uint8_t index = 0;
+			int32_t ns = 0;
+			if (!p.readArgs(index, ns)) {
+				badPayload(p);
+				continue;
+			}
+			if (index == 0) {
+				m_laser_1.pulse_width_ns = ns;
+			}
+			else if (index == 1) {
+				m_laser_2.pulse_width_ns = ns;
+			}
+		} break;
+		case lbp::cmd_guide_light_on:
+			m_guide_light = true;
+			break;
+		case lbp::cmd_guide_light_off:
+			m_guide_light = false;
+			break;
+		case lbp::cmd_focus_light_on:
+			m_focus_light = true;
+			gLog().push(Log::INFO, "Focus light on");
+			break;
+		case lbp::cmd_focus_light_off:
+			m_focus_light = false;
+			gLog().push(Log::INFO, "Focus light off");
+			break;
 		default:
 			gLog().push(Log::ERROR, QString("unexpected queued move command %1").arg(QString::number(p.cmd(), 16)));
 			break;
@@ -714,11 +845,15 @@ void MovementSim::step(double dt_s)
 
 SimState MovementSim::getSimState() const
 {
-	return SimState {
-		m_pos,
-		m_laser_1.on ? m_laser_1.power_max : 0.f,
-		m_laser_2.on ? m_laser_2.power_max : 0.f
-	};
+	SimState state;
+	state.pos = m_pos;
+	state.laser_1_power = m_laser_1.on ? m_laser_1.power_max : 0.f;
+	state.laser_2_power = m_laser_2.on ? m_laser_2.power_max : 0.f;
+	state.mode = m_mode;
+	state.min_pos = m_min_pos;
+	state.max_pos = m_max_pos;
+	state.guide_light = m_guide_light;
+	return state;
 }
 
 bool MovementSim::canEnqueue() const
@@ -808,16 +943,14 @@ int64_t MovementSim::relativeDelta(int idx, int64_t arg) const
 {
 	if (idx == m_rotary_axis) return arg; // no clamping for rotary deltas
 	const int64_t curr = m_pos.*(kAxes[idx].m);
-	const int64_t limit = m_max_pos.*(kAxes[idx].m);
-	return clampTo(curr + arg, limit) - curr;
+	return clampTo(curr + arg, m_min_pos.*(kAxes[idx].m), m_max_pos.*(kAxes[idx].m)) - curr;
 }
 
 int64_t MovementSim::absoluteDelta(int idx, int64_t arg) const
 {
 	const int64_t curr   = m_pos.*(kAxes[idx].m);
-	const int64_t limit  = m_max_pos.*(kAxes[idx].m);
 	const int64_t target = arg + m_job_origin.*(kAxes[idx].m);
-	const int64_t capped = clampTo(target, limit);
+	const int64_t capped = clampTo(target, m_min_pos.*(kAxes[idx].m), m_max_pos.*(kAxes[idx].m));
 	if (capped != target) {
 		gLog().push(Log::WARNING, QString("absolute target %1 on axis %2 clamped to %3")
 			.arg(target).arg(idx).arg(capped));
@@ -838,16 +971,80 @@ Vec4 MovementSim::applyLimits(const Vec4 &vec) const
     Vec4 result;
     for (int i = 0; i < 4; ++i) {
         const int64_t v = vec.*(kAxes[i].m);
-        const int64_t limit = m_max_pos.*(kAxes[i].m);
-        result.*(kAxes[i].m) = (i == m_rotary_axis) ? wrapTo(v, limit) : clampTo(v, limit);
+        const int64_t lo = m_min_pos.*(kAxes[i].m);
+        const int64_t hi = m_max_pos.*(kAxes[i].m);
+        result.*(kAxes[i].m) = (i == m_rotary_axis) ? wrapTo(v, hi) : clampTo(v, lo, hi);
     }
 	return result;
 }
 
-bool MovementSim::beginMove(const Vec4 &delta)
+bool MovementSim::takeSpeed(lbp::CmdPayload &p)
+{
+	const uint16_t cmd = p.cmd();
+	SpeedSet *set = nullptr;
+	switch (cmd & 0xFF00) {
+	case lbp::setting_speed_cut:
+		set = &m_cut_speed;
+		break;
+	case lbp::setting_speed_travel:
+		set = &m_travel_speed;
+		break;
+	case lbp::setting_speed_jog:
+		set = &m_jog_speed;
+		break;
+	default:
+		return false;
+	}
+	uint32_t value = 0;
+	if (!p.readArg(value)) {
+		badPayload(p);
+		return true;
+	}
+	const uint16_t axes = cmd & lbp::mask_axis;
+	if (axes & (lbp::axis_x | lbp::axis_y)) set->xy = value;
+	if (axes & lbp::axis_z) set->z = value;
+	if (axes & lbp::axis_u) set->u = value;
+	return true;
+}
+
+/** Read a positive speed from the configuration, or use the fallback. */
+static uint32_t configuredSpeed(const Configuration &config, uint16_t key, uint32_t fallback)
+{
+	int32_t value = 0;
+	return (config.get(key, value) && value > 0) ? uint32_t(value) : fallback;
+}
+
+MovementSim::SpeedSet MovementSim::speedsFor(uint16_t cmd) const
+{
+	// Simulator defaults (um/s) for speeds the configuration leaves at 0.
+	static constexpr uint32_t kHomeSpeedXY = 50000, kHomeSpeedZU = 5000, kTravelSpeedXY = 100000;
+
+	if ((cmd & 0xFF00) == lbp::move_home) {
+		SpeedSet home;
+		home.xy = configuredSpeed(m_config, lbp::cfg_xy_home_speed, kHomeSpeedXY);
+		home.z = configuredSpeed(m_config, lbp::cfg_z_home_speed, kHomeSpeedZU);
+		home.u = configuredSpeed(m_config, lbp::cfg_u_home_speed, kHomeSpeedZU);
+		return home;
+	}
+	switch (cmd & 0xFF00 & ~lbp::flag_abs) {
+	case lbp::move_cut:
+		return m_cut_speed;
+	case lbp::move_jog:
+		return m_jog_speed;
+	default: {
+		SpeedSet travel = m_travel_speed;
+		if (travel.xy == 0) {
+			travel.xy = configuredSpeed(m_config, lbp::cfg_idle_speed, kTravelSpeedXY);
+		}
+		return travel;
+	}
+	}
+}
+
+bool MovementSim::beginMove(const Vec4 &delta, const SpeedSet &speeds)
 {
 	double length = 0.0, speed = 0.0;
-	if (!pacingFor(delta, length, speed)) return false;
+	if (!pacingFor(delta, speeds, length, speed)) return false;
 
 	m_move.start    = m_pos;
 	m_move.delta    = delta;
@@ -869,18 +1066,18 @@ bool MovementSim::beginMove(const Vec4 &delta)
  * @return False if the move has no motion or no rate is set, in which case
  *         length and speed are unchanged.
  */
-bool MovementSim::pacingFor(const Vec4 &delta, double &length, double &speed) const
+bool MovementSim::pacingFor(const Vec4 &delta, const SpeedSet &speeds, double &length, double &speed) const
 {
 	const double xy = std::hypot(double(delta.x), double(delta.y));
 	if (xy > 0.0) {
 		length = xy;
-		speed  = double(m_target_vel_xy);
+		speed  = double(speeds.xy);
 	} else if (delta.z != 0) {
 		length = std::abs(double(delta.z));
-		speed  = double(m_target_vel_z);
+		speed  = double(speeds.z);
 	} else if (delta.u != 0) {
 		length = std::abs(double(delta.u));
-		speed  = double(m_target_vel_u);
+		speed  = double(speeds.u);
 	} else {
 		return false;   // no motion
 	}

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "correction.h"
 #include "simutils.h"
 
 #include <QFile>
@@ -56,6 +57,15 @@ public:
 	void stopReading();
 	bool isReading() const;
 
+	/** @brief Galvo mode accepts file_type_correction. Leaving galvo mode discards any stored table. */
+	void setGalvo(bool galvo);
+
+	/** @return The stored lens correction table (valid == false if none). */
+	const CorrectionTable &correction() const { return m_correction; }
+
+	/** @return True once after a new correction table has been received and stored. */
+	bool takeNewCorrection();
+
 private:
 	enum class State { Idle, Receiving, Reading };
 	/** @return 0 on success, or an err_* code. */
@@ -64,7 +74,14 @@ private:
 	/** @return 0 on success, or an err_* code. */
 	uint16_t receive(const lbp::MaxPayload &payload);
 
+	/** Validate and store a received correction file. @return 0 on success, or an err_* code. */
+	uint16_t finishCorrection(uint32_t &detail);
+
 	State m_state = State::Idle;
 	FileParser m_parser;
 	QFile m_file;
+	uint8_t m_receiving_type = 0;		// file_type_* of the file being received
+	bool m_galvo = false;
+	CorrectionTable m_correction;
+	bool m_new_correction = false;
 };

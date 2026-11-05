@@ -24,9 +24,25 @@ LBP is intended to function over a variety of different transport layers, e.g. s
 - **Command (2 bytes):** The 16-bit command code. See `spec.h`.
 - **Size (2 bytes):** A 16-bit unsigned integer encoding the size, in bytes, of the **Arguments** that immediately follow it. It may be `0`, and must not exceed `size_file_args`.
 - **Arguments ("Size" bytes):** The command's argument data, if any.
-- **Checksum (2 bytes):** The CRC16 checksum computed over the **Transaction ID, Command, Size, and Arguments** fields, in that order (everything after the Magic). See `checksum.cpp` for the crc16 algorithm.
+- **Checksum (2 bytes):** A CRC-16 computed over the **Transaction ID, Command, Size, and Arguments** fields, in that order (everything after the Magic). See [Checksum](#checksum).
 
-**IMPORTANT** All multi-byte fields are encoded in **Big-Endian Format**. (Helper functions are provided in `lbp/beio.h`)
+**IMPORTANT** All multi-byte fields are encoded in **Big-Endian Format**, except the Checksum (see below). (Helper functions are provided in `lbp/beio.h`)
+
+### Checksum
+The checksum is **CRC-16/X-25** (also known as CRC-16/IBM-SDLC):
+
+| Parameter        | Value                                   |
+|------------------|-----------------------------------------|
+| Width            | 16 bits                                 |
+| Polynomial       | `0x1021` (`0x8408` in reflected form)   |
+| Initial value    | `0xFFFF`                                |
+| Reflect in / out | yes / yes                               |
+| Final XOR        | `0xFFFF`                                |
+| Check value      | `0x906E` (the CRC of ASCII `123456789`) |
+
+The checksum is sent **low byte first**: a CRC of `0x906E` appears on the wire as `6e 90`. This is the one exception to big-endian
+byte order in a message. (Under review: it may change to big-endian, consistent with every other field.)
+The reference implementation is `lbp/src/checksum.cpp`.
 
 A message without arguments is therefore 12 bytes long. The largest permitted message is `size_file_msg` (512 bytes), which leaves room for 500 bytes of arguments.
 
@@ -52,22 +68,22 @@ The Handshake confirms communication between LightBurn and the firmware, and exc
 ```
 +--------------+-------+-------+-------+-----------+----------+
 | Magic        | TxID  | Cmd   | Size  | Arguments | Checksum |
-| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 09     | 50 34    |
+| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 0a     | cb 06    |
 +--------------+-------+-------+-------+-----------+----------+
 ```
 
-The command is `cmd_handshake` (`01 b8`), and its 2-byte argument is LightBurn's protocol version, `0x0009` (0.9). LightBurn has assigned this request Transaction ID `1`.
+The command is `cmd_handshake` (`01 b8`), and its 2-byte argument is LightBurn's protocol version, `0x000A` (0.10). LightBurn has assigned this request Transaction ID `1`.
 
 **Firmware Responds:**
 
 ```
 +--------------+-------+-------+-------+-----------+----------+
 | Magic        | TxID  | Cmd   | Size  | Arguments | Checksum |
-| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 09     | 50 34    |
+| 44 52 47 4e  | 00 01 | 01 b8 | 00 02 | 00 0a     | cb 06    |
 +--------------+-------+-------+-------+-----------+----------+
 ```
 
-The firmware responds with the same command code and Transaction ID, followed by the protocol version **the firmware** speaks. Here both sides speak 0.9, so the response happens to be identical to the request.
+The firmware responds with the same command code and Transaction ID, followed by the protocol version **the firmware** speaks. Here both sides speak 0.10, so the response happens to be identical to the request.
 
 #### Protocol Version
 
@@ -75,7 +91,7 @@ The firmware responds with the same command code and Transaction ID, followed by
 |------------------|------------------------------|-------------------------------|---------------|
 | `cmd_handshake`  | uint16 LightBurn's version   | uint16 firmware's version     | 2             |
 
-- The version is a 16-bit value: the **upper byte is the major** version and the **lower byte is the minor** version. `0x0009` is version 0.9; `0x0102` would be 1.2. The current version is `protocol_version` in `spec.h`.
+- The version is a 16-bit value: the **upper byte is the major** version and the **lower byte is the minor** version. `0x000A` is version 0.10; `0x0102` would be 1.2. The current version is `protocol_version` in `spec.h`.
 - The firmware must **always** respond to a handshake with its own version, even if LightBurn's version differs. LightBurn decides whether the two are compatible, so a mismatch can be reported to the user clearly instead of appearing as a timeout.
 - Compatibility (see `lbp/version.h`): major versions must match. Before 1.0, minor versions must match too, since any 0.x release may contain breaking changes. From 1.0 on, minor versions only add functionality, and LightBurn will not send commands that the firmware's minor version does not support.
 - The handshake has no side effects, and may be sent at any time.
@@ -218,7 +234,8 @@ Codes are loosely grouped by their upper byte: `0x01xx` for problems with the re
 | `0x0401` | `err_storage_full`   | Not enough space for the file. | 0 |
 | `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or out of sequence. | 0 |
 | `0x0403` | `err_invalid_file`   | The received file failed validation: its checksum doesn't match, its length doesn't match its header, or its contents are malformed. | 0 |
-| `0x0404` | `err_invalid_header` | The received file's header is not recognized or not supported: wrong magic, unsupported version, or values this machine can't accept (such as a field size that doesn't match its configuration). | Byte offset of the offending header field |
+| `0x0404` | `err_invalid_header` | The received file's header is not recognized or not supported: wrong magic, unsupported version, or values this machine can never accept. | Byte offset of the offending header field |
+| `0x0405` | `err_file_mismatch`  | A valid stored file doesn't fit the current configuration, such as a correction table whose field size differs from `cfg_field_size_x/y`. Sent when the file is applied (`cmd_galvo_correction`), not when it is received. | Byte offset of the header field that doesn't match |
 | `0xFFFF` | `err_unknown`        | Catch-all. | 0 |
 
 **Note**
@@ -341,29 +358,44 @@ configuration of default speeds and movement behaviors. The intention is to help
 prior to the movement commands.
 
 ### Movement Speed
-These movement commands will execute according to the speeds set by the user (using `cmd_speed_*` commands, see below).
-If no speed has been set by the user since the last power cycle, the laser should move at the rate specified by configured defaults.
+There are three families of speed command, one for each kind of move:
 
-| Command        | Arguments (speed in axis units / second)  | Arg Size       |
-|----------------|-------------------------------------------|----------------|
-| `cmd_speed_xy` | int32 movement speed in the xy plane      | 4              |
-| `cmd_speed_x`  | int32 movement speed along the x axis*    | 4              |
-| `cmd_speed_y`  | int32 movement speed along the y axis*    | 4              |
-| `cmd_speed_z`  | int32 movement speed along the z axis     | 4              |
-| `cmd_speed_a`  | int32 movement speed along the a axis     | 4              |
-| `cmd_speed_b`  | int32 movement speed along the b axis     | 4              |
-| `cmd_speed_c`  | int32 movement speed along the c axis     | 4              |
-| `cmd_speed_u`  | int32 movement speed along the u axis     | 4              |
-| `cmd_speed_v`  | int32 movement speed along the v axis     | 4              |
+| Family       | Commands               | Governs                                                    | Galvo meaning |
+|--------------|------------------------|------------------------------------------------------------|---------------|
+| Cut speed    | `cmd_cut_speed_*`      | programmed cut moves (`cmd_cut_*`)                         | mark speed    |
+| Travel speed | `cmd_travel_speed_*`   | programmed travel moves (`cmd_travel_*`)                   | jump speed    |
+| Jog speed    | `cmd_jog_speed_*`      | operator moves (`cmd_jog_start_*`, `cmd_jog_step_*`, `cmd_jog_to_*`) | —   |
 
-`cmd_speed_x` and `cmd_speed_y` are provided for machines that cannot move diagonally,
+Each family's command code mirrors the code of the moves it governs: cut speeds are `0x5Axx` (cut moves are `0x6Axx`/`0x6Bxx`),
+travel speeds are `0x58xx` (travel moves are `0x68xx`/`0x69xx`), and jog speeds are `0x56xx` (jog moves are `0x66xx`/`0x67xx`).
+The low byte carries axis flags, as for movement commands.
+
+Every speed command takes a single int32 argument: the speed in axis units per second (micrometers/second for linear axes),
+whatever axis flags the command carries.
+
+- Each speed is **sticky**: it applies to every following move of its kind until it is changed. Setting one family never
+  changes another, so a jog never disturbs the speed of a job's cuts, and a travel speed never changes the cut speed.
+- If a speed has not been set since the last power cycle, the firmware uses its configured default for that kind of move.
+- **Homing** ignores all speed commands. Each axis homes at its configured home speed (`cfg_*_home_speed`).
+
+The table below lists the cut-speed commands. The travel and jog families define the same set of axis combinations,
+with `travel` or `jog` in place of `cut`.
+
+| Command           | Arguments (speed in axis units / second)  | Arg Size       |
+|-------------------|-------------------------------------------|----------------|
+| `cmd_cut_speed_xy`| int32 movement speed in the xy plane      | 4              |
+| `cmd_cut_speed_x` | int32 movement speed along the x axis*    | 4              |
+| `cmd_cut_speed_y` | int32 movement speed along the y axis*    | 4              |
+| `cmd_cut_speed_z` | int32 movement speed along the z axis     | 4              |
+| `cmd_cut_speed_a` | int32 movement speed along the a axis     | 4              |
+| `cmd_cut_speed_b` | int32 movement speed along the b axis     | 4              |
+| `cmd_cut_speed_c` | int32 movement speed along the c axis     | 4              |
+| `cmd_cut_speed_u` | int32 movement speed along the u axis     | 4              |
+| `cmd_cut_speed_v` | int32 movement speed along the v axis     | 4              |
+| `cmd_cut_speed_ab`| int32 movement speed in the ab plane      | 4              |
+
+\* The single-axis x and y commands are provided for machines that cannot move diagonally,
 or whose x and y axis movement mechanisms meaningfully differ.
-
-#### TODO: Granular Movement Speed Commands
-It may be useful to define different speed commands for the different kinds of movement.
-We may do this in the future. For now, `cmd_speed_*` overrides default behavior for all moves,
-and most movement commands are expected to be preceeded with a `cmd_speed_*` if they wish to
-have different speeds than preceding movements.
 
 ### Movement Commands
 Movement commands are composed of valid movement categories in the MSB and bitwise combinations of axis flags in the LSB.
@@ -577,11 +609,11 @@ in addition to any respective numerical arguments. This index is `0`-based, with
 
 | Command               | Arguments                                  | Arg Size       |
 |-----------------------|--------------------------------------------|----------------|
-| `cmd_laser_enable`    | int8 laser index                           | 1              |
-| `cmd_laser_disable`   | int8 laser index                           | 1              |
-| `cmd_laser_power_max` | int8 laser index, int16 max power (%)*     | 3              |
-| `cmd_laser_power_min` | int8 laser index, int16 max power (%)*     | 3              |
-| `cmd_laser_freq`      | int8 laser index, int32 PWM frequency (Hz) | 5              |
+| `cmd_laser_enable`    | uint8 laser index                          | 1              |
+| `cmd_laser_disable`   | uint8 laser index                          | 1              |
+| `cmd_laser_power_max` | uint8 laser index, int16 max power (%)*    | 3              |
+| `cmd_laser_power_min` | uint8 laser index, int16 min power (%)*    | 3              |
+| `cmd_laser_freq`      | uint8 laser index, int32 PWM frequency (Hz)| 5              |
 
 These laser settings are expected to persist until the respective commands are sent again.
 
@@ -605,8 +637,8 @@ Once the laser settings have been sent, it is still necessary to turn the enable
 
 | Command         | Arguments        | Arg Size       |
 |-----------------|------------------|----------------|
-| `cmd_laser_on`  | int8 laser index | 1              |
-| `cmd_laser_off` | int8 laser index | 1              |
+| `cmd_laser_on`  | uint8 laser index | 1              |
+| `cmd_laser_off` | uint8 laser index | 1              |
 
 ### Guide and Focus Lights
 Many machines have low-power pointers in addition to their lasers. These are **not** lasers in the LBP sense:
@@ -614,8 +646,8 @@ they have no power or frequency, are never enabled with `cmd_laser_enable`, and 
 
 | Command               | Arguments        | Arg Size |
 |-----------------------|------------------|----------|
-| `cmd_guide_light_on`  | int8 laser index | 1        |
-| `cmd_guide_light_off` | int8 laser index | 1        |
+| `cmd_guide_light_on`  | uint8 laser index | 1        |
+| `cmd_guide_light_off` | uint8 laser index | 1        |
 | `cmd_focus_light_on`  | none             | 0        |
 | `cmd_focus_light_off` | none             | 0        |
 
@@ -657,7 +689,7 @@ To aid in motion planning, LBP offers a special command for encoding raster line
 
 | Command             | Arguments                                         | Arg Size     |
 |---------------------|---------------------------------------------------|--------------|
-| `cmd_raster_power`  | int8 laser index, 0 <= N <= 15 uint16 power values | 1 + 2N       |
+| `cmd_raster_power`  | uint8 laser index, 0 <= N <= 15 uint16 power values| 1 + 2N       |
 
 If the firmware receives this command, the next `cmd_cut_x`, `cmd_cut_y`, or `cmd_cut_xy` should be assumed to be a raster line.
 This `cmd_cut` will engrave N "pixels" of equal length using the power settings received in the `cmd_raster_power` message.
@@ -746,7 +778,7 @@ which says what its contents are:
 | File Type              | Value  | Contents                                                        |
 |------------------------|--------|-----------------------------------------------------------------|
 | `file_type_job`        | `0x01` | A job: a list of LBP messages (see below). `cmd_execute` runs it. |
-| `file_type_correction` | `0x02` | A galvo lens correction table. Format to be documented.         |
+| `file_type_correction` | `0x02` | A galvo lens correction table: an `.lbpcor` file (see [Lens Correction Files](#lens-correction-files)). |
 
 `0` is not a valid file type. Firmware that does not support a file type rejects it with `cmd_nack` and
 `err_invalid_arg` (detail `0`, the file type argument).
@@ -780,6 +812,97 @@ Possible functionalities include:
 - Loading saved files
 - Listing all files saved on the machine
 - Deleting files saved on the machine
+
+### Lens Correction Files
+A galvo's lens and mirrors bend straight lines (bulge, skew, trapezoid) and stretch the field (scale).
+The firmware removes that distortion using a **correction table**, uploaded by LightBurn as a file of type
+`file_type_correction`. The table is an `.lbpcor` file. All multi-byte fields are big-endian.
+
+| Part    | Contents                                                                                  |
+|---------|-------------------------------------------------------------------------------------------|
+| Header  | `header_size` bytes, described below.                                                     |
+| Grid    | `grid_x * grid_y` nodes. Each node is an int32 `dx` then an int32 `dy`, in micrometers.   |
+| Trailer | uint32 CRC-32 (zlib / ISO-HDLC) of every byte before it.                                  |
+
+**Header** (version 1, 24 bytes):
+
+| Field          | Type   | Value                                                                  |
+|----------------|--------|------------------------------------------------------------------------|
+| `magic`        | uint32 | `0x4C425043`, ASCII `LBPC` (`lbpcor_magic`)                            |
+| `version`      | uint16 | `1` (`lbpcor_version`)                                                 |
+| `header_size`  | uint16 | Size of the header in bytes; `24` for version 1                        |
+| `grid_x`       | uint16 | Nodes per row: `65`                                                    |
+| `grid_y`       | uint16 | Rows: `65`                                                             |
+| `layers`       | uint16 | `1`                                                                    |
+| `flags`        | uint16 | Linear corrections baked into the table (below)                        |
+| `field_size_x` | int32  | Field span covered by the grid, edge to edge (μm)                      |
+| `field_size_y` | int32  | Field span covered by the grid, edge to edge (μm)                      |
+
+A reader skips any header bytes past the fields it knows, using `header_size`, so later versions can add fields.
+
+**Grid.** Nodes are stored row by row, with x varying fastest. Node (`col`, `row`) sits at
+`x = -field_size_x/2 + col * field_size_x / (grid_x - 1)` and
+`y = -field_size_y/2 + row * field_size_y / (grid_y - 1)`, so row 0 is the most negative y.
+Coordinates are field-centre coordinates, the same as `cut_from_absolute` positions on the wire.
+
+**Applying the table.** Each node stores the field's **distortion** at that point: where the beam actually lands,
+minus where it was commanded. To correct a target point `p`, the firmware interpolates the grid bilinearly at `p` and
+**subtracts** the result: it commands `p - grid(p)`. (This is the EZCAD3 convention.) An all-zero table applies no correction.
+
+**Flags.** The table can also carry linear corrections: whatever linear error was present when the grid was measured.
+`flags` records which ones are baked in, so the same correction is not also applied by LightBurn:
+
+| Bit    | Name                    | Meaning                          |
+|--------|-------------------------|----------------------------------|
+| `0x01` | `lbpcor_flag_scale`     | Field scale is in the table.     |
+| `0x02` | `lbpcor_flag_rotation`  | Field rotation is in the table.  |
+| `0x04` | `lbpcor_flag_offset`    | Field offset is in the table.    |
+
+Bits 3–15 are reserved and must be `0`. The firmware ignores `flags` and applies the table as written.
+LightBurn reads them before uploading, and uses identity (scale 1, rotation 0, offset 0) for each part of its
+own field transform whose bit is set. Bulge, skew and trapezoid are always the table's job.
+
+**Receiving the file.** At `cmd_file_end` the firmware checks the file **on its own**: a bad CRC or a length that
+does not match the header is rejected with `err_invalid_file`; an unrecognized magic, an unsupported version, or a
+header value this machine can never accept is rejected with `err_invalid_header`, with the byte offset of the offending
+field as the detail. A file that passes is **stored, but not applied**: it replaces any previously stored table,
+and correction is off until it is applied with `cmd_galvo_correction`. Whether the table fits the machine's current
+configuration is checked when it is applied, not when it is received.
+
+**Lifetime.** LightBurn keeps the correction file and uploads it on every connection. Firmware may keep the
+table across power cycles, but is not required to, and LightBurn never reads a table back.
+
+#### Applying Correction
+
+| Command                | Arguments                 | Arg Size |
+|------------------------|---------------------------|----------|
+| `cmd_galvo_correction` | uint8 enable (`0` or `1`) | 1        |
+
+`cmd_galvo_correction` with `1` **applies** the stored table. The firmware first checks the table against its
+current configuration, and refuses the request if it does not fit:
+
+| Problem                                                           | Error               | Detail                                   |
+|-------------------------------------------------------------------|---------------------|------------------------------------------|
+| No valid table is stored                                          | `err_wrong_state`   | state flags                              |
+| `field_size_x` or `field_size_y` differs from `cfg_field_size_x/y` | `err_file_mismatch` | byte offset of the mismatched header field (`16` or `20`) |
+
+A table made for a different field almost always means a stale table from another lens, or a mistyped field size,
+so the firmware refuses it rather than guessing. LightBurn reports the mismatch to the user.
+
+`cmd_galvo_correction` with `0` stops applying the table; the table stays stored. LightBurn does this while its
+correction wizard marks a test pattern, so it measures the lens's raw distortion, and applies the table again when
+the wizard closes.
+
+Correction is **off** until applied, and goes back to off when:
+- a new table is received;
+- `cfg_field_size_x` or `cfg_field_size_y` changes, since the table may no longer fit.
+
+Otherwise it keeps its last state; in particular, a handshake does not change it (the handshake has no side effects).
+LightBurn uploads and applies the table on every connection, so a host that disconnects mid-calibration leaves
+correction off only until it reconnects.
+
+On connecting, LightBurn sends the configuration, uploads the table, then applies it. Firmware that keeps the table
+across power cycles may also apply it at power-on, for operation without a host, provided it makes the same check.
 
 ### Executing a Job
 Lightburn will concatenate all the commands for a job into a **file** and send using the commands listed above.
@@ -821,8 +944,8 @@ Two shapes, framed with the guide light, with the guide light blanked while movi
 
 ```
 cmd_frame_begin
-cmd_speed_xy               frame speed
-cmd_speed_travel_xy        frame speed
+cmd_cut_speed_xy           frame speed
+cmd_travel_speed_xy        frame speed
 cmd_galvo_polygon_delay    0          (galvo: no marking delays while framing)
 cmd_guide_light_on         0
 cmd_cut_abs_xy  ...                   outline of the first shape, lit

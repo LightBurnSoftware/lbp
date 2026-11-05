@@ -49,7 +49,55 @@ SimState FirmwareSim::step(int64_t dt_ns)
 	m_movement.step(double(dt_ns) / 1e9); // step movement simulation.
 	updateFwState();
 	tx(); // send output packets.
-	return m_movement.getSimState();
+	SimState state = m_movement.getSimState();
+	state.correction_on = m_correction_on;
+	return state;
+}
+
+void FirmwareSim::setMode(MachineMode mode)
+{
+	// A full reset: all stop, queues cleared, file transfers and the loaded job dropped.
+	stop();
+	m_filesystem.reset();
+	m_filesystem.setGalvo(mode == MachineMode::Galvo);
+	m_correction_on = false;
+	m_movement.setMode(mode);
+	updateFwState();
+}
+
+void FirmwareSim::processCorrection(lbp::MaxPayload &payload)
+{
+	uint8_t enable = 0;
+	if (payload.size() != 1 || !payload.readArg(enable)) {
+		m_out_q.nack(payload, lbp::err_invalid_length, 1);
+		return;
+	}
+	if (enable == 0) {
+		m_correction_on = false;
+		gLog().push(Log::INFO, "Correction off");
+		m_out_q.respond(payload);
+		return;
+	}
+
+	// Applying: the stored table must fit the current configuration.
+	const CorrectionTable &table = m_filesystem.correction();
+	if (!table.valid) {
+		m_out_q.nack(payload, lbp::err_wrong_state, m_fw_state);
+		return;
+	}
+	if (table.field_size_x_um != m_config.getOrDefault(lbp::cfg_field_size_x)) {
+		gLog().push(Log::WARNING, "Correction table field size X doesn't match cfg_field_size_x");
+		m_out_q.nack(payload, lbp::err_file_mismatch, 16); // header offset of field_size_x
+		return;
+	}
+	if (table.field_size_y_um != m_config.getOrDefault(lbp::cfg_field_size_y)) {
+		gLog().push(Log::WARNING, "Correction table field size Y doesn't match cfg_field_size_y");
+		m_out_q.nack(payload, lbp::err_file_mismatch, 20); // header offset of field_size_y
+		return;
+	}
+	m_correction_on = true;
+	gLog().push(Log::INFO, "Correction on");
+	m_out_q.respond(payload);
 }
 
 void FirmwareSim::tx()
@@ -176,6 +224,9 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 
 	// Try to handle this request with one of the components.
 	if (m_filesystem.process(payload, m_out_q)) {
+		if (m_filesystem.takeNewCorrection()) {
+			m_correction_on = false; // a new table is stored, not applied
+		}
 		return true;
 	}
 	if (m_config.process(payload, m_out_q)) {
@@ -189,11 +240,27 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	const uint16_t cmd = payload.cmd();
 
 	switch (cmd) {
-	case lbp::cmd_commit_cfg:
+	case lbp::cmd_commit_cfg: {
+		const int32_t field_x = m_config.getOrDefault(lbp::cfg_field_size_x);
+		const int32_t field_y = m_config.getOrDefault(lbp::cfg_field_size_y);
 		m_config.commit();
 		gLog().push(Log::INFO, "Config Commit");
+		if (field_x != m_config.getOrDefault(lbp::cfg_field_size_x)
+			|| field_y != m_config.getOrDefault(lbp::cfg_field_size_y)) {
+			// The table may no longer fit the field: correction goes off until it's applied again.
+			m_correction_on = false;
+			m_movement.refreshBounds();
+		}
 		m_out_q.respond(payload);
 		return true;
+	}
+	case lbp::cmd_galvo_correction:
+		if (m_movement.mode() == MachineMode::Galvo) {
+			processCorrection(payload);
+			return true;
+		}
+		m_out_q.nack(payload, lbp::err_invalid_cmd);
+		return false;
 	case lbp::cmd_handshake: {
 		uint16_t host_version = 0;
 		if (payload.readArg(host_version)) {
