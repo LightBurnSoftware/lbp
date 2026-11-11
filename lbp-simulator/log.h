@@ -8,7 +8,7 @@
 #include <QString>
 #include <QMutex>
 
-#include "vec4.h"
+#include "vec8.h"
 
 /** A simple queue of log entries. Implemented this way to help decouple server, simulator, and ui. */
 class Log
@@ -55,5 +55,5 @@ private:
 /** global log instance. */
 Log &gLog();
 
-/** Helper function to assist logging a Vec4 */
-QString toQString(const Vec4 &v);
+/** Helper function to assist logging a Vec8: the axes the simulator moves (X, Y, Z, U). */
+QString toQString(const Vec8 &v);

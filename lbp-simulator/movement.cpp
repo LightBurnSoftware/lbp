@@ -136,38 +136,42 @@ static inline int64_t wrapTo(int64_t v, int64_t lo, int64_t hi)
 	return v;
 }
 
-/** Convenience structures for quick manipulation of Vec4's against different axis codes. */
-struct AxisRef
-{
-	uint16_t flag;	// command bitmask: axis_x, axis_y, ...
-	uint16_t index; // config ordinal: axis_index_x, axis_index_y, ...
-	int64_t Vec4::*m;
-};
-static constexpr AxisRef kAxes[] = {
-	{lbp::axis_x, lbp::axis_index_x, &Vec4::x},
-	{lbp::axis_y, lbp::axis_index_y, &Vec4::y},
-	{lbp::axis_z, lbp::axis_index_z, &Vec4::z},
-	{lbp::axis_u, lbp::axis_index_u, &Vec4::u},
-};
-
+// The axes the simulator moves. Moves naming any other axis (A, B, C, V) are rejected; supporting them needs
+// per-axis speeds, limits and a pacing rule for them.
 static constexpr uint16_t kSupportedAxes = lbp::axis_x | lbp::axis_y | lbp::axis_z | lbp::axis_u;
 
 /** @return base + offset * scale, rounded per axis. Pure function of its inputs: no drift. */
-static Vec4 advance(const Vec4 &base, const Vec4 &offset, double scale)
+static Vec8 advance(const Vec8 &base, const Vec8 &offset, double scale)
 {
-	Vec4 result;
-	for (const AxisRef &a : kAxes) {
-		result.*(a.m) = base.*(a.m) + llround(double(offset.*(a.m)) * scale);
+	Vec8 result;
+	for (int i = 0; i < Vec8::kSize; ++i) {
+		result[i] = base[i] + llround(double(offset[i]) * scale);
 	}
 	return result;
 }
 
-// Gantry travel limits, hardcoded for now (micrometers).
-static const Vec4 kGantryMaxPos(300000, 180000, 120000, 60000);
+/** Gantry travel limits, hardcoded for now (micrometers). Unsupported axes stay at 0. */
+static Vec8 gantryMaxPos()
+{
+	Vec8 max;
+	max.x = 300000;
+	max.y = 180000;
+	max.z = 120000;
+	max.u = 60000;
+	return max;
+}
+
+/** @return a unit jog direction along one axis slot. */
+static Vec8 jogDirection(int slot, int64_t sign)
+{
+	Vec8 dir;
+	dir[slot] = sign;
+	return dir;
+}
 
 MovementSim::MovementSim(Configuration &config)
 	: m_config(config)
-	, m_max_pos(kGantryMaxPos)
+	, m_max_pos(gantryMaxPos())
 {
 	// Empty
 }
@@ -186,8 +190,8 @@ void MovementSim::setMode(MachineMode mode)
 
 void MovementSim::refreshBounds()
 {
-	m_min_pos = Vec4();
-	m_max_pos = kGantryMaxPos;
+	m_min_pos = Vec8();
+	m_max_pos = gantryMaxPos();
 	if (m_mode == MachineMode::Galvo) {
 		// The marking field is centred on (0,0). Z and U keep their gantry limits (e.g. a lift axis).
 		const int32_t field = m_config.getOrDefault(lbp::cfg_field_size); // square
@@ -229,6 +233,20 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		return true;
 	}
 
+	// Position queries (cmd_pos_*): one int32 per axis flag set, in slot order, for any combination of supported axes.
+	const uint16_t query_axes = cmd & lbp::mask_axis;
+	if ((cmd & 0xFF00) == lbp::query_pos && query_axes != 0 && (query_axes & ~kSupportedAxes) == 0) {
+		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, uint16_t(4 * std::bitset<8>(query_axes).count()));
+		for (int i = 0; i < Vec8::kSize; ++i) {
+			if (query_axes & flagOfSlot(i)) {
+				m.writeInt(toWire(m_pos[i]));
+			}
+		}
+		gLog().push(Log::DEBUG, QString("Position query 0x%1: %2").arg(cmd, 4, 16, QChar('0')).arg(toQString(m_pos)));
+		out_q.push(m);
+		return true;
+	}
+
 	switch (cmd) {
 	// Command buffer queries: answered immediately, never buffered. m_cmd_q is the command buffer.
 	case lbp::cmd_buffer_capacity:
@@ -237,50 +255,8 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 	case lbp::cmd_buffer_free:
 		out_q.respond(request, static_cast<int32_t>(m_cmd_q.freeSpace()));
 		return true;
-	case lbp::cmd_pos_x:
-		gLog().push(Log::DEBUG, QString("X Axis Query: %1").arg(m_pos.x));
-		out_q.respond(request, toWire(m_pos.x));
-		return true;
-	case lbp::cmd_pos_y:
-		gLog().push(Log::DEBUG, QString("Y Axis Query: %1").arg(m_pos.y));
-		out_q.respond(request, toWire(m_pos.y));
-		return true;
-	case lbp::cmd_pos_z:
-		gLog().push(Log::DEBUG, QString("Z Axis Query: %1").arg(m_pos.z));
-		out_q.respond(request, toWire(m_pos.z));
-		return true;
-	case lbp::cmd_pos_u:
-		gLog().push(Log::DEBUG, QString("U Axis Query: %1").arg(m_pos.u));
-		out_q.respond(request, toWire(m_pos.u));
-		return true;
-	case lbp::cmd_pos_xy: {
-		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 8);
-		m.writeInt(toWire(m_pos.x));
-		m.writeInt(toWire(m_pos.y));
-		out_q.push(m);
-		return true;
-	}
-	case lbp::cmd_pos_xyz: {
-		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 12);
-		m.writeInt(toWire(m_pos.x));
-		m.writeInt(toWire(m_pos.y));
-		m.writeInt(toWire(m_pos.z));
-		out_q.push(m);
-		return true;
-	}
-	case lbp::cmd_pos_xyzu: {
-		gLog().push(Log::DEBUG, "XYZU Axis Query");
-
-		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, 16);
-		m.writeInt(toWire(m_pos.x));
-		m.writeInt(toWire(m_pos.y));
-		m.writeInt(toWire(m_pos.z));
-		m.writeInt(toWire(m_pos.u));
-		out_q.push(m);
-		return true;
-	}
 	case lbp::cmd_jog_start_pos_x:
-		beginJog(Vec4(1, 0, 0, 0), m_jog_speed.xy);
+		beginJog(jogDirection(kX, 1), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_x:
@@ -288,7 +264,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_x:
-		beginJog(Vec4(-1, 0, 0, 0), m_jog_speed.xy);
+		beginJog(jogDirection(kX, -1), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_x:
@@ -296,7 +272,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_y:
-		beginJog(Vec4(0, 1, 0, 0), m_jog_speed.xy);
+		beginJog(jogDirection(kY, 1), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_y:
@@ -304,7 +280,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_y:
-		beginJog(Vec4(0, -1, 0, 0), m_jog_speed.xy);
+		beginJog(jogDirection(kY, -1), m_jog_speed.xy);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_y:
@@ -312,7 +288,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_z:
-		beginJog(Vec4(0, 0, 1, 0), m_jog_speed.z);
+		beginJog(jogDirection(kZ, 1), m_jog_speed.z);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_z:
@@ -320,7 +296,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_z:
-		beginJog(Vec4(0, 0, -1, 0), m_jog_speed.z);
+		beginJog(jogDirection(kZ, -1), m_jog_speed.z);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_z:
@@ -328,7 +304,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_pos_u:
-		beginJog(Vec4(0, 0, 0, 1), m_jog_speed.u);
+		beginJog(jogDirection(kU, 1), m_jog_speed.u);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_pos_u:
@@ -336,7 +312,7 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_start_neg_u:
-		beginJog(Vec4(0, 0, 0, -1), m_jog_speed.u);
+		beginJog(jogDirection(kU, -1), m_jog_speed.u);
 		out_q.respond(request);
 		return true;
 	case lbp::cmd_jog_stop_neg_u:
@@ -475,7 +451,7 @@ static bool isAbsoluteMove(uint16_t cmd)
 	return isMoveCmd(cmd) && (cmd & lbp::flag_abs) == lbp::flag_abs;
 }
 
-bool MovementSim::decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta)
+bool MovementSim::decodeMoveDelta(lbp::CmdPayload &p, Vec8 &delta)
 {
 	const uint16_t cmd = p.cmd();
 	const bool home = ((cmd & 0xFF00) == lbp::move_home);
@@ -487,20 +463,21 @@ bool MovementSim::decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta)
 	if (cmd & lbp::mask_axis & ~kSupportedAxes) {
 		return false; // a/b/c/v: can't decode
 	}
-	for (int i = 0; i < 4; ++i) {
-		if (!(cmd & kAxes[i].flag)) {
+	// One int32 argument per axis flag set, in slot order.
+	for (int i = 0; i < Vec8::kSize; ++i) {
+		if (!(cmd & flagOfSlot(i))) {
 			continue;
 		}
 
 		if (home) {
-			delta.*(kAxes[i].m) = homeDelta(i);
+			delta[i] = homeDelta(i);
 			continue;
 		}
 		int32_t arg = 0;
 		if (!p.readArg(arg)) {
 			return false;
 		}
-		delta.*(kAxes[i].m) = abs ? absoluteDelta(i, arg) : relativeDelta(i, arg);
+		delta[i] = abs ? absoluteDelta(i, arg) : relativeDelta(i, arg);
 	}
 	return true;
 }
@@ -522,7 +499,7 @@ MovementSim::State MovementSim::takeNextCommand()
 			continue;
 		}
 		if (isMoveCmd(cmd)) {
-			Vec4 delta;
+			Vec8 delta;
 			if (!decodeMoveDelta(p, delta)) {
 				badPayload(p);
 				continue; // malformed: discard, try the next
@@ -827,15 +804,15 @@ void MovementSim::resume()
 	}
 }
 
-void MovementSim::beginJog(const Vec4 &d, int32_t target_vel)
+void MovementSim::beginJog(const Vec8 &d, int32_t target_vel)
 {
 	refreshRotary();
 	m_laser_1.on = false; // operator moves never fire
 	m_laser_2.on = false;
 	double norm = 0.0;
 	double speed = double(target_vel);
-	for (const AxisRef &a : kAxes) {
-		const double v = double(d.*(a.m));
+	for (int i = 0; i < Vec8::kSize; ++i) {
+		const double v = double(d[i]);
 		norm += v * v;
 	}
 	norm = std::sqrt(norm);
@@ -843,8 +820,8 @@ void MovementSim::beginJog(const Vec4 &d, int32_t target_vel)
 		return;
 	}
 
-	for (int i = 0; i < 4; ++i) {
-		m_jog.dir[i] = double(d.*(kAxes[i].m)) / norm;
+	for (int i = 0; i < Vec8::kSize; ++i) {
+		m_jog.dir[i] = double(d[i]) / norm;
 	}
 	m_jog.start = m_pos;
 	m_jog.traveled = 0.0;
@@ -903,10 +880,9 @@ void MovementSim::step(double dt_s)
 
 		case State::Jogging: {
 			m_jog.traveled += m_jog.speed * budget_s;
-			Vec4 p;
-			for (int i = 0; i < 4; ++i) {
-				p.*(kAxes[i].m) = m_jog.start.*(kAxes[i].m)
-								  + llround(m_jog.dir[i] * m_jog.traveled);
+			Vec8 p;
+			for (int i = 0; i < Vec8::kSize; ++i) {
+				p[i] = m_jog.start[i] + llround(m_jog.dir[i] * m_jog.traveled);
 			}
 			m_pos = applyLimits(p);
 			budget_s = 0.0;
@@ -1027,50 +1003,47 @@ void MovementSim::refreshRotary()
 		return;
 	}
 
-	for (int i = 0; i < 4; ++i) {
-		if (axis == kAxes[i].index) {
-			m_rotary_axis = i;
-			return;
-		}
+	// Only an axis the simulator moves can be the rotary.
+	const int slot = slotOfIndex(axis);
+	if (slot >= 0 && (flagOfSlot(slot) & kSupportedAxes)) {
+		m_rotary_axis = slot;
 	}
 }
 
-int64_t MovementSim::relativeDelta(int idx, int64_t arg) const
+int64_t MovementSim::relativeDelta(int slot, int64_t arg) const
 {
-	if (idx == m_rotary_axis) return arg; // no clamping for rotary deltas
-	const int64_t curr = m_pos.*(kAxes[idx].m);
-	return clampTo(curr + arg, m_min_pos.*(kAxes[idx].m), m_max_pos.*(kAxes[idx].m)) - curr;
+	if (slot == m_rotary_axis) return arg; // no clamping for rotary deltas
+	const int64_t curr = m_pos[slot];
+	return clampTo(curr + arg, m_min_pos[slot], m_max_pos[slot]) - curr;
 }
 
-int64_t MovementSim::absoluteDelta(int idx, int64_t arg) const
+int64_t MovementSim::absoluteDelta(int slot, int64_t arg) const
 {
-	const int64_t curr   = m_pos.*(kAxes[idx].m);
-	const int64_t target = arg + m_job_origin.*(kAxes[idx].m);
-	const int64_t capped = clampTo(target, m_min_pos.*(kAxes[idx].m), m_max_pos.*(kAxes[idx].m));
+	const int64_t curr   = m_pos[slot];
+	const int64_t target = arg + m_job_origin[slot];
+	const int64_t capped = clampTo(target, m_min_pos[slot], m_max_pos[slot]);
 	if (capped != target) {
 		gLog().push(Log::WARNING, QString("absolute target %1 on axis %2 clamped to %3")
-			.arg(target).arg(idx).arg(capped));
+			.arg(target).arg(slot).arg(capped));
 	}
 	return capped - curr;
 }
 
-int64_t MovementSim::homeDelta(int idx) const
+int64_t MovementSim::homeDelta(int slot) const
 {
-	if (idx == m_rotary_axis) {
+	if (slot == m_rotary_axis) {
 		return 0; // rotary has no machine zero to seek
 	}
-	return -(m_pos.*(kAxes[idx].m));
+	return -m_pos[slot];
 }
 
-Vec4 MovementSim::applyLimits(const Vec4 &vec) const
+Vec8 MovementSim::applyLimits(const Vec8 &vec) const
 {
-    Vec4 result;
-    for (int i = 0; i < 4; ++i) {
-        const int64_t v = vec.*(kAxes[i].m);
-        const int64_t lo = m_min_pos.*(kAxes[i].m);
-        const int64_t hi = m_max_pos.*(kAxes[i].m);
-        result.*(kAxes[i].m) = (i == m_rotary_axis) ? wrapTo(v, lo, hi) : clampTo(v, lo, hi);
-    }
+	Vec8 result;
+	for (int i = 0; i < Vec8::kSize; ++i) {
+		result[i] = (i == m_rotary_axis) ? wrapTo(vec[i], m_min_pos[i], m_max_pos[i])
+										 : clampTo(vec[i], m_min_pos[i], m_max_pos[i]);
+	}
 	return result;
 }
 
@@ -1137,7 +1110,7 @@ MovementSim::SpeedSet MovementSim::speedsFor(uint16_t cmd) const
 	}
 }
 
-bool MovementSim::beginMove(const Vec4 &delta, const SpeedSet &speeds)
+bool MovementSim::beginMove(const Vec8 &delta, const SpeedSet &speeds)
 {
 	double length = 0.0, speed = 0.0;
 	if (!pacingFor(delta, speeds, length, speed)) return false;
@@ -1162,7 +1135,7 @@ bool MovementSim::beginMove(const Vec4 &delta, const SpeedSet &speeds)
  * @return False if the move has no motion or no rate is set, in which case
  *         length and speed are unchanged.
  */
-bool MovementSim::pacingFor(const Vec4 &delta, const SpeedSet &speeds, double &length, double &speed) const
+bool MovementSim::pacingFor(const Vec8 &delta, const SpeedSet &speeds, double &length, double &speed) const
 {
 	const double xy = std::hypot(double(delta.x), double(delta.y));
 	if (xy > 0.0) {

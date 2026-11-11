@@ -13,10 +13,13 @@ SimView::SimView(QWidget *parent)
 	, m_buffer(400, 300, QImage::Format_RGB32)
 	, m_timer()
 	, m_min_um()
-	, m_max_um(300000, 180000, 0, 0)
+	, m_max_um()
 	, m_x_px_offset(0)
 	, m_y_px_offset(0)
 {
+	// A gantry bed until the first SimState arrives.
+	m_max_um.x = 300000;
+	m_max_um.y = 180000;
 	m_timer.start();
 }
 

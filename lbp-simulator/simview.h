@@ -43,8 +43,8 @@ private:
 	QElapsedTimer m_timer;
 
 	// extent of the simulated workbed (gantry) or marking field (galvo) in micrometers, from SimState
-	Vec4 m_min_um;
-	Vec4 m_max_um;
+	Vec8 m_min_um;
+	Vec8 m_max_um;
 	MachineMode m_mode = MachineMode::Gantry;
 
 	// offset into the drawn widget where the workbed is located

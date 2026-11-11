@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "vec4.h"
+#include "vec8.h"
 
 /** What kind of machine the simulator pretends to be. */
 enum class MachineMode {
@@ -13,14 +13,14 @@ enum class MachineMode {
 
 struct SimState
 {
-	Vec4 pos;
+	Vec8 pos;
 	float laser_1_power = 0.f;
 	float laser_2_power = 0.f;
 
 	// For display
 	MachineMode mode = MachineMode::Gantry;
-	Vec4 min_pos;				// travel limits, micrometers
-	Vec4 max_pos;
+	Vec8 min_pos;				// travel limits, micrometers
+	Vec8 max_pos;
 	bool guide_light = false;	// galvo guide (aiming) light on
 	bool correction_on = false;	// galvo lens correction applied
 };

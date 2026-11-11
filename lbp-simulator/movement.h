@@ -7,7 +7,7 @@
 #include "correction.h"
 #include "simstate.h"
 #include "simutils.h"
-#include "vec4.h"
+#include "vec8.h"
 
 #include <cstdint>
 #include <lbp/payload.h>
@@ -33,8 +33,8 @@ struct LaserSettings {
 
 /** Data describing a move in progress. */
 struct Move {
-	Vec4   start;            // wrapped position when the move began
-	Vec4   delta;            // signed displacement; may exceed a rotary axis limit
+	Vec8   start;            // wrapped position when the move began
+	Vec8   delta;            // signed displacement; may exceed a rotary axis limit
 	double length = 0.0;     // path distance used to pace the move (um)
 	double traveled = 0.0;   // distance covered so far (um)
 	double speed = 0.0;      // path speed (um/s)
@@ -47,8 +47,8 @@ struct Move {
 
 /** Data describing a jog in progress. A jog has no endpoint; it runs until stopped. */
 struct Jog {
-	Vec4   start;
-	double dir[4] = {0, 0, 0, 0};  // unit direction, indexed like kAxes
+	Vec8   start;
+	double dir[Vec8::kSize] = {};  // unit direction, indexed by axis slot
 	double traveled = 0.0;
 	double speed = 0.0;
 };
@@ -147,14 +147,14 @@ private:
 
 	/** Refresh our knowledge of the configured rotary axis. Called when a move begins. */
 	void refreshRotary();
-	/** Calculate the axis delta for a relative move. */
-	int64_t relativeDelta(int idx, int64_t arg) const;
-	/** Calculate the axis delta for an absolute move. */
-	int64_t absoluteDelta(int idx, int64_t arg) const;
-	/** Calculate the axis delta for an a move to machine 0 */
-	int64_t homeDelta(int idx) const;
+	/** Calculate the axis delta for a relative move. @param slot The axis slot (see Vec8). */
+	int64_t relativeDelta(int slot, int64_t arg) const;
+	/** Calculate the axis delta for an absolute move. @param slot The axis slot (see Vec8). */
+	int64_t absoluteDelta(int slot, int64_t arg) const;
+	/** Calculate the axis delta for a move to machine 0. @param slot The axis slot (see Vec8). */
+	int64_t homeDelta(int slot) const;
 
-	bool decodeMoveDelta(lbp::CmdPayload &p, Vec4 &delta);
+	bool decodeMoveDelta(lbp::CmdPayload &p, Vec8 &delta);
 
 	/** Speeds for each axis group, in um/s (0 = not set). */
 	struct SpeedSet {
@@ -168,26 +168,26 @@ private:
 	/** The speeds that govern a move command: its family's, or the configured defaults. */
 	SpeedSet speedsFor(uint16_t cmd) const;
 	/** Choose the path metric and rate for a move. */
-	bool pacingFor(const Vec4 &delta, const SpeedSet &speeds, double &length, double &speed) const;
-	bool beginMove(const Vec4 &delta, const SpeedSet &speeds);
-	void beginJog(const Vec4 &dir, int32_t target_vel);
+	bool pacingFor(const Vec8 &delta, const SpeedSet &speeds, double &length, double &speed) const;
+	bool beginMove(const Vec8 &delta, const SpeedSet &speeds);
+	void beginJog(const Vec8 &dir, int32_t target_vel);
 	void endJog();
 
 	/** Apply each axis's travel limit: linear axes clip, rotary axes wrap. */
-	Vec4 applyLimits(const Vec4 &vec) const;
+	Vec8 applyLimits(const Vec8 &vec) const;
 
 	Configuration &m_config;	 // reference to configuration component, for certain lookups.
 	State m_state = State::Idle; // "movement state" - controls internal state machine.
 	Move m_move;				 // the Move currently executing
 	Jog m_jog;					 // the Jog currently executing
-	int m_rotary_axis = -1; // rotary axis index, or -1 for none, refreshed when a move or jog begins.
-	Vec4 m_pos;				// current laser position
-	Vec4 m_job_origin;		// origin offset for absolute moves during the current job.
+	int m_rotary_axis = -1; // rotary axis slot (see Vec8), or -1 for none, refreshed when a move or jog begins.
+	Vec8 m_pos;				// current laser position
+	Vec8 m_job_origin;		// origin offset for absolute moves during the current job.
 	MachineMode m_mode = MachineMode::Gantry;
 	// Lens correction being applied, or nullptr. Owned by the FileSystem. Not applied yet: see step().
 	const CorrectionTable *m_correction = nullptr;
-	Vec4 m_min_pos;			// travel limits per axis: gantry [0, max]; galvo X/Y [-field/2, +field/2].
-	Vec4 m_max_pos;
+	Vec8 m_min_pos;			// travel limits per axis: gantry [0, max]; galvo X/Y [-field/2, +field/2].
+	Vec8 m_max_pos;
 	double m_dwell_remaining_s = 0.0;  // remaining seconds to dwell if in dwelling state.
 	SpeedSet m_cut_speed;		  // speeds for cut moves (cmd_cut_speed_*)
 	SpeedSet m_travel_speed;	  // speeds for travel moves (cmd_travel_speed_*)
