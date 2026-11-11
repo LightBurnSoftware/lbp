@@ -52,9 +52,7 @@ SimState FirmwareSim::step(int64_t dt_ns)
 		reportProgress(dt_ns);
 	}
 	tx(); // send output packets.
-	SimState state = m_movement.getSimState();
-	state.correction_on = m_correction_on;
-	return state;
+	return m_movement.getSimState();
 }
 
 void FirmwareSim::setMode(MachineMode mode)
@@ -63,8 +61,7 @@ void FirmwareSim::setMode(MachineMode mode)
 	stop();
 	m_filesystem.reset();
 	m_filesystem.setGalvo(mode == MachineMode::Galvo);
-	m_correction_on = false;
-	m_movement.setMode(mode);
+	m_movement.setMode(mode); // also turns correction off
 	updateFwState();
 }
 
@@ -76,7 +73,7 @@ void FirmwareSim::processCorrection(lbp::MaxPayload &payload)
 		return;
 	}
 	if (enable == 0) {
-		m_correction_on = false;
+		m_movement.setCorrection(nullptr);
 		gLog().push(Log::INFO, "Correction off");
 		m_out_q.respond(payload);
 		return;
@@ -93,7 +90,7 @@ void FirmwareSim::processCorrection(lbp::MaxPayload &payload)
 		m_out_q.nack(payload, lbp::err_file_mismatch, lbp::lbpcor_field_size_offset);
 		return;
 	}
-	m_correction_on = true;
+	m_movement.setCorrection(&table);
 	gLog().push(Log::INFO, "Correction on");
 	m_out_q.respond(payload);
 }
@@ -263,7 +260,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 	// Try to handle this request with one of the components.
 	if (m_filesystem.process(payload, m_out_q)) {
 		if (m_filesystem.takeNewCorrection()) {
-			m_correction_on = false; // a new table is stored, not applied
+			m_movement.setCorrection(nullptr); // a new table is stored, not applied
 		}
 		return true;
 	}
@@ -284,7 +281,7 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 		gLog().push(Log::INFO, "Config Commit");
 		if (field != m_config.getOrDefault(lbp::cfg_field_size)) {
 			// The table may no longer fit the field: correction goes off until it's applied again.
-			m_correction_on = false;
+			m_movement.setCorrection(nullptr);
 			m_movement.refreshBounds();
 		}
 		m_out_q.respond(payload);

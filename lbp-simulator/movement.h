@@ -4,6 +4,7 @@
 #pragma once
 
 #include "configuration.h"
+#include "correction.h"
 #include "simstate.h"
 #include "simutils.h"
 #include "vec4.h"
@@ -127,6 +128,13 @@ public:
 	/** @brief Recompute travel limits from the mode and configuration (e.g. after cfg_field_size changes). */
 	void refreshBounds();
 
+	/**
+	 * @brief Set the lens correction applied to galvo motion (cmd_galvo_correction), or nullptr for none.
+	 * The caller checks that the table fits first, owns it, and turns correction off before replacing or
+	 * dropping it. Turned off by setMode.
+	 */
+	void setCorrection(const CorrectionTable *table) { m_correction = table; }
+
 private:
 	enum class State { Idle, Jogging, Moving, Dwelling, Paused };
 	struct PausedState {
@@ -176,6 +184,8 @@ private:
 	Vec4 m_pos;				// current laser position
 	Vec4 m_job_origin;		// origin offset for absolute moves during the current job.
 	MachineMode m_mode = MachineMode::Gantry;
+	// Lens correction being applied, or nullptr. Owned by the FileSystem. Not applied yet: see step().
+	const CorrectionTable *m_correction = nullptr;
 	Vec4 m_min_pos;			// travel limits per axis: gantry [0, max]; galvo X/Y [-field/2, +field/2].
 	Vec4 m_max_pos;
 	double m_dwell_remaining_s = 0.0;  // remaining seconds to dwell if in dwelling state.

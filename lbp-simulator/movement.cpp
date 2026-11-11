@@ -175,6 +175,7 @@ MovementSim::MovementSim(Configuration &config)
 void MovementSim::setMode(MachineMode mode)
 {
 	m_mode = mode;
+	m_correction = nullptr;
 	m_guide_light = false;
 	m_focus_light = false;
 	m_warned_galvo_rotary = false;
@@ -882,6 +883,12 @@ void MovementSim::step(double dt_s)
 			}
 
 			m_pos = applyLimits(advance(m_move.start, m_move.delta, m_move.progress()));
+			if (m_correction != nullptr) {
+				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's distortion,
+				// interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"). It does this for every point
+				// it outputs along the move, not just the endpoints: the distortion isn't linear, so a corrected
+				// straight line is a curve in mirror space. The simulator draws the uncorrected (intended) path.
+			}
 
 			const float progress = float(m_move.progress());
 			m_laser_1.progressRaster(progress);
@@ -931,6 +938,7 @@ SimState MovementSim::getSimState() const
 	state.min_pos = m_min_pos;
 	state.max_pos = m_max_pos;
 	state.guide_light = m_guide_light;
+	state.correction_on = m_correction != nullptr;
 	return state;
 }
 

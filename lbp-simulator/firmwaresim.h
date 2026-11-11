@@ -97,5 +97,4 @@ private:
 	uint16_t m_job_txid = lbp::txid_none; // The cmd_execute that started the running job, for its event_result.
 	uint32_t m_last_progress = UINT32_MAX; // Last progress reported (UINT32_MAX: none yet this job).
 	int64_t m_since_progress_ns = 0; // Time since the last progress report.
-	bool m_correction_on = false; // Galvo lens correction applied (cmd_galvo_correction).
 };
