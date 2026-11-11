@@ -201,7 +201,7 @@ constexpr uint16_t cmd_laser_disable 	= cls_laser | 0x05E2; // uint8 laser index
 constexpr uint16_t cmd_laser_off 		= cls_laser | 0x05C1; // uint8 laser index
 constexpr uint16_t cmd_laser_on 		= cls_laser | 0x05C2; // uint8 laser index
 
-constexpr uint16_t cmd_focus_z 			= cls_laser | 0x0F00 | axis_z; // arguments TODO
+constexpr uint16_t cmd_focus_z 			= cls_laser | 0x0F00 | axis_z;
 constexpr uint16_t cmd_laser_offset_xy	= cls_laser | 0x0100 | axis_x | axis_y; // uint8 laser index, int32 x, y offsets (um) // TODO
 
 constexpr uint16_t cmd_raster_power = cls_laser | 0x05AA; // uint8 laser index, up to fifteen 16-bit power % arguments

@@ -701,7 +701,7 @@ MovementSim::State MovementSim::takeNextCommand()
 				badPayload(p);
 				continue;
 			}
-			const char *name = "end";
+			QString name = "end";
 			int32_t *target = &m_galvo_end_delay_us;
 			if (p.cmd() == lbp::cmd_galvo_laser_on_delay) {
 				name = "laser on";
