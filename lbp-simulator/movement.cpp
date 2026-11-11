@@ -161,11 +161,11 @@ static Vec8 gantryMaxPos()
 	return max;
 }
 
-/** @return a unit jog direction along one axis slot. */
-static Vec8 jogDirection(int slot, int64_t sign)
+/** @return a unit jog direction along one axis (see Vec8 for idx). */
+static Vec8 jogDirection(int idx, int64_t sign)
 {
 	Vec8 dir;
-	dir[slot] = sign;
+	dir[idx] = sign;
 	return dir;
 }
 
@@ -233,12 +233,12 @@ bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSourc
 		return true;
 	}
 
-	// Position queries (cmd_pos_*): one int32 per axis flag set, in slot order, for any combination of supported axes.
+	// Position queries (cmd_pos_*): one int32 per axis flag set, in idx order, for any combination of supported axes.
 	const uint16_t query_axes = cmd & lbp::mask_axis;
 	if ((cmd & 0xFF00) == lbp::query_pos && query_axes != 0 && (query_axes & ~kSupportedAxes) == 0) {
 		lbp::CmdMsg m = lbp::CmdMsg::responseTo(request, uint16_t(4 * std::bitset<8>(query_axes).count()));
 		for (int i = 0; i < Vec8::kSize; ++i) {
-			if (query_axes & flagOfSlot(i)) {
+			if (query_axes & flagOfIdx(i)) {
 				m.writeInt(toWire(m_pos[i]));
 			}
 		}
@@ -463,9 +463,9 @@ bool MovementSim::decodeMoveDelta(lbp::CmdPayload &p, Vec8 &delta)
 	if (cmd & lbp::mask_axis & ~kSupportedAxes) {
 		return false; // a/b/c/v: can't decode
 	}
-	// One int32 argument per axis flag set, in slot order.
+	// One int32 argument per axis flag set, in idx order.
 	for (int i = 0; i < Vec8::kSize; ++i) {
-		if (!(cmd & flagOfSlot(i))) {
+		if (!(cmd & flagOfIdx(i))) {
 			continue;
 		}
 
@@ -991,11 +991,11 @@ void MovementSim::refreshRotary()
 	int32_t enabled = 0;
 	if (!m_config.get(lbp::cfg_rotary_enable, enabled) || !enabled) return;
 
-	int32_t axis = -1;
-	if (!m_config.get(lbp::cfg_rotary_axis, axis)) return;
+	int32_t axis_id = 0;
+	if (!m_config.get(lbp::cfg_rotary_axis, axis_id)) return;
 
 	// A galvo's X and Y are its mirrors: they can't be rotary. (A rotary on Z or U still works.)
-	if (m_mode == MachineMode::Galvo && (axis == lbp::axis_index_x || axis == lbp::axis_index_y)) {
+	if (m_mode == MachineMode::Galvo && (axis_id == lbp::axis_id_x || axis_id == lbp::axis_id_y)) {
 		if (!m_warned_galvo_rotary) {
 			gLog().push(Log::WARNING, "Galvo mode: ignoring the rotary setting on X/Y (cfg_rotary_axis)");
 			m_warned_galvo_rotary = true;
@@ -1004,37 +1004,37 @@ void MovementSim::refreshRotary()
 	}
 
 	// Only an axis the simulator moves can be the rotary.
-	const int slot = slotOfIndex(axis);
-	if (slot >= 0 && (flagOfSlot(slot) & kSupportedAxes)) {
-		m_rotary_axis = slot;
+	const int idx = idxFromAxisId(axis_id);
+	if (idx >= 0 && (flagOfIdx(idx) & kSupportedAxes)) {
+		m_rotary_axis = idx;
 	}
 }
 
-int64_t MovementSim::relativeDelta(int slot, int64_t arg) const
+int64_t MovementSim::relativeDelta(int idx, int64_t arg) const
 {
-	if (slot == m_rotary_axis) return arg; // no clamping for rotary deltas
-	const int64_t curr = m_pos[slot];
-	return clampTo(curr + arg, m_min_pos[slot], m_max_pos[slot]) - curr;
+	if (idx == m_rotary_axis) return arg; // no clamping for rotary deltas
+	const int64_t curr = m_pos[idx];
+	return clampTo(curr + arg, m_min_pos[idx], m_max_pos[idx]) - curr;
 }
 
-int64_t MovementSim::absoluteDelta(int slot, int64_t arg) const
+int64_t MovementSim::absoluteDelta(int idx, int64_t arg) const
 {
-	const int64_t curr   = m_pos[slot];
-	const int64_t target = arg + m_job_origin[slot];
-	const int64_t capped = clampTo(target, m_min_pos[slot], m_max_pos[slot]);
+	const int64_t curr   = m_pos[idx];
+	const int64_t target = arg + m_job_origin[idx];
+	const int64_t capped = clampTo(target, m_min_pos[idx], m_max_pos[idx]);
 	if (capped != target) {
 		gLog().push(Log::WARNING, QString("absolute target %1 on axis %2 clamped to %3")
-			.arg(target).arg(slot).arg(capped));
+			.arg(target).arg(idx).arg(capped));
 	}
 	return capped - curr;
 }
 
-int64_t MovementSim::homeDelta(int slot) const
+int64_t MovementSim::homeDelta(int idx) const
 {
-	if (slot == m_rotary_axis) {
+	if (idx == m_rotary_axis) {
 		return 0; // rotary has no machine zero to seek
 	}
-	return -m_pos[slot];
+	return -m_pos[idx];
 }
 
 Vec8 MovementSim::applyLimits(const Vec8 &vec) const

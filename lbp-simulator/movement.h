@@ -48,7 +48,7 @@ struct Move {
 /** Data describing a jog in progress. A jog has no endpoint; it runs until stopped. */
 struct Jog {
 	Vec8   start;
-	double dir[Vec8::kSize] = {};  // unit direction, indexed by axis slot
+	double dir[Vec8::kSize] = {};  // unit direction, indexed like Vec8
 	double traveled = 0.0;
 	double speed = 0.0;
 };
@@ -147,12 +147,12 @@ private:
 
 	/** Refresh our knowledge of the configured rotary axis. Called when a move begins. */
 	void refreshRotary();
-	/** Calculate the axis delta for a relative move. @param slot The axis slot (see Vec8). */
-	int64_t relativeDelta(int slot, int64_t arg) const;
-	/** Calculate the axis delta for an absolute move. @param slot The axis slot (see Vec8). */
-	int64_t absoluteDelta(int slot, int64_t arg) const;
-	/** Calculate the axis delta for a move to machine 0. @param slot The axis slot (see Vec8). */
-	int64_t homeDelta(int slot) const;
+	/** Calculate the axis delta for a relative move. @param idx The axis (see Vec8). */
+	int64_t relativeDelta(int idx, int64_t arg) const;
+	/** Calculate the axis delta for an absolute move. @param idx The axis (see Vec8). */
+	int64_t absoluteDelta(int idx, int64_t arg) const;
+	/** Calculate the axis delta for a move to machine 0. @param idx The axis (see Vec8). */
+	int64_t homeDelta(int idx) const;
 
 	bool decodeMoveDelta(lbp::CmdPayload &p, Vec8 &delta);
 
@@ -180,7 +180,7 @@ private:
 	State m_state = State::Idle; // "movement state" - controls internal state machine.
 	Move m_move;				 // the Move currently executing
 	Jog m_jog;					 // the Jog currently executing
-	int m_rotary_axis = -1; // rotary axis slot (see Vec8), or -1 for none, refreshed when a move or jog begins.
+	int m_rotary_axis = -1; // rotary axis idx (see Vec8), or -1 for none, refreshed when a move or jog begins.
 	Vec8 m_pos;				// current laser position
 	Vec8 m_job_origin;		// origin offset for absolute moves during the current job.
 	MachineMode m_mode = MachineMode::Gantry;
