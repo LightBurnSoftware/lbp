@@ -947,7 +947,6 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_laser2_preig_freq:
 	case cfg_laser2_preig_pct:
 	case cfg_laser2_type:
-	case cfg_idle_speed:
 	case cfg_idle_acc:
 	case cfg_idle_delay:
 	case cfg_start_speed:
@@ -963,10 +962,7 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 	case cfg_line_shift_speed:
 	case cfg_facula_size_pct:
 	case cfg_engrave_factor_pct:
-	case cfg_xy_home_speed:
-	case cfg_z_home_speed:
 	case cfg_z_work_speed:
-	case cfg_u_home_speed:
 	case cfg_u_work_speed:
 	case cfg_material_thick:
 	case cfg_focus_distance:
@@ -997,6 +993,17 @@ bool getConfigDefault(uint16_t cmd, int32_t &value)
 		return true;
 	case cfg_field_size:
 		value = 110000; // micrometers
+		return true;
+	// Speeds the simulator needs to be nonzero, in micrometers/sec.
+	case cfg_xy_home_speed:
+		value = 50000;
+		return true;
+	case cfg_z_home_speed:
+	case cfg_u_home_speed:
+		value = 5000;
+		return true;
+	case cfg_idle_speed:	// travel speed when no cmd_travel_speed_xy has been sent
+		value = 100000;
 		return true;
 	default:
 		return false;

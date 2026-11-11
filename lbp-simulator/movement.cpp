@@ -1103,23 +1103,23 @@ bool MovementSim::takeSpeed(lbp::CmdPayload &p)
 	return true;
 }
 
-/** Read a positive speed from the configuration, or use the fallback. */
-static uint32_t configuredSpeed(const Configuration &config, uint16_t key, uint32_t fallback)
+/** Read a speed from the configuration. A value set to 0 or less would stall the move, so use the default instead. */
+static uint32_t configuredSpeed(const Configuration &config, uint16_t key)
 {
-	int32_t value = 0;
-	return (config.get(key, value) && value > 0) ? uint32_t(value) : fallback;
+	int32_t value = config.getOrDefault(key);
+	if (value <= 0) {
+		getConfigDefault(key, value);
+	}
+	return uint32_t(value);
 }
 
 MovementSim::SpeedSet MovementSim::speedsFor(uint16_t cmd) const
 {
-	// Simulator defaults (um/s) for speeds the configuration leaves at 0.
-	static constexpr uint32_t kHomeSpeedXY = 50000, kHomeSpeedZU = 5000, kTravelSpeedXY = 100000;
-
 	if ((cmd & 0xFF00) == lbp::move_home) {
 		SpeedSet home;
-		home.xy = configuredSpeed(m_config, lbp::cfg_xy_home_speed, kHomeSpeedXY);
-		home.z = configuredSpeed(m_config, lbp::cfg_z_home_speed, kHomeSpeedZU);
-		home.u = configuredSpeed(m_config, lbp::cfg_u_home_speed, kHomeSpeedZU);
+		home.xy = configuredSpeed(m_config, lbp::cfg_xy_home_speed);
+		home.z = configuredSpeed(m_config, lbp::cfg_z_home_speed);
+		home.u = configuredSpeed(m_config, lbp::cfg_u_home_speed);
 		return home;
 	}
 	switch (cmd & 0xFF00 & ~lbp::flag_abs) {
@@ -1130,7 +1130,7 @@ MovementSim::SpeedSet MovementSim::speedsFor(uint16_t cmd) const
 	default: {
 		SpeedSet travel = m_travel_speed;
 		if (travel.xy == 0) {
-			travel.xy = configuredSpeed(m_config, lbp::cfg_idle_speed, kTravelSpeedXY);
+			travel.xy = configuredSpeed(m_config, lbp::cfg_idle_speed);
 		}
 		return travel;
 	}
