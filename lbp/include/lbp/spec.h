@@ -354,11 +354,14 @@ constexpr uint16_t cut_type_scan_bi_y = scan_bi | axis_y;
 // them, the firmware uses its cfg_galvo_* defaults. Dwells (cmd_dwell) never get galvo delays added.
 // See spec.md, "Galvo Delays".
 constexpr uint16_t setting_galvo_delay = cls_settings | 0x0D00;
-// Laser on / off delays ("Laser On TC" / "Laser Off TC"). Arg: int32 us; the on delay may be negative.
+// Laser on / off delays ("Laser On TC" / "Laser Off TC"). Args: uint8 laser index, int32 us; the on delay may be
+// negative. Each laser has its own pair, since each source switches with its own latency; a laser index the machine
+// doesn't have is refused with err_invalid_arg. A disabled laser keeps its delays for when it is enabled.
 // They apply only where a cut move lights or darkens a laser; never to firing in place, never to guide lights.
 // On delay: when a cut move lights a dark laser, it fires this long after the move starts (negative: before).
 // Off delay: when lasers lit by a cut move go dark (travel, cmd_laser_off), they stay lit this long
 // after that cut move ends.
+// The other galvo delays (polygon, end, travel) time the mirrors, which every laser shares: they have no laser index.
 constexpr uint16_t cmd_galvo_laser_on_delay		= setting_galvo_delay | 0x01;
 constexpr uint16_t cmd_galvo_laser_off_delay	= setting_galvo_delay | 0x02;
 // Polygon delay ("Polygon TC"). Arg: int32 us, the full delay. Applied with the laser on at each vertex between two
@@ -901,6 +904,7 @@ constexpr uint16_t cfg_axis_auto_home = cls_cfg | 0x0402;
 // uploaded .lbpcor table (file_type_correction). See cmd_galvo_correction.
 
 // GALVO: machine defaults for the per-layer galvo delays (cmd_galvo_*), same units.
+// The laser on / off defaults apply to every laser until a job sets that laser's delays.
 constexpr uint16_t cfg_galvo_laser_on_delay		= cls_cfg | 0x0F41; // GALVO (stub): microseconds
 constexpr uint16_t cfg_galvo_laser_off_delay	= cls_cfg | 0x0F42; // GALVO (stub): microseconds
 constexpr uint16_t cfg_galvo_polygon_delay		= cls_cfg | 0x0F43; // GALVO (stub): microseconds

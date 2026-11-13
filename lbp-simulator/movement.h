@@ -21,6 +21,8 @@ struct LaserSettings {
 	size_t num_rasters = 0;
 	float raster_powers[lbp::size_max_cmd_args >> 1] = {};
 	int32_t pulse_width_ns = 0; // galvo MOPA sources (cmd_laser_pulse_width)
+	int32_t on_delay_us = 0;	// galvo laser on / off delays (cmd_galvo_laser_on/off_delay); stored, not applied yet
+	int32_t off_delay_us = 0;
 	bool on = false;
 	bool enabled = false;
 
@@ -202,8 +204,6 @@ private:
 	bool m_job_ended = false;	// latching flag to indicate a job has completed.
 
 	// Galvo state (galvo mode only). The simulator stores these; it doesn't simulate their timing yet.
-	int32_t m_galvo_laser_on_delay_us = 0;
-	int32_t m_galvo_laser_off_delay_us = 0;
 	int32_t m_galvo_polygon_delay_us = 0;
 	int32_t m_galvo_end_delay_us = 0;
 	int32_t m_galvo_travel_delay_min_us = 0;

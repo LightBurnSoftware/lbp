@@ -1060,8 +1060,8 @@ Two shapes, framed with the guide light, with the guide light blanked while movi
 ```
 cmd_frame_begin
 cmd_travel_speed_xy        frame speed
-cmd_galvo_laser_on_delay   0          (galvo: all galvo delays are zeroed while framing)
-cmd_galvo_laser_off_delay  0
+cmd_galvo_laser_on_delay   0 0        (galvo: all galvo delays are zeroed while framing; laser 0, 0 us)
+cmd_galvo_laser_off_delay  0 0
 cmd_galvo_polygon_delay    0
 cmd_galvo_end_delay        0
 cmd_galvo_travel_delay     0 0 0
@@ -1078,7 +1078,8 @@ cmd_frame_end
 
 The laser on/off delays apply only to lasers lit by cut moves, never to guide lights, so the firmware toggles the guide light
 exactly where it appears in the sequence. Framing zeroes all galvo delays; the explicit `cmd_dwell` lets the mirrors
-settle before the guide light comes back on.
+settle before the guide light comes back on. (The example zeroes laser 0's on and off delays only: a frame fires no
+laser, so they don't affect it.)
 
 ## Galvo Delays
 A galvo's mirrors lag behind the commanded position: they take time to speed up, trail behind while moving, and
@@ -1087,14 +1088,19 @@ really are. They are the same settings galvo controllers such as EZCAD and BSL u
 
 | Command                     | Arguments                         | Applies                                                              | Also known as        |
 |-----------------------------|-----------------------------------|----------------------------------------------------------------------|----------------------|
-| `cmd_galvo_laser_on_delay`  | int32 μs (may be negative)        | When a cut move lights a dark laser: the laser fires this long after the move starts (negative: before it starts) | Laser On TC          |
-| `cmd_galvo_laser_off_delay` | int32 μs                          | When lasers lit by a cut move go dark (a travel move or `cmd_laser_off`): they stay lit this long after that cut move ends | Laser Off TC         |
+| `cmd_galvo_laser_on_delay`  | uint8 laser index, int32 μs (may be negative) | When a cut move lights that dark laser: it fires this long after the move starts (negative: before it starts) | Laser On TC          |
+| `cmd_galvo_laser_off_delay` | uint8 laser index, int32 μs       | When that laser, lit by a cut move, goes dark (a travel move or `cmd_laser_off`): it stays lit this long after that cut move ends | Laser Off TC         |
 | `cmd_galvo_polygon_delay`   | int32 μs                          | At each vertex between two consecutive cut moves, scaled by the turn angle t: delay × min(t, 90°) / 90° | Polygon TC           |
 | `cmd_galvo_end_delay`       | int32 μs                          | After the last cut move before the lasers go dark: wait this long, measured from the end of that cut move, before continuing | End TC, mark delay   |
 | `cmd_galvo_travel_delay`    | int32 min μs, int32 max μs, int32 dist μm | After each travel move of length d: max if d ≥ dist (or dist ≤ 0), else min + (max − min) × d / dist; none if d = 0 | Jump delay           |
 
 - **Per layer.** LightBurn sends all five with each layer's settings. Each stays in effect until it is changed.
-- **Defaults.** Until a job sets them, the firmware uses its `cfg_galvo_*` defaults.
+- **Per laser: on and off only.** Each laser switches with its own latency, so it has its own on and off delays,
+  named by its laser index (sent for each laser the layer uses). A laser index the machine doesn't have is refused with
+  `err_invalid_arg`; a disabled laser keeps its delays for when it is enabled. The polygon, end and travel delays time
+  the mirrors, which all lasers share, so they have no laser index.
+- **Defaults.** Until a job sets them, the firmware uses its `cfg_galvo_*` defaults. The on and off defaults apply to
+  every laser.
 - **Dwells are exact.** `cmd_dwell` never has a galvo delay added: it waits exactly as long as it says.
 - **Firing in place is never delayed.** `cmd_laser_on` and `cmd_laser_off` with no cut move between them switch the laser
   exactly where they appear, like a dwell.

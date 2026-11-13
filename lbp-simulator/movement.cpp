@@ -38,6 +38,8 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 		break;
 	case lbp::cmd_laser_freq:
 	case lbp::cmd_laser_pulse_width:
+	case lbp::cmd_galvo_laser_on_delay: // uint8 laser index, int32 us
+	case lbp::cmd_galvo_laser_off_delay:
 		expected = 5;
 		break;
 	case lbp::cmd_laser_enable:
@@ -49,8 +51,6 @@ static bool argSizeValid(uint16_t cmd, size_t args, uint32_t &expected)
 	case lbp::cmd_guide_light_off:
 		expected = 1;
 		break;
-	case lbp::cmd_galvo_laser_on_delay:
-	case lbp::cmd_galvo_laser_off_delay:
 	case lbp::cmd_galvo_polygon_delay:
 	case lbp::cmd_galvo_end_delay:
 		expected = 4;
@@ -89,6 +89,8 @@ static bool isLaserIndexCmd(uint16_t cmd)
 	case lbp::cmd_laser_freq:
 	case lbp::cmd_laser_pulse_width:
 	case lbp::cmd_raster_power:
+	case lbp::cmd_galvo_laser_on_delay:
+	case lbp::cmd_galvo_laser_off_delay:
 		return true;
 	default:
 		return false;
@@ -692,7 +694,23 @@ MovementSim::State MovementSim::takeNextCommand()
 			m_job_origin.reset();
 			break;
 		case lbp::cmd_galvo_laser_on_delay:
-		case lbp::cmd_galvo_laser_off_delay:
+		case lbp::cmd_galvo_laser_off_delay: {
+			// Per laser. Stored and logged; the simulator doesn't apply galvo delays to its timing yet.
+			uint8_t index = 0;
+			int32_t us = 0;
+			if (!p.readArgs(index, us)) {
+				badPayload(p);
+				continue;
+			}
+			LaserSettings &laser = index == 0 ? m_laser_1 : m_laser_2; // other indices were refused on arrival
+			const bool on = p.cmd() == lbp::cmd_galvo_laser_on_delay;
+			int32_t &target = on ? laser.on_delay_us : laser.off_delay_us;
+			if (target != us) {
+				gLog().push(Log::DEBUG,
+							QString("Galvo laser %1 %2 delay: %3 us").arg(index).arg(on ? "on" : "off").arg(us));
+			}
+			target = us;
+		} break;
 		case lbp::cmd_galvo_polygon_delay:
 		case lbp::cmd_galvo_end_delay: {
 			// Stored and logged; the simulator doesn't apply galvo delays to its timing yet.
@@ -703,13 +721,7 @@ MovementSim::State MovementSim::takeNextCommand()
 			}
 			QString name = "end";
 			int32_t *target = &m_galvo_end_delay_us;
-			if (p.cmd() == lbp::cmd_galvo_laser_on_delay) {
-				name = "laser on";
-				target = &m_galvo_laser_on_delay_us;
-			} else if (p.cmd() == lbp::cmd_galvo_laser_off_delay) {
-				name = "laser off";
-				target = &m_galvo_laser_off_delay_us;
-			} else if (p.cmd() == lbp::cmd_galvo_polygon_delay) {
+			if (p.cmd() == lbp::cmd_galvo_polygon_delay) {
 				name = "polygon";
 				target = &m_galvo_polygon_delay_us;
 			}
