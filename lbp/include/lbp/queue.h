@@ -68,10 +68,13 @@ public:
 		return true;
 	}
 
-	/** @return the number of items currently queued. */
+	/** @return the maximum number of items the queue can hold. Fixed. */
+	static constexpr size_t capacity() { return Capacity; }
+
+	/** @return the number of items currently queued (like std::vector::size(), not the maximum; see capacity()). */
 	size_t size() const { return m_head - m_tail; }
 
-	/** @return the number of items that can be queued before overflowing. */
+	/** @return the number of items that can be queued before overflowing: capacity() - size(). */
 	size_t freeSpace() const { return Capacity - size(); }
 
 	/** @return true if no items exist in the queue. */

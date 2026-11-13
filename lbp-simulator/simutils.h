@@ -10,7 +10,17 @@
 /** Identifies if a command comes from a job file or transport. */
 enum class CmdSource { File, Wire };
 
-using CmdQueue = lbp::Queue<lbp::CmdPayload, 512>;
+/** No file offset: the command arrived over the connection, not from a job file. */
+constexpr uint32_t kNoFileOffset = UINT32_MAX;
+
+/** A buffered command, with the job-file offset it came from (for job progress reporting). */
+struct QueuedCmd
+{
+	lbp::CmdPayload payload;
+	uint32_t file_offset = kNoFileOffset;
+};
+
+using CmdQueue = lbp::Queue<QueuedCmd, 512>;
 using WireParser = lbp::Parser<4096>;
 using FileParser = lbp::Parser<4096>;
 
@@ -40,6 +50,8 @@ public:
 	void respond(const lbp::MaxPayload &request, int32_t value);
 	/** Queue a cmd_nack rejecting request. */
 	void nack(const lbp::MaxPayload &request, uint16_t code, uint32_t detail = 0);
+	/** Queue an unsolicited cmd_event (txid 0): uint8 kind, uint16 code, uint32 detail. */
+	void event(uint8_t kind, uint16_t code, uint32_t detail);
 	/** @return true if the most recent non-nack response with a transaction id answered txid; copies it to out. */
 	bool lastResponse(uint16_t txid, lbp::CmdMsg &out) const;
 	bool pop(lbp::CmdMsg &out) { return m_q.pop(out); }

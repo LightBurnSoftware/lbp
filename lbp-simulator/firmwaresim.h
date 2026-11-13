@@ -56,6 +56,9 @@ public:
 	/** Simulate a fault (e.g. an open interlock). While active, motion is stopped and refused. */
 	void setFault(bool active);
 
+	/** Switch between gantry and galvo simulation. A full reset: stops everything first. */
+	void setMode(MachineMode mode);
+
 private:
 	/** Process incoming input. */
 	bool process(lbp::MaxPayload &payload);
@@ -65,11 +68,21 @@ private:
 
 	/** Keep the movement queue fed from the job file while a job is executing. */
 	void pumpJob();
-	void beginJob();
-	void endJob();
+	/** Start the loaded job. txid: the cmd_execute's transaction id, reported back in the job's event_result. */
+	void beginJob(uint16_t txid);
+	/**
+	 * End the running job (no-op if none): send the final event_job_progress, then event_result with result
+	 * (0 = ran to the end, err_canceled, err_fault). Call before anything that resets the movement simulator.
+	 */
+	void endJob(uint16_t result);
 	void checkJobComplete();
+	/** Send event_job_progress (progress_bytes_executed) while a job runs: on change, at most every 250 ms; at least every 2 s. */
+	void reportProgress(int64_t dt_ns);
 
 	void updateFwState();
+
+	/** Handle cmd_galvo_correction (galvo mode). */
+	void processCorrection(lbp::MaxPayload &payload);
 
 	WireParser m_parser; // Buffers and parses incoming bytes into messages.
 	Configuration m_config; // Manages reading, writing, and storing config values.
@@ -80,4 +93,8 @@ private:
 	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
 	uint16_t m_last_txid = lbp::txid_none; // Most recent transaction id processed, for retry detection.
 	bool m_fault = false; // Simulated fault, reported as state_fault.
+	uint32_t m_job_size = 0; // Size of the running job file, for the final progress report.
+	uint16_t m_job_txid = lbp::txid_none; // The cmd_execute that started the running job, for its event_result.
+	uint32_t m_last_progress = UINT32_MAX; // Last progress reported (UINT32_MAX: none yet this job).
+	int64_t m_since_progress_ns = 0; // Time since the last progress report.
 };

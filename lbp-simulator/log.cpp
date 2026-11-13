@@ -51,7 +51,7 @@ void Log::warning(const QString &msg)
 	push(Log::WARNING, msg);
 }
 
-QString toQString(const Vec4 &v)
+QString toQString(const Vec8 &v)
 {
 	return QString("(%1, %2, %3, %4)").arg(v.x).arg(v.y).arg(v.z).arg(v.u);
 }

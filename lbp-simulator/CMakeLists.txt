@@ -23,8 +23,9 @@ qt_add_executable(lbp-simulator
     json.hpp
     movement.h movement.cpp
     simstate.h
-    vec4.h vec4.cpp
+    vec8.h
     filesystem.h filesystem.cpp
+    correction.h correction.cpp
     simutils.h simutils.cpp
     transportwidget.h transportwidget.cpp
 )
