@@ -79,19 +79,16 @@ void FirmwareSim::processCorrection(lbp::MaxPayload &payload)
 		return;
 	}
 
-	// Applying: the stored table must fit the current configuration.
+	// Applying: the table's field replaces cfg_field_size while it's applied.
 	const CorrectionTable &table = m_filesystem.correction();
 	if (!table.valid) {
 		m_out_q.nack(payload, lbp::err_wrong_state, m_fw_state);
 		return;
 	}
-	if (table.field_size_um != m_config.getOrDefault(lbp::cfg_field_size)) {
-		gLog().push(Log::WARNING, "Correction table field size doesn't match cfg_field_size");
-		m_out_q.nack(payload, lbp::err_file_mismatch, lbp::lbpcor_field_size_offset);
-		return;
-	}
 	m_movement.setCorrection(&table);
-	gLog().push(Log::INFO, "Correction on");
+	gLog().push(Log::INFO, QString("Correction on: %1 um field (cfg_field_size %2 um)")
+							   .arg(table.field_size_um)
+							   .arg(m_config.getOrDefault(lbp::cfg_field_size)));
 	m_out_q.respond(payload);
 }
 
@@ -276,14 +273,9 @@ bool FirmwareSim::process(lbp::MaxPayload &payload)
 
 	switch (cmd) {
 	case lbp::cmd_commit_cfg: {
-		const int32_t field = m_config.getOrDefault(lbp::cfg_field_size);
 		m_config.commit();
 		gLog().push(Log::INFO, "Config Commit");
-		if (field != m_config.getOrDefault(lbp::cfg_field_size)) {
-			// The table may no longer fit the field: correction goes off until it's applied again.
-			m_movement.setCorrection(nullptr);
-			m_movement.refreshBounds();
-		}
+		m_movement.refreshBounds(); // cfg_field_size may have changed (no effect while a table is applied)
 		m_out_q.respond(payload);
 		return true;
 	}

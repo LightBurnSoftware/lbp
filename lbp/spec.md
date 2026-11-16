@@ -267,7 +267,6 @@ Codes are loosely grouped by their upper byte: `0x01xx` for problems with the re
 | `0x0402` | `err_transfer`       | `cmd_file_chunk` or `cmd_file_end` without a `cmd_file_begin`, or a chunk that would end past the file's declared size. | The declared size, or 0 |
 | `0x0403` | `err_invalid_file`   | The received file failed validation: its CRC-32 doesn't match `cmd_file_end`, its length doesn't match its header, or its contents are malformed. | 0 |
 | `0x0404` | `err_invalid_header` | The received file's header is not recognized or not supported: wrong magic, unsupported version, or values this machine can never accept. | Byte offset of the offending header field |
-| `0x0405` | `err_file_mismatch`  | A valid stored file doesn't fit the current configuration, such as a correction table whose field size differs from `cfg_field_size`. Sent when the file is applied (`cmd_galvo_correction`), not when it is received. | Byte offset of the header field that doesn't match |
 | `0xFFFF` | `err_unknown`        | Catch-all. | 0 |
 
 **Note**
@@ -894,57 +893,83 @@ A galvo's lens and mirrors bend straight lines (bulge, skew, trapezoid) and stre
 The firmware removes that distortion using a **correction table**, uploaded by LightBurn as a file of type
 `file_type_correction`. The table is an `.lbpcor` file. All multi-byte fields are big-endian.
 
-| Part    | Contents                                                                                  |
-|---------|-------------------------------------------------------------------------------------------|
-| Header  | `header_size` bytes, described below.                                                     |
-| Grid    | `grid_x * grid_y` nodes. Each node is an int32 `dx` then an int32 `dy`, in micrometers.   |
+| Part    | Contents                                                                              |
+|---------|---------------------------------------------------------------------------------------|
+| Header  | `header_size` bytes, described below.                                                 |
+| Grid    | `grid_size * grid_size` cells, in the format `cell_format` names.                     |
 
 The file has no checksum of its own; the transfer's `cmd_file_end` carries its CRC-32. Its length is exactly
-`header_size + grid_x * grid_y * 8` bytes.
+`header_size + grid_size * grid_size * 8` bytes (for `cell_format` 1, the only format so far).
 
-**Header** (version 1, 20 bytes):
+**Header** (version 1, 24 bytes):
 
-| Field          | Type   | Value                                                                  |
-|----------------|--------|------------------------------------------------------------------------|
-| `magic`        | uint32 | `0x4C425043`, ASCII `LBPC` (`lbpcor_magic`)                            |
-| `version`      | uint16 | `1` (`lbpcor_version`)                                                 |
-| `header_size`  | uint16 | Size of the header in bytes; `20` for version 1                        |
-| `grid_x`       | uint16 | Nodes per row: `65`                                                    |
-| `grid_y`       | uint16 | Rows: `65`                                                             |
-| `layers`       | uint16 | `1`                                                                    |
-| `flags`        | uint16 | Linear corrections baked into the table (below)                        |
-| `field_size`   | int32  | Field span covered by the grid, edge to edge (μm). The field is square. |
+| Offset | Field          | Type    | Value                                                                    |
+|--------|----------------|---------|--------------------------------------------------------------------------|
+| 0      | `magic`        | char[8] | ASCII `LBP_COR` followed by a zero byte (`lbpcor_magic`)                 |
+| 8      | `version`      | uint16  | `1` (`lbpcor_version`)                                                   |
+| 10     | `header_size`  | uint16  | Size of the header in bytes; `24` for version 1                          |
+| 12     | `field_size`   | int32   | Field span covered by the grid, edge to edge (μm). The field is square.  |
+| 16     | `grid_size`    | uint16  | Nodes per side. Odd, and at least `3` (EZCAD3 uses `65`).                |
+| 18     | `axis_flags`   | uint8   | The head's orientation (below). For LightBurn.                           |
+| 19     | `composition`  | uint8   | The corrections the table holds (below). For LightBurn.                  |
+| 20     | `cell_format`  | uint8   | `1` (`lbpcor_cell_int32_nm`): each cell is an int32 `dx` then an int32 `dy`, in nanometers. |
+| 21     | reserved       | 3 bytes | Written as `0`, ignored on read.                                         |
 
 A reader skips any header bytes past the fields it knows, using `header_size`, so later versions can add fields.
 
-**Grid.** Nodes are stored row by row, with x varying fastest. Node (`col`, `row`) sits at
-`x = -field_size/2 + col * field_size / (grid_x - 1)` and
-`y = -field_size/2 + row * field_size / (grid_y - 1)`, so row 0 is the most negative y.
-Coordinates are field-centre coordinates, the same as `cut_from_absolute` positions on the wire.
+**Grid.** Cells are stored row by row, with x varying fastest; row 0 is the most negative y. With
+`c = (grid_size - 1) / 2` (the centre node) and `step = field_size / (grid_size - 1)`, node (`col`, `row`) sits at
+`x = (col - c) * step`, `y = (row - c) * step`. For a 65-node grid this is EZCAD3's `(col - 32) * GridSize`.
+Coordinates are field-centre coordinates, the same as `cut_from_absolute` positions on the wire (LightBurn has
+already applied its axis swap and inversion).
 
-**Applying the table.** Each node stores the field's **distortion** at that point: where the beam actually lands,
+**Applying the table.** Each cell stores the field's **distortion** at that node: where the beam actually lands,
 minus where it was commanded. To correct a target point `p`, the firmware interpolates the grid bilinearly at `p` and
-**subtracts** the result: it commands `p - grid(p)`. (This is the EZCAD3 convention.) An all-zero table applies no correction.
+**subtracts** the result: it commands `p - grid(p)`. (This is the EZCAD3 convention.) An all-zero table applies no
+correction. Cells are nanometers while positions are micrometers, and the interpolation multiplies cells by
+fractional weights, so do this arithmetic in 64-bit integers or floating point.
 
-**Flags.** The table can also carry linear corrections: whatever linear error was present when the grid was measured.
-`flags` records which ones are baked in, so the same correction is not also applied by LightBurn:
+**Axis flags.** The head's orientation when the table was made: EZCAD3's `.cor` `Mode`, decoded.
 
-| Bit    | Name                    | Meaning                          |
-|--------|-------------------------|----------------------------------|
-| `0x01` | `lbpcor_flag_scale`     | Field scale is in the table.     |
-| `0x02` | `lbpcor_flag_rotation`  | Field rotation is in the table.  |
-| `0x04` | `lbpcor_flag_offset`    | Field offset is in the table.    |
+| Bit    | Name                    | Meaning                 |
+|--------|-------------------------|-------------------------|
+| `0x01` | `lbpcor_axis_swap`      | Galvo 2 drives X.       |
+| `0x02` | `lbpcor_axis_invert_x`  | X polarity is reversed. |
+| `0x04` | `lbpcor_axis_invert_y`  | Y polarity is reversed. |
 
-Bits 3–15 are reserved and must be `0`. The firmware ignores `flags` and applies the table as written.
-LightBurn reads them before uploading, and uses identity (scale 1, rotation 0, offset 0) for each part of its
-own field transform whose bit is set. Bulge, skew and trapezoid are always the table's job.
+**Composition.** Which corrections the table holds:
+
+| Bit    | Name                    | Meaning                                                         |
+|--------|-------------------------|-----------------------------------------------------------------|
+| `0x01` | `lbpcor_has_scale`      | Field scale.                                                    |
+| `0x02` | `lbpcor_has_rotation`   | Field rotation.                                                 |
+| `0x04` | `lbpcor_has_offset`     | Field offset.                                                   |
+| `0x08` | `lbpcor_has_skew`       | Skew (parallelism).                                             |
+| `0x10` | `lbpcor_has_bulge`      | Bulge (pillow, barrel).                                         |
+| `0x20` | `lbpcor_has_trapezoid`  | Trapezoid (keystone).                                           |
+| `0x40` | `lbpcor_has_residual`   | Measured detail beyond these terms: the table can't be rebuilt from parameters. |
+
+The firmware ignores `axis_flags` and `composition` and applies the table as written. They tell LightBurn how
+the table was made. While the table is in use, LightBurn takes its axis swap and inversion from `axis_flags`
+in place of the device's own settings, and uses identity (scale 1, rotation 0, offset 0) for each part of its own
+field transform that `composition` says the table holds, so nothing is applied twice.
 
 **Receiving the file.** At `cmd_file_end`, after the transfer's CRC-32 check, the firmware checks the file **on its own**:
-a length that does not match the header is rejected with `err_invalid_file`; an unrecognized magic, an unsupported version, or a
-header value this machine can never accept is rejected with `err_invalid_header`, with the byte offset of the offending
-field as the detail. A file that passes is **stored, but not applied**: it replaces any previously stored table,
-and correction is off until it is applied with `cmd_galvo_correction`. Whether the table fits the machine's current
-configuration is checked when it is applied, not when it is received.
+
+| Problem                                                                    | Error                | Detail                     |
+|----------------------------------------------------------------------------|----------------------|----------------------------|
+| Unrecognized `magic`                                                       | `err_invalid_header` | `0`                        |
+| Unsupported `version`                                                      | `err_invalid_header` | `8`                        |
+| `header_size` less than `24`                                               | `err_invalid_header` | `10`                       |
+| `field_size` not positive                                                  | `err_invalid_header` | `12`                       |
+| `grid_size` even, less than `3`, or larger than this firmware can hold     | `err_invalid_header` | `16`                       |
+| Unsupported `cell_format`                                                  | `err_invalid_header` | `20`                       |
+| Length doesn't match the header                                            | `err_invalid_file`   | `0`                        |
+| *(optional)* A cell's `dx` or `dy` is larger than half the field           | `err_invalid_file`   | `0`                        |
+
+The last check is optional; it catches a table written in micrometers by mistake. A file that passes is **stored,
+but not applied**: it replaces any previously stored table, and correction is off until it is applied with
+`cmd_galvo_correction`.
 
 **Lifetime.** LightBurn keeps the correction file and uploads it on every connection. Firmware may keep the
 table across power cycles, but is not required to, and LightBurn never reads a table back.
@@ -955,31 +980,26 @@ table across power cycles, but is not required to, and LightBurn never reads a t
 |------------------------|---------------------------|----------|
 | `cmd_galvo_correction` | uint8 enable (`0` or `1`) | 1        |
 
-`cmd_galvo_correction` with `1` **applies** the stored table. The firmware first checks the table against its
-current configuration, and refuses the request if it does not fit:
+`cmd_galvo_correction` with `1` **applies** the stored table. If no valid table is stored it is refused with
+`err_wrong_state` (detail: the state flags).
 
-| Problem                                                           | Error               | Detail                                   |
-|-------------------------------------------------------------------|---------------------|------------------------------------------|
-| No valid table is stored                                          | `err_wrong_state`   | state flags                              |
-| `field_size` differs from `cfg_field_size`                        | `err_file_mismatch` | byte offset of the mismatched header field (`16`) |
+**The table's field replaces the configured one.** While a table is applied, the firmware uses the table's
+`field_size` in place of `cfg_field_size`, both to map positions onto the mirrors and as the field's limits.
+A correction table is made by measuring the lens, and its field is the measured one: an EZCAD3 table for a
+"100 mm" lens may say 78.82 mm. (EZCAD3 does the same: the `.cor` file's field wins.) `cfg_field_size` keeps its
+stored value, and is used again once correction is off. LightBurn shows the table's field as the workspace.
 
-A table made for a different field almost always means a stale table from another lens, or a mistyped field size,
-so the firmware refuses it rather than guessing. LightBurn reports the mismatch to the user.
+`cmd_galvo_correction` with `0` stops applying the table; the table stays stored, and the configured field is back
+in use. LightBurn does this while its correction wizard marks a test pattern, so it measures the lens's raw
+distortion, and applies the table again when the wizard closes.
 
-`cmd_galvo_correction` with `0` stops applying the table; the table stays stored. LightBurn does this while its
-correction wizard marks a test pattern, so it measures the lens's raw distortion, and applies the table again when
-the wizard closes.
-
-Correction is **off** until applied, and goes back to off when:
-- a new table is received;
-- `cfg_field_size` changes, since the table may no longer fit.
-
-Otherwise it keeps its last state; in particular, a handshake does not change it (the handshake has no side effects).
-LightBurn uploads and applies the table on every connection, so a host that disconnects mid-calibration leaves
-correction off only until it reconnects.
+Correction is **off** until applied, and goes back to off when a new table is received. Otherwise it keeps its last
+state; in particular, a handshake does not change it (the handshake has no side effects), and neither does a change
+to `cfg_field_size`. LightBurn uploads and applies the table on every connection, so a host that disconnects
+mid-calibration leaves correction off only until it reconnects.
 
 On connecting, LightBurn sends the configuration, uploads the table, then applies it. Firmware that keeps the table
-across power cycles may also apply it at power-on, for operation without a host, provided it makes the same check.
+across power cycles may also apply it at power-on, for operation without a host.
 
 ### Executing a Job
 Lightburn will concatenate all the commands for a job into a **file** and send using the commands listed above.

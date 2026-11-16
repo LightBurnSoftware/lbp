@@ -127,15 +127,18 @@ public:
 	void setMode(MachineMode mode);
 	MachineMode mode() const { return m_mode; }
 
-	/** @brief Recompute travel limits from the mode and configuration (e.g. after cfg_field_size changes). */
+	/** @brief Recompute travel limits from the mode and the field in use (e.g. after cfg_field_size changes). */
 	void refreshBounds();
 
 	/**
 	 * @brief Set the lens correction applied to galvo motion (cmd_galvo_correction), or nullptr for none.
-	 * The caller checks that the table fits first, owns it, and turns correction off before replacing or
-	 * dropping it. Turned off by setMode.
+	 * While a table is applied, its field replaces cfg_field_size (the travel limits follow).
+	 * The caller owns the table, and turns correction off before replacing or dropping it. Turned off by setMode.
 	 */
-	void setCorrection(const CorrectionTable *table) { m_correction = table; }
+	void setCorrection(const CorrectionTable *table);
+
+	/** @return the galvo field in use, in um: the applied correction table's, else cfg_field_size. */
+	int32_t fieldSize() const;
 
 private:
 	enum class State { Idle, Jogging, Moving, Dwelling, Paused };

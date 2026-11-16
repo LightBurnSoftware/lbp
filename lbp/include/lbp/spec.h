@@ -157,7 +157,6 @@ constexpr uint16_t err_storage_full		= 0x0401; // not enough space for the file.
 constexpr uint16_t err_transfer			= 0x0402; // chunk/end without a file_begin, or a chunk past the file's size. Detail: the declared size, or 0.
 constexpr uint16_t err_invalid_file		= 0x0403; // file failed validation (checksum, length, malformed contents).
 constexpr uint16_t err_invalid_header	= 0x0404; // file header not recognized or not supported. Detail: byte offset of the offending field.
-constexpr uint16_t err_file_mismatch	= 0x0405; // a valid stored file does not fit the current configuration. Detail: byte offset of the header field that doesn't match.
 
 // 0xD0xx: reserved for vendor-specific codes.
 
@@ -242,23 +241,39 @@ constexpr uint8_t file_type_correction	= 0x02; // galvo lens correction table: a
 constexpr uint16_t cmd_mainboard_version = cls_files | 0x05B0; // TODO
 
 // GALVO: .lbpcor, the galvo lens correction table (file_type_correction). See spec.md, "Lens Correction Files".
-// Layout, big-endian: header, then grid_x * grid_y (dx, dy) int32 micrometer pairs (row-major, x fastest).
+// Layout, big-endian: a header, then grid_size * grid_size cells (row-major, x fastest, row 0 at -y).
 // No checksum of its own: the transfer's cmd_file_end carries the file's CRC-32.
-// Header: uint32 magic, uint16 version, uint16 header_size, uint16 grid_x, uint16 grid_y, uint16 layers,
-//         uint16 flags, int32 field_size (um; the field is square).
-// Readers skip header bytes beyond the fields they know, using header_size.
-constexpr uint32_t lbpcor_magic			= 0x4C425043; // 'LBPC'
+// Header (24 bytes): char[8] magic, uint16 version, uint16 header_size, int32 field_size (um; the field is square),
+//         uint16 grid_size (odd, >= 3), uint8 axis_flags, uint8 composition, uint8 cell_format, 3 reserved bytes.
+// Readers skip header bytes beyond the fields they know, using header_size. Reserved bytes are written as 0 and
+// ignored on read. Offsets below are the err_invalid_header details.
+constexpr char lbpcor_magic[8]			= {'L', 'B', 'P', '_', 'C', 'O', 'R', '\0'};
 constexpr uint16_t lbpcor_version		= 1;
-constexpr uint16_t lbpcor_header_size	= 20; // size of the version 1 header, in bytes
-constexpr uint16_t lbpcor_field_size_offset = 16; // byte offset of field_size in the header
-constexpr uint16_t lbpcor_grid_size		= 65; // grid_x and grid_y: 65 x 65 nodes
-constexpr uint16_t lbpcor_layers		= 1;
-// flags: which linear corrections are baked into the table. The firmware ignores them; LightBurn uses
-// identity for each baked-in part of its own field transform so it isn't applied twice.
-constexpr uint16_t lbpcor_flag_scale	= 0x0001;
-constexpr uint16_t lbpcor_flag_rotation	= 0x0002;
-constexpr uint16_t lbpcor_flag_offset	= 0x0004;
-constexpr uint16_t lbpcor_flags_reserved = 0xFFF8; // must be 0
+constexpr uint16_t lbpcor_header_size	= 24; // size of the version 1 header, in bytes
+constexpr uint16_t lbpcor_offset_magic			= 0;
+constexpr uint16_t lbpcor_offset_version		= 8;
+constexpr uint16_t lbpcor_offset_header_size	= 10;
+constexpr uint16_t lbpcor_offset_field_size		= 12; // int32 um
+constexpr uint16_t lbpcor_offset_grid_size		= 16; // uint16
+constexpr uint16_t lbpcor_offset_axis_flags		= 18; // uint8
+constexpr uint16_t lbpcor_offset_composition	= 19; // uint8
+constexpr uint16_t lbpcor_offset_cell_format	= 20; // uint8
+// cell_format: how each cell is stored.
+constexpr uint8_t lbpcor_cell_int32_nm	= 1; // int32 dx, int32 dy, in nanometers (8 bytes per cell)
+// axis_flags and composition are for LightBurn; the firmware ignores them and applies the table as written.
+// axis_flags: the head's orientation (EZCAD3's .cor Mode, decoded). While the table is in use, LightBurn uses
+// these in place of the device's own swap and invert settings.
+constexpr uint8_t lbpcor_axis_swap		= 0x01; // galvo 2 drives X
+constexpr uint8_t lbpcor_axis_invert_x	= 0x02;
+constexpr uint8_t lbpcor_axis_invert_y	= 0x04;
+// composition: which corrections the table holds, so LightBurn doesn't also apply them.
+constexpr uint8_t lbpcor_has_scale		= 0x01;
+constexpr uint8_t lbpcor_has_rotation	= 0x02;
+constexpr uint8_t lbpcor_has_offset		= 0x04;
+constexpr uint8_t lbpcor_has_skew		= 0x08;
+constexpr uint8_t lbpcor_has_bulge		= 0x10;
+constexpr uint8_t lbpcor_has_trapezoid	= 0x20;
+constexpr uint8_t lbpcor_has_residual	= 0x40; // measured detail beyond the parametric terms
 
 // ----------------------------------------------------------------------------
 // 0x5000: Settings -----------------------------------------------------------
@@ -377,11 +392,10 @@ constexpr uint16_t cmd_galvo_end_delay			= setting_galvo_delay | 0x04;
 constexpr uint16_t cmd_galvo_travel_delay		= setting_galvo_delay | 0x05;
 
 // GALVO: apply (1) or stop applying (0) the stored lens correction table (file_type_correction).
-// Arg: uint8 enable (0 or 1). Uploading a table stores it but does not apply it; enabling checks the stored
-// table against the current configuration, then applies it. Refused with err_wrong_state if no valid table
-// is stored, or err_file_mismatch if the table does not fit the configuration (e.g. its field size differs
-// from cfg_field_size). Correction is off until enabled, and off again after a new table is uploaded
-// or a change to cfg_field_size. Otherwise it keeps its last state.
+// Arg: uint8 enable (0 or 1). Uploading a table stores it but does not apply it. Enabling applies it, and
+// refuses with err_wrong_state if no valid table is stored. While a table is applied, its field_size replaces
+// cfg_field_size; disabling restores the configured field. Correction is off until enabled, and off again after
+// a new table is uploaded. Otherwise it keeps its last state.
 // LightBurn sends the configuration, uploads the table, then enables it; and disables correction while its
 // correction wizard marks an uncorrected test pattern.
 constexpr uint16_t cmd_galvo_correction = cls_settings | 0x0C0E;
@@ -819,6 +833,7 @@ constexpr uint16_t cfg_v_step_length		= axis_id_v | axis_step_length;
 // Field size is its span, edge to edge, in micrometers: the same on both mirror axes. Galvo coordinates on the
 // wire stay in micrometers; the firmware converts them to its own mirror command units by mapping
 // +/- size/2 onto its full command range (which only the firmware knows).
+// While a lens correction table is applied (cmd_galvo_correction), the table's field_size is used instead.
 constexpr uint16_t cfg_field_size	= cls_cfg | 0x0F10;	// GALVO: int32 micrometers
 
 // User Origin
@@ -902,6 +917,7 @@ constexpr uint16_t cfg_axis_auto_home = cls_cfg | 0x0402;
 // Field offset, rotation, flips and axis swap are applied by LightBurn before sending.
 // Lens correction (bulge, skew, trapezoid, and usually scale) is applied by the firmware, from an
 // uploaded .lbpcor table (file_type_correction). See cmd_galvo_correction.
+// (While a table is in use, LightBurn takes the swap and flips from the table's axis_flags.)
 
 // GALVO: machine defaults for the per-layer galvo delays (cmd_galvo_*), same units.
 // The laser on / off defaults apply to every laser until a job sets that laser's delays.

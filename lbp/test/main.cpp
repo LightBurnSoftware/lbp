@@ -72,7 +72,7 @@ int main()
 		assert(wire[0] == 0x90 && wire[1] == 0x6e);
 	}
 
-	// .lbpcor trailer is CRC-32 (zlib): check value 0xCBF43926.
+	// File transfers end with a CRC-32 (zlib, cmd_file_end): check value 0xCBF43926.
 	{
 		const uint8_t check[] = {'1', '2', '3', '4', '5', '6', '7', '8', '9'};
 		assert(lbp::crc32(check, sizeof(check)) == 0xCBF43926u);

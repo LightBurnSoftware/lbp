@@ -196,13 +196,24 @@ void MovementSim::refreshBounds()
 	m_max_pos = gantryMaxPos();
 	if (m_mode == MachineMode::Galvo) {
 		// The marking field is centred on (0,0). Z and U keep their gantry limits (e.g. a lift axis).
-		const int32_t field = m_config.getOrDefault(lbp::cfg_field_size); // square
+		const int32_t field = fieldSize(); // square
 		m_min_pos.x = -field / 2;
 		m_max_pos.x = field / 2;
 		m_min_pos.y = -field / 2;
 		m_max_pos.y = field / 2;
 	}
 	m_pos = applyLimits(m_pos);
+}
+
+void MovementSim::setCorrection(const CorrectionTable *table)
+{
+	m_correction = table;
+	refreshBounds(); // the table's field replaces cfg_field_size while it's applied
+}
+
+int32_t MovementSim::fieldSize() const
+{
+	return m_correction != nullptr ? m_correction->field_size_um : m_config.getOrDefault(lbp::cfg_field_size);
 }
 
 bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source, uint32_t file_offset)
@@ -873,8 +884,8 @@ void MovementSim::step(double dt_s)
 
 			m_pos = applyLimits(advance(m_move.start, m_move.delta, m_move.progress()));
 			if (m_correction != nullptr) {
-				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's distortion,
-				// interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"). It does this for every point
+				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's distortion
+				// (nm), interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"). It does this for every point
 				// it outputs along the move, not just the endpoints: the distortion isn't linear, so a corrected
 				// straight line is a curve in mirror space. The simulator draws the uncorrected (intended) path.
 			}

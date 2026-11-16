@@ -6,17 +6,8 @@
 #include <lbp/beio.h>
 #include <lbp/spec.h>
 
-// Byte offsets of the version 1 header fields (spec.md, "Lens Correction Files").
-namespace {
-constexpr uint32_t kOffMagic = 0;
-constexpr uint32_t kOffVersion = 4;
-constexpr uint32_t kOffHeaderSize = 6;
-constexpr uint32_t kOffGridX = 8;
-constexpr uint32_t kOffGridY = 10;
-constexpr uint32_t kOffLayers = 12;
-constexpr uint32_t kOffFlags = 14;
-constexpr uint32_t kOffField = lbp::lbpcor_field_size_offset;
-} // namespace
+#include <cstdlib>
+#include <cstring>
 
 uint16_t CorrectionTable::parse(const QByteArray &data, uint32_t &detail)
 {
@@ -31,63 +22,63 @@ uint16_t CorrectionTable::parse(const QByteArray &data, uint32_t &detail)
 	}
 
 	// Header: check each field, reporting the first bad one by its offset.
-	if (lbp::readBE32(p + kOffMagic) != lbp::lbpcor_magic) {
-		detail = kOffMagic;
+	if (std::memcmp(p + lbp::lbpcor_offset_magic, lbp::lbpcor_magic, sizeof(lbp::lbpcor_magic)) != 0) {
+		detail = lbp::lbpcor_offset_magic;
 		return lbp::err_invalid_header;
 	}
-	if (lbp::readBE16(p + kOffVersion) != lbp::lbpcor_version) {
-		detail = kOffVersion;
+	if (lbp::readBE16(p + lbp::lbpcor_offset_version) != lbp::lbpcor_version) {
+		detail = lbp::lbpcor_offset_version;
 		return lbp::err_invalid_header;
 	}
-	const uint16_t header_size = lbp::readBE16(p + kOffHeaderSize);
+	const uint16_t header_size = lbp::readBE16(p + lbp::lbpcor_offset_header_size);
 	if (header_size < lbp::lbpcor_header_size) {
-		detail = kOffHeaderSize;
+		detail = lbp::lbpcor_offset_header_size;
 		return lbp::err_invalid_header;
 	}
-	const uint16_t grid_x_val = lbp::readBE16(p + kOffGridX);
-	if (grid_x_val != lbp::lbpcor_grid_size) {
-		detail = kOffGridX;
-		return lbp::err_invalid_header;
-	}
-	const uint16_t grid_y_val = lbp::readBE16(p + kOffGridY);
-	if (grid_y_val != lbp::lbpcor_grid_size) {
-		detail = kOffGridY;
-		return lbp::err_invalid_header;
-	}
-	if (lbp::readBE16(p + kOffLayers) != lbp::lbpcor_layers) {
-		detail = kOffLayers;
-		return lbp::err_invalid_header;
-	}
-	const uint16_t flags_val = lbp::readBE16(p + kOffFlags);
-	if ((flags_val & lbp::lbpcor_flags_reserved) != 0) {
-		detail = kOffFlags;
-		return lbp::err_invalid_header;
-	}
-	const int32_t field = (int32_t) lbp::readBE32(p + kOffField);
+	const int32_t field = (int32_t) lbp::readBE32(p + lbp::lbpcor_offset_field_size);
 	if (field <= 0) {
-		detail = kOffField;
+		detail = lbp::lbpcor_offset_field_size;
+		return lbp::err_invalid_header;
+	}
+	// Odd, so a node sits at the field centre; no upper limit beyond what this simulator can hold.
+	const uint16_t grid = lbp::readBE16(p + lbp::lbpcor_offset_grid_size);
+	if (grid < 3 || (grid % 2) == 0) {
+		detail = lbp::lbpcor_offset_grid_size;
+		return lbp::err_invalid_header;
+	}
+	if (p[lbp::lbpcor_offset_cell_format] != lbp::lbpcor_cell_int32_nm) {
+		detail = lbp::lbpcor_offset_cell_format;
 		return lbp::err_invalid_header;
 	}
 
 	// Length. (No checksum of its own: the transfer's cmd_file_end CRC-32 was already checked.)
-	const size_t nodes = size_t(grid_x_val) * grid_y_val;
+	const size_t nodes = size_t(grid) * grid;
 	if (size != header_size + nodes * 8) {
 		return lbp::err_invalid_file;
 	}
 
-	// Grid: (dx, dy) int32 pairs after the header.
-	dx_um.resize(nodes);
-	dy_um.resize(nodes);
+	// Grid: (dx, dy) int32 nanometer pairs after the header.
+	// The optional magnitude check: a cell larger than half the field is a broken table, most likely
+	// one written in micrometers.
+	const int64_t limit_nm = int64_t(field) * 500;
+	dx_nm.resize(nodes);
+	dy_nm.resize(nodes);
 	const uint8_t *g = p + header_size;
 	for (size_t i = 0; i < nodes; i++) {
-		dx_um[i] = (int32_t) lbp::readBE32(g + i * 8);
-		dy_um[i] = (int32_t) lbp::readBE32(g + i * 8 + 4);
+		const int32_t dx = (int32_t) lbp::readBE32(g + i * 8);
+		const int32_t dy = (int32_t) lbp::readBE32(g + i * 8 + 4);
+		if (std::llabs(dx) > limit_nm || std::llabs(dy) > limit_nm) {
+			*this = CorrectionTable();
+			return lbp::err_invalid_file;
+		}
+		dx_nm[i] = dx;
+		dy_nm[i] = dy;
 	}
 
-	flags = flags_val;
 	field_size_um = field;
-	grid_x = grid_x_val;
-	grid_y = grid_y_val;
+	grid_size = grid;
+	axis_flags = p[lbp::lbpcor_offset_axis_flags];
+	composition = p[lbp::lbpcor_offset_composition];
 	valid = true;
 	return 0;
 }

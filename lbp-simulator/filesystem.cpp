@@ -331,8 +331,10 @@ uint16_t FileSystem::finishCorrection(uint32_t &detail)
 
 	m_correction = std::move(table);
 	m_new_correction = true;
-	gLog().push(Log::INFO, QString("Correction table stored: %1 um field, flags 0x%2")
+	gLog().push(Log::INFO, QString("Correction table stored: %1 x %1 grid, %2 um field, axis flags 0x%3, composition 0x%4")
+								.arg(m_correction.grid_size)
 								.arg(m_correction.field_size_um)
-								.arg(m_correction.flags, 0, 16));
+								.arg(m_correction.axis_flags, 2, 16, QChar('0'))
+								.arg(m_correction.composition, 2, 16, QChar('0')));
 	return 0;
 }
