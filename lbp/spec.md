@@ -1097,7 +1097,7 @@ really are. They are the same settings galvo controllers such as EZCAD and BSL u
 |-----------------------------|-----------------------------------|----------------------------------------------------------------------|----------------------|
 | `cmd_galvo_laser_on_delay`  | uint8 laser index, int32 μs (may be negative) | When a cut move lights that dark laser: it fires this long after the move starts (negative: before it starts) | Laser On TC          |
 | `cmd_galvo_laser_off_delay` | uint8 laser index, int32 μs       | When that laser, lit by a cut move, goes dark (a travel move or `cmd_laser_off`): it stays lit this long after that cut move ends | Laser Off TC         |
-| `cmd_galvo_polygon_delay`   | int32 μs                          | At each vertex between two consecutive cut moves, scaled by the turn angle t: delay × min(t, 90°) / 90° | Polygon TC           |
+| `cmd_galvo_polygon_delay`   | int32 μs                          | At each vertex between two consecutive cut moves, scaled by the turn angle. | Polygon TC           |
 | `cmd_galvo_end_delay`       | int32 μs                          | After the last cut move before the lasers go dark: wait this long, measured from the end of that cut move, before continuing | End TC, mark delay   |
 | `cmd_galvo_travel_delay`    | int32 min μs, int32 max μs, int32 dist μm | After each travel move of length d: max if d ≥ dist (or dist ≤ 0), else min + (max − min) × d / dist; none if d = 0 | Jump delay           |
 
