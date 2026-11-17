@@ -150,7 +150,7 @@ void CorrectionTable::locate(int32_t pos_um, uint32_t &cell, uint32_t &frac) con
 	}
 }
 
-void CorrectionTable::distortion(int32_t x_um, int32_t y_um, int32_t &dx_nm, int32_t &dy_nm) const
+void CorrectionTable::correction(int32_t x_um, int32_t y_um, int32_t &dx_nm, int32_t &dy_nm) const
 {
 	if (!valid()) {
 		dx_nm = dy_nm = 0;
@@ -175,7 +175,7 @@ void CorrectionTable::distortion(int32_t x_um, int32_t y_um, int32_t &dx_nm, int
 void CorrectionTable::correct(int32_t x_um, int32_t y_um, int64_t &x_nm, int64_t &y_nm) const
 {
 	int32_t dx, dy;
-	distortion(x_um, y_um, dx, dy);
+	correction(x_um, y_um, dx, dy);
 	x_nm = int64_t(x_um) * 1000 - dx;
 	y_nm = int64_t(y_um) * 1000 - dy;
 }

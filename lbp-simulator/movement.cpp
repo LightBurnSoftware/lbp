@@ -884,7 +884,7 @@ void MovementSim::step(double dt_s)
 
 			m_pos = applyLimits(advance(m_move.start, m_move.delta, m_move.progress()));
 			if (m_correction != nullptr) {
-				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's distortion
+				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's correction
 				// (nm), interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"): m_correction->correct(). It does this for every point
 				// it outputs along the move, not just the endpoints: the distortion isn't linear, so a corrected
 				// straight line is a curve in mirror space. The simulator draws the uncorrected (intended) path.

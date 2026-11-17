@@ -261,7 +261,8 @@ constexpr uint16_t lbpcor_offset_axis_flags		= 18; // uint8
 constexpr uint16_t lbpcor_offset_composition	= 19; // uint8
 constexpr uint16_t lbpcor_offset_cell_format	= 20; // uint8
 // cell_format: how each cell is stored.
-constexpr uint8_t lbpcor_cell_int32_nm	= 1; // int32 dx, int32 dy, in nanometers (8 bytes per cell)
+constexpr uint8_t lbpcor_cell_int32_nm	= 1; // int32 dx, int32 dy, in nanometers (8 bytes per cell): the correction
+												// for a target at that node; the firmware commands p - grid(p)
 // axis_flags and composition are for LightBurn; the firmware ignores them and applies the table as written.
 // axis_flags: the head's orientation (EZCAD3's .cor Mode, decoded). While the table is in use, LightBurn uses
 // these in place of the device's own swap and invert settings.

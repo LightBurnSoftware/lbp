@@ -898,10 +898,11 @@ A reader skips any header bytes past the fields it knows, using `header_size`, s
 Coordinates are field-centre coordinates, the same as `cut_from_absolute` positions on the wire (LightBurn has
 already applied its axis swap and inversion).
 
-**Applying the table.** Each cell stores the field's **distortion** at that node: where the beam actually lands,
-minus where it was commanded. To correct a target point `p`, the firmware interpolates the grid bilinearly at `p` and
-**subtracts** the result: it commands `p - grid(p)`. An all-zero table applies no
-correction. A point outside the field takes the correction of the nearest point on the field's edge: clamp each
+**Applying the table.** Each cell stores the **correction** for a target at that node: the amount to subtract from the
+target so the beam lands on it. To correct a target point `p`, the firmware interpolates the grid bilinearly at `p` and
+**subtracts** the result: it commands `p - grid(p)`. These are not the raw measured distortion (where a commanded
+point lands, minus the command): the two differ wherever the distortion varies across the field, and LightBurn works
+out the correction when it builds the table. An all-zero table applies no correction. A point outside the field takes the correction of the nearest point on the field's edge: clamp each
 coordinate of `p` to `±field_size / 2` for the lookup only (still subtract the result from the unclamped `p`), and
 never extrapolate the grid. Cells are nanometers while positions are micrometers, and the interpolation multiplies cells by
 fractional weights, so do this arithmetic in 64-bit integers or floating point.

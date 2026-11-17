@@ -46,7 +46,7 @@ std::vector<uint8_t> makeLbpCor(int32_t field_um, uint16_t grid, const CellFn &c
 }
 
 // The spec's interpolation, written plainly in double: the reference the fixed-point version is held to.
-void referenceDistortion(const lbpexamples::CorrectionTable &t, double x_um, double y_um, double &dx, double &dy)
+void referenceCorrection(const lbpexamples::CorrectionTable &t, double x_um, double y_um, double &dx, double &dy)
 {
 	const int n = t.gridSize();
 	auto locate = [&](double pos, int &cell, double &frac) {
@@ -116,8 +116,8 @@ void checkAgainstReference(const lbpexamples::CorrectionTable &t, uint32_t seed,
 		const int32_t y = int32_t(int64_t(nextRandom(seed) % uint32_t(span)) - span / 2);
 		int32_t dx, dy;
 		double rx, ry;
-		t.distortion(x, y, dx, dy);
-		referenceDistortion(t, x, y, rx, ry);
+		t.correction(x, y, dx, dy);
+		referenceCorrection(t, x, y, rx, ry);
 		if (std::fabs(dx - rx) > limit || std::fabs(dy - ry) > limit) {
 			std::cout << "lbpcor: field " << t.fieldSize() << " grid " << t.gridSize() << " at (" << x << ", " << y
 					  << "): (" << dx << ", " << dy << ") vs (" << rx << ", " << ry << "), tolerance " << limit
@@ -215,7 +215,7 @@ void testCorrectionTable()
 	{
 		CorrectionTable t;
 		int32_t dx = 1, dy = 1;
-		t.distortion(1234, -5678, dx, dy);
+		t.correction(1234, -5678, dx, dy);
 		assert(dx == 0 && dy == 0);
 		int64_t x, y;
 		t.correct(1234, -5678, x, y);
@@ -232,7 +232,7 @@ void testCorrectionTable()
 		for (int row = 0; row < grid; row++) {
 			for (int col = 0; col < grid; col++) {
 				int32_t dx, dy, nx, ny;
-				t.distortion((col - 32) * step, (row - 32) * step, dx, dy);
+				t.correction((col - 32) * step, (row - 32) * step, dx, dy);
 				t.node(col, row, nx, ny);
 				assert(dx == nx && dy == ny);
 			}
@@ -268,31 +268,31 @@ void testCorrectionTable()
 			for (int32_t y : {INT32_MIN, -1, 0, 1, INT32_MAX}) {
 				int32_t dx, dy;
 				double rx, ry;
-				t.distortion(x, y, dx, dy);
-				referenceDistortion(t, x, y, rx, ry);
+				t.correction(x, y, dx, dy);
+				referenceCorrection(t, x, y, rx, ry);
 				assert(std::fabs(dx - rx) <= tolerance(t));
 				assert(std::fabs(dy - ry) <= tolerance(t));
 			}
 		}
 	}
 
-	// Outside the field: the distortion at the nearest point on the edge. correct() subtracts it from the
+	// Outside the field: the correction at the nearest point on the edge. correct() subtracts it from the
 	// unclamped position.
 	{
 		const std::vector<uint8_t> f = makeLbpCor(100000, 65, pincushion(100000, 65));
 		CorrectionTable t;
 		assert(t.parse(f.data(), f.size(), detail) == 0);
 		int32_t ex, ey, ox, oy;
-		t.distortion(50000, -12345, ex, ey);
-		t.distortion(80000, -12345, ox, oy);
+		t.correction(50000, -12345, ex, ey);
+		t.correction(80000, -12345, ox, oy);
 		assert(ex == ox && ey == oy);
-		t.distortion(-50000, -50000, ex, ey);
-		t.distortion(-90000, -70000, ox, oy);
+		t.correction(-50000, -50000, ex, ey);
+		t.correction(-90000, -70000, ox, oy);
 		assert(ex == ox && ey == oy);
 
 		int64_t x, y;
 		t.correct(80000, -12345, x, y);
-		t.distortion(80000, -12345, ox, oy);
+		t.correction(80000, -12345, ox, oy);
 		assert(x == 80000000 - ox && y == -12345000 - oy);
 	}
 }

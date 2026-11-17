@@ -43,7 +43,7 @@ public:
 	uint16_t parse(const uint8_t *file, size_t size, uint32_t &detail,
 				   uint16_t max_grid = 0xFFFF, bool check_cells = true);
 
-	/** @brief Forget the file. distortion() and correct() then return no correction. */
+	/** @brief Forget the file. correction() and correct() then return no correction. */
 	void clear() { *this = CorrectionTable(); }
 
 	bool valid() const { return m_cells != nullptr; }
@@ -56,24 +56,25 @@ public:
 	 * @brief Read one node of the grid.
 	 * @param col 0 .. gridSize()-1, from -x.
 	 * @param row 0 .. gridSize()-1, from -y.
-	 * @param dx_nm, dy_nm Out: the measured distortion at that node, in nanometers.
+	 * @param dx_nm, dy_nm Out: the correction for a target at that node, in nanometers.
 	 */
 	void node(uint16_t col, uint16_t row, int32_t &dx_nm, int32_t &dy_nm) const;
 
 	/**
-	 * @brief The distortion at a position, interpolated bilinearly between the four surrounding nodes.
+	 * @brief The correction for a target position, interpolated bilinearly between the four surrounding nodes:
+	 * the amount to subtract from the target so the beam lands on it.
 	 *
 	 * Positions are wire coordinates: micrometers from the field centre. A position outside the field takes the
-	 * distortion at the nearest point on its edge (it is clamped, not extrapolated). Without a table, (0, 0).
+	 * correction at the nearest point on its edge (it is clamped, not extrapolated). Without a table, (0, 0).
 	 *
 	 * Accuracy, against exact arithmetic: within 1 nm, plus 2/1048576 of the largest difference between
 	 * neighbouring nodes (about 0.2 nm when they differ by 100 um). Exact at the nodes. (For fields over 2^25 um,
 	 * 33 m, a little looser.)
 	 */
-	void distortion(int32_t x_um, int32_t y_um, int32_t &dx_nm, int32_t &dy_nm) const;
+	void correction(int32_t x_um, int32_t y_um, int32_t &dx_nm, int32_t &dy_nm) const;
 
 	/**
-	 * @brief Where to aim the mirrors so the beam lands on (x_um, y_um): the position minus its distortion.
+	 * @brief Where to aim the mirrors so the beam lands on (x_um, y_um): the position minus its correction().
 	 *
 	 * The result is in nanometers, so the correction keeps its full resolution through to the firmware's own
 	 * conversion to mirror units.
