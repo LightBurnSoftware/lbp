@@ -64,7 +64,6 @@ void SimView::layoutBuffer(const QSize &size)
 	} else {
 		sizeForHeight(size);
 	}
-	qDebug() << m_buffer.width() << m_buffer.height() << m_x_px_offset << m_y_px_offset;
 	clear();
 }
 

@@ -118,7 +118,7 @@ constexpr uint16_t cmd_stop 	= 0x0CFF;	// Immediately: stop all movement, turn o
 											// and discard the command buffer. Never refused. Does not clear a fault.
 constexpr uint16_t cmd_clear_fault = 0x0CEE;	// Acknowledge and clear a latched fault (state_fault). Refused with err_fault
 												// while the cause is still present. With no fault, does nothing. Resumes nothing.
-												// TODO: Not yet sent by Lightburn.
+												// LightBurn sends it on connect. A reset on the machine may clear a fault too.
 
 constexpr uint16_t cmd_frame_begin = 0x0FAB; // Marks beginning of a frame commands.
 constexpr uint16_t cmd_frame_end = 0x0FAE; // Marks the end of frame commands.
@@ -243,6 +243,8 @@ constexpr uint16_t cmd_mainboard_version = cls_files | 0x05B0; // TODO
 // GALVO: .lbpcor, the galvo lens correction table (file_type_correction). See spec.md, "Lens Correction Files".
 // Layout, big-endian: a header, then grid_size * grid_size cells (row-major, x fastest, row 0 at -y).
 // No checksum of its own: the transfer's cmd_file_end carries the file's CRC-32.
+// 2D only: it corrects the field at the working height it was measured at. Dynamic-focus heads keep their focus
+// calibration in the firmware.
 // Header (24 bytes): char[8] magic, uint16 version, uint16 header_size, int32 field_size (um; the field is square),
 //         uint16 grid_size (odd, >= 3), uint8 axis_flags, uint8 composition, uint8 cell_format, 3 reserved bytes.
 // Readers skip header bytes beyond the fields they know, using header_size. Reserved bytes are written as 0 and
@@ -620,7 +622,7 @@ constexpr uint32_t state_paused = 0x0008;			// machine is paused mid-job.
 constexpr uint32_t state_receiving = 0x0010;		// machine is receiving a file from LB
 constexpr uint32_t state_file_loaded = 0x0020;		// a file is loaded and ready to execute.
 constexpr uint32_t state_computing = 0x0040;		// machine is performing a non-trivial computation.
-constexpr uint32_t state_fault = 0x0080;			// a fault prevents operation (interlock, e-stop, hardware). Latched: stays set until cmd_clear_fault.
+constexpr uint32_t state_fault = 0x0080;			// a fault prevents operation (interlock, e-stop, hardware). Latched: stays set until cleared (cmd_clear_fault, a machine reset, or power cycle).
 constexpr uint32_t state_pedal_down = 0x0100;		// the foot pedal (start input) is currently pressed. Presses are reported by event_input.
 constexpr uint32_t state_door_open = 0x0200;		// the enclosure door or lid is open.
 constexpr uint32_t state_interlock_open = 0x0400;	// the safety interlock circuit is open; the laser cannot fire.
