@@ -92,6 +92,11 @@ void SimWorker::onFaultRequested(bool active)
 	m_sim.setFault(active);
 }
 
+void SimWorker::onModeRequested(MachineMode mode)
+{
+	m_sim.setMode(mode);
+}
+
 void SimWorker::onTransportRx(const QByteArray &bytes)
 {
 	m_sim.rxCallback((const uint8_t *) bytes.data(), bytes.size());

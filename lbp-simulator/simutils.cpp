@@ -44,6 +44,16 @@ void OutputQueue::nack(const lbp::MaxPayload &request, uint16_t code, uint32_t d
 	push(lbp::CmdMsg::nackTo(request, code, detail));
 }
 
+void OutputQueue::event(uint8_t kind, uint16_t code, uint32_t detail)
+{
+	gLog().push(Log::DEBUG, QString("Event kind %1, code %2, detail %3").arg(kind).arg(code).arg(detail));
+	lbp::CmdMsg msg(lbp::cmd_event, 7);
+	msg.writeByte(kind);
+	msg.writeShort(code);
+	msg.writeInt(static_cast<int32_t>(detail)); // uint32 on the wire, same bits
+	push(std::move(msg));
+}
+
 bool OutputQueue::lastResponse(uint16_t txid, lbp::CmdMsg &out) const
 {
 	if (txid == lbp::txid_none || m_last_response.txid() != txid) {

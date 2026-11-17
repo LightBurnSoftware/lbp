@@ -57,6 +57,7 @@ public:
 					m_header = (m_header << 8) | m_byte;
 					if (m_header == magic_start) {
 						m_buffer.setBookmark(); // If a bad packet is detected, rewind to just after this header.
+						m_msg_offset = m_buffer.consumed() - size_start; // this message's first byte (its magic)
 						m_state = State::TxId;
 						seeklen = 0;
 					}
@@ -132,11 +133,19 @@ public:
 	/** @return a reference to the current parsed payload. */
 	MaxPayload &payload() { return m_payload; }
 
+	/**
+	 * @return the byte offset of the message last returned by parseNext(), counted from the last clear().
+	 * When a file is fed from its first byte (e.g. a job file), this is the message's offset in the file:
+	 * what event_job_progress / progress_bytes_executed reports while that message executes.
+	 */
+	size_t messageOffset() const { return m_msg_offset; }
+
 	/** Clears the buffer and resets the parser. */
 	void clear()
 	{
 		m_buffer.clear();
 		m_header = 0;
+		m_msg_offset = 0;
 		m_state = State::HeaderSync;
 		checksum_rejections = 0;
 		size_rejections = 0;
@@ -183,6 +192,7 @@ private:
 	RingBuffer<Capacity> m_buffer;		// Stores bytes to be parsed.
 	MaxPayload m_payload;				// Stores current payload tha we're working on.
 	uint32_t m_header = 0;			 	// Storage for the header we're searching for.
+	size_t m_msg_offset = 0;			// Offset (since clear()) of the message being parsed / last returned.
 	uint8_t m_crc_buffer[2] = {};	  	// Scratch for read value of the checksum.
 	uint8_t m_txid_buffer[size_txid] = {}; // Raw txid bytes, kept for the checksum computation.
 	uint8_t m_cmd_buffer[size_cmd] = {};	// Raw cmd bytes, kept for the checksum computation.

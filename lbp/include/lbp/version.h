@@ -29,7 +29,7 @@ constexpr bool versionsCompatible(uint16_t host, uint16_t device)
 		&& (versionMajor(host) != 0 || versionMinor(host) == versionMinor(device));
 }
 
-static_assert(versionMajor(protocol_version) == 0 && versionMinor(protocol_version) == 9, "protocol_version is 0.9");
+static_assert(versionMajor(protocol_version) == 0 && versionMinor(protocol_version) == 10, "protocol_version is 0.10");
 
 } // namespace lbp
 

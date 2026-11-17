@@ -32,6 +32,12 @@ public:
 	size_t freeSpace() const { return Capacity - (m_head - reserved()); }
 
 	/**
+	 * @return the total number of bytes read since the last clear(). The read index runs freely (it is only masked
+	 * when indexing), so this is the stream position of the next byte to read. A rewind() moves it back.
+	 */
+	size_t consumed() const { return m_tail; }
+
+	/**
 	 * @brief Read data from the buffer.
 	 * @param dst Destination buffer.
 	 * @param len Number of bytes to read.

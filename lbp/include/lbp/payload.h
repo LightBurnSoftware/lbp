@@ -115,7 +115,7 @@ public:
 	}
 
 	/**
-	 * @brief Read the next len bytes from the arg section of the payload. Advances arg read cursor by len.
+	 * @brief Read the next len bytes from the arg section of the payload. Advances read cursor by len.
 	 * @param dst The destination buffer.
 	 * @param len The number of bytes to read.
 	 * @return True if len bytes could be read, false if there were not that many bytes remaining to read.

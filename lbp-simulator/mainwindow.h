@@ -9,8 +9,10 @@
 #include "transportwidget.h"
 
 #include <QCheckBox>
+#include <QLabel>
 #include <QMainWindow>
 #include <QPushButton>
+#include <QRadioButton>
 #include <QTextEdit>
 #include <QThread>
 #include <QWidget>
@@ -29,6 +31,7 @@ signals:
 	void startTransportRequested(Transport::Config config);
 	void stopTransportRequested();
 	void faultRequested(bool active);
+	void modeRequested(MachineMode mode);
 
 protected:
 	void timerEvent(QTimerEvent *event) override;
@@ -39,6 +42,8 @@ private:
 	void onStopTransportClicked();
 	void onStartTransportClicked();
 	void onClearClicked();
+	void onGalvoModeToggled(bool galvo);
+	void updateStatus(const SimState &state);
 
 	// widgets
 	TransportWidget *wTransport = nullptr;
@@ -48,6 +53,9 @@ private:
 	QPushButton *pbStop = nullptr;
 	QPushButton *pbClearSim = nullptr;
 	QCheckBox *cbFault = nullptr;
+	QRadioButton *rbGantry = nullptr;
+	QRadioButton *rbGalvo = nullptr;
+	QLabel *lblStatus = nullptr;
 
 	// members
 	SimWorker *m_worker; // harness to operate the firmware simulation

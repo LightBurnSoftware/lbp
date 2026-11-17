@@ -43,6 +43,9 @@ public slots:
 	/** Start or clear a simulated fault. */
 	void onFaultRequested(bool active);
 
+	/** Switch the simulated machine between gantry and galvo (a full simulator reset). */
+	void onModeRequested(MachineMode mode);
+
 private slots:
 	/** Invoked when the transport layer has bytes ready for reading. */
 	void onTransportRx(const QByteArray &bytes);

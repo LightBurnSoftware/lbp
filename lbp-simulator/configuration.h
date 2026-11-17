@@ -43,6 +43,9 @@ public:
 	 */
 	bool get(uint16_t key, int32_t &value) const;
 
+	/** @return the canonical value for a key, or its default (getConfigDefault) if it has never been set. */
+	int32_t getOrDefault(uint16_t key) const;
+
 	/**
 	 * @brief Attempt to process the given request. May enqueue an output packet.
 	 *
