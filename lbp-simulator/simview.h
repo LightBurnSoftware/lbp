@@ -16,6 +16,12 @@ public:
 	QSize sizeHint() const override;
 
 	void tick();
+	/**
+	 * @brief Set the area shown: the gantry bed or the galvo field, in micrometers (only x and y are used).
+	 * If it changed, the view is re-fitted to the new aspect ratio and cleared.
+	 */
+	void setWorkArea(MachineMode mode, const Vec8 &min_um, const Vec8 &max_um);
+	/** @brief Draw one simulation point. Call setWorkArea first if the work area may have changed. */
 	void heat(SimState state);
 	void cool(float rate);
 

@@ -137,9 +137,6 @@ public:
 	 */
 	void setCorrection(const lbpexamples::CorrectionTable *table);
 
-	/** @return the galvo field in use, in um: the applied correction table's, else cfg_field_size. */
-	int32_t fieldSize() const;
-
 private:
 	enum class State { Idle, Jogging, Moving, Dwelling, Paused };
 	struct PausedState {
@@ -158,6 +155,8 @@ private:
 	int64_t absoluteDelta(int idx, int64_t arg) const;
 	/** Calculate the axis delta for a move to machine 0. @param idx The axis (see Vec8). */
 	int64_t homeDelta(int idx) const;
+	/** @return the galvo field in use, in um: the applied correction table's, else cfg_field_size. */
+	int32_t fieldSize() const;
 
 	bool decodeMoveDelta(lbp::CmdPayload &p, Vec8 &delta);
 

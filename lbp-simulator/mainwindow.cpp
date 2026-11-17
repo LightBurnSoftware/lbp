@@ -111,6 +111,8 @@ void MainWindow::timerEvent(QTimerEvent *event)
 	m_points.clear();
 	m_worker->getSimPoints(m_points);
 	for (const SimState &point : m_points) {
+		// Per point: the mode or field can change partway through a batch.
+		wSimView->setWorkArea(point.mode, point.min_pos, point.max_pos);
 		wSimView->heat(point);
 	}
 	if (!m_points.empty()) {

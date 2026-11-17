@@ -128,17 +128,20 @@ void SimView::clear()
 	m_buffer.fill(QColor(0, 0, 0));
 }
 
+void SimView::setWorkArea(MachineMode mode, const Vec8 &min_um, const Vec8 &max_um)
+{
+	if (mode == m_mode && min_um.x == m_min_um.x && min_um.y == m_min_um.y && max_um.x == m_max_um.x
+		&& max_um.y == m_max_um.y) {
+		return;
+	}
+	m_mode = mode;
+	m_min_um = min_um;
+	m_max_um = max_um;
+	layoutBuffer(size()); // the old pixels no longer map to the same positions
+}
+
 void SimView::heat(SimState state)
 {
-	// The bed (or galvo field) comes from the simulation; re-fit the view when it changes.
-	if (state.mode != m_mode || state.min_pos.x != m_min_um.x || state.min_pos.y != m_min_um.y
-		|| state.max_pos.x != m_max_um.x || state.max_pos.y != m_max_um.y) {
-		m_mode = state.mode;
-		m_min_um = state.min_pos;
-		m_max_um = state.max_pos;
-		layoutBuffer(size());
-	}
-
 	// Channels: red = position (fades), green = laser cutting (stays), blue = guide light (fades).
 	int x = getXPx(state.pos.x);
 	int y = getYPx(state.pos.y);
