@@ -300,7 +300,8 @@ void FileSystem::setGalvo(bool galvo)
 {
 	m_galvo = galvo;
 	if (!galvo) {
-		m_correction = CorrectionTable();
+		m_correction.clear();
+		m_correction_file.clear();
 		m_new_correction = false;
 	}
 }
@@ -322,19 +323,23 @@ uint16_t FileSystem::finishCorrection(uint32_t &detail)
 	}
 
 	// Validate before replacing the stored table: a bad file leaves the previous table in place.
-	CorrectionTable table;
-	const uint16_t err = table.parse(file.readAll(), detail);
+	// The table is a view over the bytes, so the bytes are kept alongside it (moving a QByteArray keeps its data
+	// where it is).
+	QByteArray bytes = file.readAll();
+	lbpexamples::CorrectionTable table;
+	const uint16_t err = table.parse((const uint8_t *) bytes.constData(), size_t(bytes.size()), detail);
 	if (err) {
 		gLog().error(QString("Correction file rejected: error 0x%1, detail %2").arg(err, 4, 16, QChar('0')).arg(detail));
 		return err;
 	}
 
-	m_correction = std::move(table);
+	m_correction_file = std::move(bytes);
+	m_correction = table;
 	m_new_correction = true;
 	gLog().push(Log::INFO, QString("Correction table stored: %1 x %1 grid, %2 um field, axis flags 0x%3, composition 0x%4")
-								.arg(m_correction.grid_size)
-								.arg(m_correction.field_size_um)
-								.arg(m_correction.axis_flags, 2, 16, QChar('0'))
-								.arg(m_correction.composition, 2, 16, QChar('0')));
+								.arg(m_correction.gridSize())
+								.arg(m_correction.fieldSize())
+								.arg(m_correction.axisFlags(), 2, 16, QChar('0'))
+								.arg(m_correction.composition(), 2, 16, QChar('0')));
 	return 0;
 }

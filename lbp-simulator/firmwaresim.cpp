@@ -80,14 +80,14 @@ void FirmwareSim::processCorrection(lbp::MaxPayload &payload)
 	}
 
 	// Applying: the table's field replaces cfg_field_size while it's applied.
-	const CorrectionTable &table = m_filesystem.correction();
-	if (!table.valid) {
+	const lbpexamples::CorrectionTable &table = m_filesystem.correction();
+	if (!table.valid()) {
 		m_out_q.nack(payload, lbp::err_wrong_state, m_fw_state);
 		return;
 	}
 	m_movement.setCorrection(&table);
 	gLog().push(Log::INFO, QString("Correction on: %1 um field (cfg_field_size %2 um)")
-							   .arg(table.field_size_um)
+							   .arg(table.fieldSize())
 							   .arg(m_config.getOrDefault(lbp::cfg_field_size)));
 	m_out_q.respond(payload);
 }

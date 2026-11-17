@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 LightBurn Software, LLC
 
-#include <lbp/lbpcor.h>
+#include "lbpcor.h"
 
 #include <lbp/beio.h>
 #include <lbp/spec.h>
 
 #include <cstring>
 
-namespace lbp {
+namespace lbpexamples {
+
+using namespace lbp; // the spec's constants and the big-endian readers
 
 namespace {
 
@@ -178,4 +180,4 @@ void CorrectionTable::correct(int32_t x_um, int32_t y_um, int64_t &x_nm, int64_t
 	y_nm = int64_t(y_um) * 1000 - dy;
 }
 
-} // namespace lbp
+} // namespace lbpexamples

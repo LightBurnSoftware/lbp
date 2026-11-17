@@ -25,16 +25,17 @@ qt_add_executable(lbp-simulator
     simstate.h
     vec8.h
     filesystem.h filesystem.cpp
-    correction.h correction.cpp
     simutils.h simutils.cpp
     transportwidget.h transportwidget.cpp
 )
 
 add_subdirectory(../lbp build)
+add_subdirectory(../examples examples) # the example .lbpcor reader
 
 target_link_libraries(lbp-simulator
     PRIVATE
         lbp
+        lbpcor_example
         Qt::Core
         Qt::Widgets
         Qt6::Network

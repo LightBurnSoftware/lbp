@@ -4,11 +4,11 @@
 #pragma once
 
 #include "configuration.h"
-#include "correction.h"
 #include "simstate.h"
 #include "simutils.h"
 #include "vec8.h"
 
+#include <lbpcor.h> // examples/
 #include <cstdint>
 #include <lbp/payload.h>
 #include <lbp/queue.h>
@@ -135,7 +135,7 @@ public:
 	 * While a table is applied, its field replaces cfg_field_size (the travel limits follow).
 	 * The caller owns the table, and turns correction off before replacing or dropping it. Turned off by setMode.
 	 */
-	void setCorrection(const CorrectionTable *table);
+	void setCorrection(const lbpexamples::CorrectionTable *table);
 
 	/** @return the galvo field in use, in um: the applied correction table's, else cfg_field_size. */
 	int32_t fieldSize() const;
@@ -190,7 +190,7 @@ private:
 	Vec8 m_job_origin;		// origin offset for absolute moves during the current job.
 	MachineMode m_mode = MachineMode::Gantry;
 	// Lens correction being applied, or nullptr. Owned by the FileSystem. Not applied yet: see step().
-	const CorrectionTable *m_correction = nullptr;
+	const lbpexamples::CorrectionTable *m_correction = nullptr;
 	Vec8 m_min_pos;			// travel limits per axis: gantry [0, max]; galvo X/Y [-field/2, +field/2].
 	Vec8 m_max_pos;
 	double m_dwell_remaining_s = 0.0;  // remaining seconds to dwell if in dwelling state.

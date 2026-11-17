@@ -3,9 +3,10 @@
 
 #pragma once
 
-#include "correction.h"
 #include "simutils.h"
 
+#include <lbpcor.h> // examples/: the example .lbpcor reader
+#include <QByteArray>
 #include <QFile>
 
 /**
@@ -62,8 +63,8 @@ public:
 	/** @brief Galvo mode accepts file_type_correction. Leaving galvo mode discards any stored table. */
 	void setGalvo(bool galvo);
 
-	/** @return The stored lens correction table (valid == false if none). */
-	const CorrectionTable &correction() const { return m_correction; }
+	/** @return The stored lens correction table (valid() is false if none). */
+	const lbpexamples::CorrectionTable &correction() const { return m_correction; }
 
 	/** @return True once after a new correction table has been received and stored. */
 	bool takeNewCorrection();
@@ -92,6 +93,7 @@ private:
 	uint32_t m_receive_size = 0;		// declared size, for the chunk bounds check
 	uint8_t m_receiving_type = 0;		// file_type_* of the file being received
 	bool m_galvo = false;
-	CorrectionTable m_correction;
+	QByteArray m_correction_file;		// the stored .lbpcor; m_correction reads its cells in place
+	lbpexamples::CorrectionTable m_correction;	// a view over m_correction_file
 	bool m_new_correction = false;
 };

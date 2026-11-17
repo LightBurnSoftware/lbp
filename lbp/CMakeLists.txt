@@ -10,12 +10,10 @@ set (CMAKE_CXX_STANDARD 17)
 add_library(lbp STATIC
 	src/beio.cpp
 	src/checksum.cpp
-	src/lbpcor.cpp
 	src/payload.cpp
 
 	include/lbp/beio.h
 	include/lbp/checksum.h
-	include/lbp/lbpcor.h
 	include/lbp/message.h
 	include/lbp/parser.h
 	include/lbp/payload.h

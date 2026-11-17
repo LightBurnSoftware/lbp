@@ -906,6 +906,8 @@ coordinate of `p` to `±field_size / 2` for the lookup only (still subtract the 
 never extrapolate the grid. Cells are nanometers while positions are micrometers, and the interpolation multiplies cells by
 fractional weights, so do this arithmetic in 64-bit integers or floating point.
 
+An example reader and corrector, in integer arithmetic, is in [`examples/lbpcor.h`](../examples/lbpcor.h).
+
 **Two dimensions only.** The table corrects the field at the working height it was measured at; on a lens that
 isn't telecentric, the field's scale drifts slightly above or below that height. Heads that refocus across the field
 (dynamic focus, usually without an f-theta lens) keep that focus calibration in the firmware: this table carries no Z.

@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 LightBurn Software, LLC
 
-#ifndef LBP_LBPCOR_H
-#define LBP_LBPCOR_H
+#ifndef LBPEXAMPLES_LBPCOR_H
+#define LBPEXAMPLES_LBPCOR_H
 
 #include <cstddef>
 #include <cstdint>
 
 /**
  * .lbpcor: reading a galvo lens correction table and correcting positions with it.
+ *
+ * An example implementation, not part of the lbp library or the protocol: firmware may store and apply the table
+ * however it likes, as long as it follows the spec. Copy these two files and adapt them if they suit. They need
+ * only lbp/spec.h and lbp/beio.h.
  *
  * See spec.md, "Lens Correction Files". CorrectionTable is a view over the received file's bytes: it copies
  * nothing and allocates nothing, so the file can sit in RAM or in memory-mapped flash. The bytes must stay put
@@ -17,7 +21,7 @@
  * All arithmetic is integer: no FPU is needed and every platform gets the same answer. Correcting a point takes
  * a few 64-bit multiplies and shifts and no divides.
  */
-namespace lbp {
+namespace lbpexamples {
 
 class CorrectionTable
 {
@@ -88,6 +92,6 @@ private:
 	uint64_t m_scale = 0; // grid units per um, fixed point: see locate()
 };
 
-} // namespace lbp
+} // namespace lbpexamples
 
-#endif // LBP_LBPCOR_H
+#endif // LBPEXAMPLES_LBPCOR_H

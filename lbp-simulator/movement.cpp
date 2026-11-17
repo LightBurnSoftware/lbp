@@ -205,7 +205,7 @@ void MovementSim::refreshBounds()
 	m_pos = applyLimits(m_pos);
 }
 
-void MovementSim::setCorrection(const CorrectionTable *table)
+void MovementSim::setCorrection(const lbpexamples::CorrectionTable *table)
 {
 	m_correction = table;
 	refreshBounds(); // the table's field replaces cfg_field_size while it's applied
@@ -213,7 +213,7 @@ void MovementSim::setCorrection(const CorrectionTable *table)
 
 int32_t MovementSim::fieldSize() const
 {
-	return m_correction != nullptr ? m_correction->field_size_um : m_config.getOrDefault(lbp::cfg_field_size);
+	return m_correction != nullptr ? m_correction->fieldSize() : m_config.getOrDefault(lbp::cfg_field_size);
 }
 
 bool MovementSim::process(lbp::MaxPayload &request, OutputQueue &out_q, CmdSource source, uint32_t file_offset)
@@ -885,7 +885,7 @@ void MovementSim::step(double dt_s)
 			m_pos = applyLimits(advance(m_move.start, m_move.delta, m_move.progress()));
 			if (m_correction != nullptr) {
 				// TODO: apply lens correction. A firmware commands the mirrors to m_pos minus the table's distortion
-				// (nm), interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"). It does this for every point
+				// (nm), interpolated bilinearly at m_pos (spec.md, "Lens Correction Files"): m_correction->correct(). It does this for every point
 				// it outputs along the move, not just the endpoints: the distortion isn't linear, so a corrected
 				// straight line is a curve in mirror space. The simulator draws the uncorrected (intended) path.
 			}
