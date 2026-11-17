@@ -90,7 +90,7 @@ private:
 	FileSystem m_filesystem; // Filesystem component - receives and manages files from LightBurn.
 	OutputQueue m_out_q; // Output message queue.
 	TxCallback m_tx_callback; // Callback for sending output messages.
-	uint32_t m_fw_state = lbp::state_idle; // Machine state flags, returned with `cmd_get_state`.
+	uint32_t m_fw_state = 0; // Machine state flags, returned with `cmd_get_state`.
 	uint16_t m_last_txid = lbp::txid_none; // Most recent transaction id processed, for retry detection.
 	bool m_fault = false; // Simulated fault, reported as state_fault.
 	uint32_t m_job_size = 0; // Size of the running job file, for the final progress report.

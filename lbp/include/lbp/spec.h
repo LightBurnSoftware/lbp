@@ -614,7 +614,6 @@ constexpr uint16_t cls_state_query = 0x8000; // "eight" rhymes with "state"
 // The Get State command will return a 32-bit integer composed of state_* flags.
 constexpr uint16_t cmd_get_state = cls_state_query | 0x057A;
 
-constexpr uint32_t state_idle = 0x0000;				// machine is on but not moving or executing a job
 constexpr uint32_t state_moving = 0x0001;			// machine is moving, either by job or user control
 constexpr uint32_t state_executing_job = 0x0002;	// machine is executing a job
 constexpr uint32_t state_executing_frame = 0x0004;	// machine is executing framing commands.
@@ -628,6 +627,11 @@ constexpr uint32_t state_door_open = 0x0200;		// the enclosure door or lid is op
 constexpr uint32_t state_interlock_open = 0x0400;	// the safety interlock circuit is open; the laser cannot fire.
 constexpr uint32_t state_needs_home = 0x0800;		// the machine's position can't be trusted (not homed since power-up, or lost
 													// in a fault); cleared by homing. Never set by machines without homing.
+
+// Activity: the machine is doing something. It is idle when none of these is set; the other flags describe its
+// condition (fault, door, file loaded, ...) and may be set while it's idle. Paused counts: a job is in progress.
+constexpr uint32_t state_activity_mask = state_moving | state_executing_job | state_executing_frame | state_paused
+										 | state_receiving | state_computing;
 
 // Position Queries
 constexpr uint16_t query_pos = cls_state_query | 0x0100;
@@ -931,11 +935,6 @@ constexpr uint16_t cfg_galvo_travel_delay_min	= cls_cfg | 0x0F45; // GALVO (stub
 constexpr uint16_t cfg_galvo_travel_delay_max	= cls_cfg | 0x0F46; // GALVO (stub): microseconds
 constexpr uint16_t cfg_galvo_travel_delay_dist	= cls_cfg | 0x0F47; // GALVO (stub): micrometers
 constexpr uint16_t cfg_travel_speed				= cls_cfg | 0x0F50; // GALVO (stub): default travel (jump) speed, micrometers/sec
-
-// Other boolean settings
-// Laser 1 Output Signal
-// Laser 2 Output Signal
-
 } // namespace lbp
 
 #endif // LBP_SPEC_H

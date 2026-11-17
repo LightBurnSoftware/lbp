@@ -1153,8 +1153,7 @@ doing at the time of the query.
 |------------------|-----------------------|----------------|
 | `cmd_get_state`  | int32 state flags     | 4              |
 
-The response argument is a bitwise-OR composition of one or more of the following flags:
-- `state_idle`: The machine is on, but not moving or executing any programmed commands.
+The response argument is a bitwise-OR composition of zero or more of the following flags:
 - `state_moving`: The machine is moving, either from operator or programmed commands.
 - `state_executing_job`: The machine is executing a job.
 - `state_executing_frame`: The machine is executing framing commands.
@@ -1169,6 +1168,12 @@ The response argument is a bitwise-OR composition of one or more of the followin
 - `state_needs_home`: The machine's position can't be trusted: it hasn't homed since power-up, or a fault may have cost it its position. Cleared by homing. LightBurn offers to home before running a job. Machines without homing (including galvos) never set it.
 
 Many simultaneous flags are possible - for example it is quite reasonable to be moving during a job.
+
+**Idle.** There is no idle flag. The machine is idle when none of the activity flags is set: `state_moving`,
+`state_executing_job`, `state_executing_frame`, `state_paused`, `state_receiving` and `state_computing`
+(`state_activity_mask` in `spec.h`). Paused counts as activity, since a job is still in progress. The other flags
+describe the machine's condition and can be set while it is idle: a machine with its door open, a file loaded or a
+fault latched is still idle. Test for idle with `(state & state_activity_mask) == 0`, never `state == 0`.
 
 **Note:** More state flags may prove necessary as development continues.
 

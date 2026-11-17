@@ -14,8 +14,7 @@ namespace lbp {
  * bit is always assumed to be set, thus we only use 16 bits to
  * represent the 17 bit value.
  *
- * The result is the standard CRC-16/X-25 value: crc16("123456789") == 0x906E. Like every other field,
- * it is sent big-endian (high byte first) at the end of a message. See spec.md, "Checksum".
+ * The result is the standard CRC-16/X-25 value: crc16("123456789") == 0x906E. See spec.md, "Checksum".
  */
 uint16_t crc16(const uint8_t *data_p, size_t len);
 
